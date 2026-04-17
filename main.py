@@ -1,0 +1,59 @@
+# Файл: main.py
+import asyncio
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+from loader import bot, dp
+from database import db
+from handlers import admin, user, common
+from middlewares.access_check import AccessMiddleware
+
+
+def setup_logging():
+    """Configure logging to console and rotating file."""
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+
+    log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s] - %(message)s')
+    log_file = 'logs/bot.log'
+
+    # File handler: 5MB limit, keep 5 backup files
+    file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(logging.INFO)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    console_handler.setLevel(logging.INFO)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+
+
+async def main():
+    setup_logging()
+
+    # Initialize Database
+    db.init_db()
+
+    # Register Middleware
+    dp.message.outer_middleware(AccessMiddleware())
+
+    # Register Routers (common первым для перехвата глобальных кнопок)
+    dp.include_router(common.router)
+    dp.include_router(user.router)
+    dp.include_router(admin.router)
+
+    logging.info("🚀 Бот запущен и готов к работе!")
+
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logging.info("👋 Бот остановлен вручную")
