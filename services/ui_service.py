@@ -13,11 +13,13 @@ class UIService:
         """Удаляет последнее запомненное меню из чата."""
         data = await state.get_data()
         last_id = data.get("last_menu_id")
+        logger.info(f"🧹 clear_last_menu: last_menu_id={last_id}, chat_id={chat_id}")
         if last_id:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=last_id)
-            except Exception:
-                pass
+                logger.info(f"🧹 Удалено меню: {last_id}")
+            except Exception as e:
+                logger.warning(f"🧹 Не удалось удалить меню {last_id}: {e}")
             finally:
                 await state.update_data(last_menu_id=None)
 

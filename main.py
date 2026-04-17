@@ -6,7 +6,7 @@ from logging.handlers import RotatingFileHandler
 from loader import bot, dp
 from database import db
 from handlers import admin, user, common
-from middlewares.access_check import AccessMiddleware
+from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
 
 
 def setup_logging():
@@ -38,8 +38,13 @@ async def main():
     # Initialize Database
     db.init_db()
 
-    # Register Middleware
-    dp.message.outer_middleware(AccessMiddleware())
+    # Register Middlewares (порядок важен!)
+    # 1. Сначала регистрируем/обновляем юзера
+    dp.message.outer_middleware(UserManagerMiddleware())
+    # 2. Чистим сервисные сообщения и синхронизируем топики
+    dp.message.outer_middleware(ForumUtilityMiddleware())
+    # 3. В последнюю очередь проверяем доступ к контенту
+    dp.message.outer_middleware(AccessGuardMiddleware())
 
     # Register Routers (common первым для перехвата глобальных кнопок)
     dp.include_router(common.router)
