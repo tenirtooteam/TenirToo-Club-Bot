@@ -32,6 +32,7 @@ def topic_edit_kb(topic_id, group_id=0):
         builder.button(text="🗑 Убрать из группы", callback_data=f"topic_del_{topic_id}_{group_id}")
         builder.button(text="⬅️ Назад", callback_data=f"group_topics_list_{group_id}")
     else:
+        builder.button(text="🗑 Удалить из БД", callback_data=f"global_topic_del_{topic_id}")
         builder.button(text="⬅️ Назад", callback_data="all_topics_list")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)

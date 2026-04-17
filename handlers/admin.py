@@ -240,6 +240,15 @@ async def topic_in_group_detail(callback: types.CallbackQuery):
     )
 
 
+@router.callback_query(F.data.startswith("global_topic_del_"))
+@safe_callback()
+async def global_topic_delete_handler(callback: types.CallbackQuery):
+    topic_id = int(callback.data.split("_")[-1])
+    db.delete_topic(topic_id)
+    await callback.answer("✅ Топик полностью удален из БД!")
+    await show_all_topics(callback)
+
+
 # --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ---
 
 @router.callback_query(F.data == "manage_users")

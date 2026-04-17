@@ -117,6 +117,18 @@ def get_topic_name(topic_id: int) -> str:
     return row[0] if row else f"Топик {topic_id}"
 
 
+def delete_topic(topic_id: int):
+    try:
+        with get_conn() as conn:
+            with conn:
+                conn.execute("DELETE FROM group_topics WHERE topic_id = ?", (topic_id,))
+                conn.execute("DELETE FROM topic_names WHERE topic_id = ?", (topic_id,))
+        logger.warning(f"🗑 Топик ID: {topic_id} полностью удален из базы")
+    except sqlite3.Error as e:
+        logger.error(f"❌ Ошибка при удалении топика {topic_id}: {e}")
+
+
+
 def get_groups_by_topic(topic_id: int) -> list:
     with get_conn() as conn:
         c = conn.cursor()
