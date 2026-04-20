@@ -1,5 +1,6 @@
 # Файл: keyboards/admin_kb.py
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
 from database import db
 
 
@@ -14,16 +15,18 @@ def main_admin_kb(is_superadmin: bool = False):
     builder.adjust(1)
     return builder.as_markup()
 
-def all_topics_kb():
-    builder = InlineKeyboardBuilder()
+def all_topics_kb(page: int = 1, limit: int = 7):
+    from keyboards.pagination_util import build_paginated_menu
     topic_ids = db.get_all_unique_topics()
+    item_buttons = []
     for t_id in topic_ids:
         t_name = db.get_topic_name(t_id)
-        builder.button(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_global_view_{t_id}")
-    builder.button(text="⬅️ Назад", callback_data="admin_main")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_global_view_{t_id}"))
+    static_buttons = [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, "all_topics_list")
 
 def topic_edit_kb(topic_id, group_id=0):
     builder = InlineKeyboardBuilder()
@@ -38,43 +41,54 @@ def topic_edit_kb(topic_id, group_id=0):
     builder.adjust(1)
     return builder.as_markup()
 
-def group_topics_list_kb(group_id):
-    builder = InlineKeyboardBuilder()
+def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
+    from keyboards.pagination_util import build_paginated_menu
     topics = db.get_topics_of_group(group_id)
+    item_buttons = []
     for t_id in topics:
         t_name = db.get_topic_name(t_id)
-        builder.button(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_in_group_{t_id}_{group_id}")
-    builder.button(text="➕ Добавить топик (ID)", callback_data=f"add_topic_to_{group_id}")
-    builder.button(text="⬅️ Назад", callback_data=f"group_info_{group_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_in_group_{t_id}_{group_id}"))
+        
+    static_buttons = [
+        InlineKeyboardButton(text="➕ Добавить топик (ID)", callback_data=f"add_topic_to_{group_id}"),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"group_topics_list_{group_id}")
 
-def available_topics_kb(group_id):
-    builder = InlineKeyboardBuilder()
+def available_topics_kb(group_id, page: int = 1, limit: int = 7):
+    from keyboards.pagination_util import build_paginated_menu
     all_topics = db.get_all_unique_topics()
     group_topics = set(db.get_topics_of_group(group_id))
     available = [t for t in all_topics if t not in group_topics]
+    
+    item_buttons = []
     if not available:
-        builder.button(text="🚫 Все топики уже в группе", callback_data="noop")
-    for t_id in available:
-        t_name = db.get_topic_name(t_id)
-        builder.button(text=f"📍 {t_name} (ID: {t_id})", callback_data=f"topic_add_confirm_{t_id}_{group_id}")
-    builder.button(text="⬅️ Назад", callback_data=f"group_topics_list_{group_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        item_buttons.append(InlineKeyboardButton(text="🚫 Все топики уже в группе", callback_data="noop"))
+    else:
+        for t_id in available:
+            t_name = db.get_topic_name(t_id)
+            item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name} (ID: {t_id})", callback_data=f"topic_add_confirm_{t_id}_{group_id}"))
+            
+    static_buttons = [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_topics_list_{group_id}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"add_topic_to_{group_id}")
 
-def groups_list_kb():
-    builder = InlineKeyboardBuilder()
+def groups_list_kb(page: int = 1, limit: int = 7):
     groups = db.get_all_groups()
+    item_buttons = []
     for g_id, g_name in groups:
-        builder.button(text=f"🔹 {g_name}", callback_data=f"group_info_{g_id}")
-    builder.button(text="➕ Создать группу", callback_data="add_group_start")
-    builder.button(text="⬅️ Назад", callback_data="admin_main")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        item_buttons.append(InlineKeyboardButton(text=f"🔹 {g_name}", callback_data=f"group_info_{g_id}"))
+        
+    static_buttons = [
+        InlineKeyboardButton(text="➕ Создать группу", callback_data="add_group_start"),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    from keyboards.pagination_util import build_paginated_menu
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, "manage_groups")
 
 def group_edit_kb(group_id):
     builder = InlineKeyboardBuilder()
@@ -85,16 +99,19 @@ def group_edit_kb(group_id):
     builder.adjust(1)
     return builder.as_markup()
 
-def users_list_kb():
-    builder = InlineKeyboardBuilder()
+def users_list_kb(page: int = 1, limit: int = 7):
     users = db.get_all_users()
-    for u_id, f_name, l_name in users:
-        builder.button(text=f"👤 {f_name} {l_name}", callback_data=f"user_info_{u_id}")
-    builder.button(text="➕ Добавить пользователя", callback_data="add_user_start")
-    builder.button(text="⬅️ Назад", callback_data="admin_main")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+    item_buttons = [
+        InlineKeyboardButton(text=f"👤 {f_name} {l_name}", callback_data=f"user_info_{u_id}")
+        for u_id, f_name, l_name in users
+    ]
+    static_buttons = [
+        InlineKeyboardButton(text="➕ Добавить пользователя", callback_data="add_user_start"),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    from keyboards.pagination_util import build_paginated_menu
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, "manage_users")
 
 def user_edit_kb(user_id):
     builder = InlineKeyboardBuilder()
@@ -106,42 +123,43 @@ def user_edit_kb(user_id):
     builder.adjust(1)
     return builder.as_markup()
 
-def user_groups_edit_kb(user_id):
-    builder = InlineKeyboardBuilder()
+def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
+    from keyboards.pagination_util import build_paginated_menu
     all_groups = db.get_all_groups()
-    user_groups = [g[0] for g in db.get_user_groups(user_id)]
+    user_groups = set(g[0] for g in db.get_user_groups(user_id))
+    
+    item_buttons = []
     for g_id, g_name in all_groups:
-        status = "✅" if g_id in user_groups else "❌"
-        action = "rev" if g_id in user_groups else "gra"
-        builder.button(text=f"{status} {g_name}", callback_data=f"u_gr_{action}_{user_id}_{g_id}")
-    builder.button(text="⬅️ Назад", callback_data=f"user_info_{user_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        mark = "✅ " if g_id in user_groups else "❌ "
+        item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_group_toggle_{user_id}_{g_id}"))
+        
+    static_buttons = [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"user_info_{user_id}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_groups_manage_{user_id}")
 
 def manage_roles_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="👤 Назначить роль пользователю", callback_data="assign_role_start")
     builder.button(text="📋 Список пользователей с ролями", callback_data="list_users_roles")
-    builder.button(text="➕ Создать новую роль", callback_data="create_role_start")
     builder.button(text="⬅️ Назад", callback_data="admin_main")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
 
 
-def role_selection_kb(user_id: int, topic_id: int = None):
+def role_selection_kb(user_id: int):
     """Клавиатура выбора роли для пользователя."""
     builder = InlineKeyboardBuilder()
-    roles = db.get_all_roles()  # Новая функция, которую добавим позже
+    roles = db.get_all_roles()  
     for role_id, role_name in roles:
-        # Не даём назначать superadmin через интерфейс (только суперадмин сам может, но упростим)
+        # Не даём назначать superadmin через интерфейс 
         if role_name == 'superadmin':
             continue
-        callback_data = f"role_assign_{user_id}_{role_id}"
-        if topic_id is not None:
-            callback_data += f"_{topic_id}"
-        builder.button(text=role_name.capitalize(), callback_data=callback_data)
+        callback_data = f"role_pick_{user_id}_{role_id}"
+        display_name = "👑 Админ" if role_name == "admin" else "🛡 Модератор" if role_name == "moderator" else role_name.capitalize()
+        builder.button(text=display_name, callback_data=callback_data)
     builder.button(text="⬅️ Назад", callback_data=f"user_roles_manage_{user_id}")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
@@ -151,10 +169,7 @@ def role_selection_kb(user_id: int, topic_id: int = None):
 def user_roles_manage_kb(user_id: int):
     """Клавиатура управления ролями конкретного пользователя."""
     builder = InlineKeyboardBuilder()
-    from config import ADMIN_ID  # добавьте в начало файла
     user_roles = list(db.get_user_roles(user_id))
-    if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in user_roles):
-        user_roles.append(('superadmin', None))
     for role_name, topic_id in user_roles:
         if topic_id is None:
             display = f"✅ {role_name} (глобально)"
@@ -171,43 +186,44 @@ def user_roles_manage_kb(user_id: int):
     return builder.as_markup()
 
 
-def topic_selection_for_role_kb(user_id: int):
-    """Клавиатура выбора топика для роли модератора."""
-    builder = InlineKeyboardBuilder()
-    topics = db.get_all_unique_topics()
-    for t_id in topics:
+def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
+    from keyboards.pagination_util import build_paginated_menu
+    all_topics = db.get_all_unique_topics()
+    
+    item_buttons = []
+    for t_id in all_topics:
         t_name = db.get_topic_name(t_id)
-        builder.button(text=f"{t_name}", callback_data=f"role_assign_topic_{user_id}_{t_id}")
-    builder.button(text="⬅️ Назад", callback_data=f"role_assign_user_{user_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+        item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"role_assign_topic_{user_id}_{t_id}"))
+        
+    static_buttons = [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"role_assign_user_{user_id}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"topic_assign_pg_{user_id}")
 
 def back_to_manage_roles_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ Назад", callback_data="manage_roles")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    return builder.as_markup()
+
+def user_disambiguation_kb(users_page: list, page: int, total_pages: int):
     builder = InlineKeyboardBuilder()
-    users = db.get_all_users()
+    for u_id, f_name, l_name in users_page:
+        builder.button(text=f"👤 {f_name} {l_name}", callback_data=f"usr_pick_{u_id}")
     
-    direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
-    all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
-    has_access = direct_users | all_authorized
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"usr_pg_{page - 1}"))
+    if page < total_pages:
+        nav_buttons.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"usr_pg_{page + 1}"))
     
-    for u_id, f_name, l_name in users:
-        if u_id not in has_access:
-            builder.button(
-                text=f"❌ {f_name} {l_name}",
-                callback_data=f"mod_tgl_dir_{u_id}_{topic_id}"
-            )
-            
-    builder.button(
-        text="⬅️ Назад",
-        callback_data=f"mod_users_manage_{topic_id}"
-    )
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    if nav_buttons:
+        builder.row(*nav_buttons)
+        
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="close_menu"))
     return builder.as_markup()
 
 

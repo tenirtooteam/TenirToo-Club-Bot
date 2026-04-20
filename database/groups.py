@@ -21,8 +21,10 @@ def create_group(name: str) -> int:
 def get_all_groups() -> list:
     with get_conn() as conn:
         c = conn.cursor()
-        c.execute("SELECT id, name FROM groups ORDER BY id")
-        return c.fetchall()
+        c.execute("SELECT id, name FROM groups")
+        groups = c.fetchall()
+        groups.sort(key=lambda x: x[1].lower() if x[1] else "")
+        return groups
 
 def get_group_name(group_id: int) -> str:
     with get_conn() as conn:

@@ -8,8 +8,10 @@ logger = logging.getLogger(__name__)
 def get_all_unique_topics() -> list:
     with get_conn() as conn:
         c = conn.cursor()
-        c.execute("SELECT topic_id FROM topic_names ORDER BY topic_id ASC")
-        return [row[0] for row in c.fetchall()]
+        c.execute("SELECT topic_id, name FROM topic_names")
+        topics = c.fetchall()
+        topics.sort(key=lambda x: x[1].lower() if x[1] else "")
+        return [row[0] for row in topics]
 
 def update_topic_name(topic_id: int, name: str):
     try:

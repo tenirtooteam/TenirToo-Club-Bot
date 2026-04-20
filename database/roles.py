@@ -5,16 +5,6 @@ from .connection import get_conn
 
 logger = logging.getLogger(__name__)
 
-def add_role(name: str) -> int:
-    try:
-        with get_conn() as conn:
-            with conn:
-                c = conn.cursor()
-                c.execute("INSERT INTO roles (name) VALUES (?)", (name,))
-                return c.lastrowid
-    except sqlite3.Error as e:
-        logger.error(f"❌ Ошибка при добавлении роли: {e}")
-        return 0
 
 def get_role_id(name: str) -> int:
     with get_conn() as conn:
@@ -62,7 +52,13 @@ def get_user_roles(user_id: int) -> list:
             JOIN roles r ON ur.role_id = r.id
             WHERE ur.user_id = ?
         """, (user_id,))
-        return c.fetchall()
+        roles = c.fetchall()
+        
+    from config import ADMIN_ID
+    if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in roles):
+        roles.append(('superadmin', None))
+        
+    return roles
 
 def get_moderators_of_topic(topic_id: int) -> list:
     with get_conn() as conn:
@@ -105,3 +101,10 @@ def get_all_roles() -> list:
         c = conn.cursor()
         c.execute("SELECT id, name FROM roles ORDER BY id")
         return c.fetchall()
+
+def get_role_name_by_id(role_id: int) -> str:
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT name FROM roles WHERE id = ?", (role_id,))
+        row = c.fetchone()
+        return row[0] if row else ""

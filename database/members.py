@@ -58,8 +58,13 @@ def update_user_name(user_id: int, first_name: str, last_name: str):
 def get_all_users() -> list:
     with get_conn() as conn:
         c = conn.cursor()
-        c.execute("SELECT user_id, first_name, last_name FROM users ORDER BY last_name")
-        return c.fetchall()
+        c.execute("SELECT user_id, first_name, last_name FROM users")
+        users = c.fetchall()
+        users.sort(key=lambda x: (
+            x[1].lower() if x[1] else "",
+            x[2].lower() if x[2] else ""
+        ))
+        return users
 
 
 def get_user_name(user_id: int) -> str:
@@ -70,3 +75,31 @@ def get_user_name(user_id: int) -> str:
     if row:
         return f"{row[0]} {row[1]}".strip()
     return "Неизвестный юзер"
+
+
+def find_users_by_query(query: str) -> list:
+    parts = [p.lower().strip() for p in query.split() if p.strip()]
+    if not parts:
+        return []
+    
+    # SQLite's LOWER() only works for ASCII, failing on Cyrillic. 
+    # Fetch all users and filter in Python.
+    all_users = get_all_users()
+    matched = []
+
+    if len(parts) == 1:
+        w = parts[0]
+        for user_id, fname, lname in all_users:
+            f = fname.lower() if fname else ""
+            l = lname.lower() if lname else ""
+            if f == w or l == w:
+                matched.append((user_id, fname, lname))
+    else:
+        w1, w2 = parts[0], parts[1]
+        for user_id, fname, lname in all_users:
+            f = fname.lower() if fname else ""
+            l = lname.lower() if lname else ""
+            if (f == w1 and l == w2) or (f == w2 and l == w1):
+                matched.append((user_id, fname, lname))
+                
+    return matched

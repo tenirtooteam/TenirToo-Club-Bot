@@ -3,7 +3,7 @@
 from .connection import init_db, get_conn
 from .members import (
     add_user, get_all_users, delete_user, update_user_name,
-    get_user_name, user_exists
+    get_user_name, user_exists, find_users_by_query
 )
 from .groups import (
     create_group, get_all_groups, delete_group,
@@ -16,9 +16,9 @@ from .topics import (
     delete_topic, register_topic_if_not_exists
 )
 from .roles import (
-    add_role, get_role_id, grant_role, revoke_role, get_user_roles,
+    get_role_id, grant_role, revoke_role, get_user_roles,
     get_moderators_of_topic, is_global_admin, is_moderator_of_topic,
-    get_all_roles
+    get_all_roles, get_role_name_by_id
 )
 from .permissions import (
     can_write, is_topic_restricted, get_topic_authorized_users,

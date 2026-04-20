@@ -35,8 +35,6 @@ class AdminStates(StatesGroup):
     waiting_for_new_name = State()
     # Новые состояния для управления ролями
     waiting_for_new_role_user = State()      # выбор пользователя для назначения роли
-    waiting_for_role_topic = State()         # выбор топика для модератора
-    waiting_for_new_role_name = State()      # создание новой роли (для суперадмина)
 
 # --- ГЛАВНОЕ МЕНЮ ---
 
@@ -66,10 +64,24 @@ async def back_to_main(callback: types.CallbackQuery):
 
 # --- УПРАВЛЕНИЕ ГРУППАМИ ---
 
-@router.callback_query(F.data == "manage_groups")
+@router.callback_query(F.data.startswith("manage_groups"))
 @safe_callback()
 async def show_groups(callback: types.CallbackQuery):
-    await callback.message.edit_text("📂 <b>Группы доступа:</b>", reply_markup=kb.groups_list_kb(), parse_mode="HTML")
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    await callback.message.edit_text("📂 <b>Группы доступа:</b>", reply_markup=kb.groups_list_kb(page=page),
+                                     parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("topic_assign_pg_"))
+@safe_callback()
+async def role_assign_choose_topic(callback: types.CallbackQuery):
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    user_id = int(parts[0].replace("topic_assign_pg_", ""))
+    user_name = db.get_user_name(user_id)
+    await callback.message.edit_text(f"📍 Выбери топик для {user_name} в роли Модератора:",
+                                     reply_markup=kb.topic_selection_for_role_kb(user_id, page=page), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("group_info_"))
@@ -114,11 +126,12 @@ async def delete_group_handler(callback: types.CallbackQuery):
 
 # --- УПРАВЛЕНИЕ ТОПИКАМИ ---
 
-@router.callback_query(F.data == "all_topics_list")
+@router.callback_query(F.data.startswith("all_topics_list"))
 @safe_callback()
 async def show_all_topics(callback: types.CallbackQuery):
-    await callback.message.edit_text("📍 <b>Все топики в системе:</b>", reply_markup=kb.all_topics_kb(),
-                                     parse_mode="HTML")
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    await callback.message.edit_text("📍 <b>Все топики:</b>", reply_markup=kb.all_topics_kb(page=page), parse_mode="HTML")
 
 
 @router.callback_query(
@@ -149,10 +162,12 @@ async def topic_detail(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("group_topics_list_"))
 @safe_callback()
 async def show_group_topics(callback: types.CallbackQuery):
-    group_id = int(callback.data.split("_")[-1])
-    group_name = db.get_group_name(group_id)
-    await callback.message.edit_text(f"📍 <b>Топики группы: {group_name}</b>",
-                                     reply_markup=kb.group_topics_list_kb(group_id), parse_mode="HTML")
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    group_id = int(parts[0].replace("group_topics_list_", ""))
+    g_name = db.get_group_name(group_id)
+    await callback.message.edit_text(f"📍 <b>Топики в группе {g_name} (ID: {group_id}):</b>",
+                                     reply_markup=kb.group_topics_list_kb(group_id, page=page), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("topic_del_"))
@@ -173,13 +188,12 @@ async def remove_topic_from_group_handler(callback: types.CallbackQuery):
 @router.callback_query(F.data.startswith("add_topic_to_"))
 @safe_callback()
 async def add_topic_to_group_init(callback: types.CallbackQuery):
-    group_id = int(callback.data.split("_")[-1])
-    group_name = db.get_group_name(group_id)
-    await callback.message.edit_text(
-        f"➕ <b>Выбери топик для добавления в группу «{group_name}»:</b>",
-        reply_markup=kb.available_topics_kb(group_id),
-        parse_mode="HTML"
-    )
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    group_id = int(parts[0].replace("add_topic_to_", ""))
+    await callback.message.edit_text("📍 Выберите топик для добавления в группу:",
+                                     reply_markup=kb.available_topics_kb(group_id, page=page),
+                                     parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("topic_add_confirm_"))
@@ -250,10 +264,12 @@ async def global_topic_delete_handler(callback: types.CallbackQuery):
 
 # --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ---
 
-@router.callback_query(F.data == "manage_users")
+@router.callback_query(F.data.startswith("manage_users"))
 @safe_callback()
 async def show_users(callback: types.CallbackQuery):
-    await callback.message.edit_text("👥 <b>Список пользователей:</b>", reply_markup=kb.users_list_kb(),
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    await callback.message.edit_text("👥 <b>Список пользователей:</b>", reply_markup=kb.users_list_kb(page=page),
                                      parse_mode="HTML")
 
 
@@ -322,10 +338,12 @@ async def process_user_rename(message: types.Message, state: FSMContext):
 @router.callback_query(F.data.startswith("user_groups_manage_"))
 @safe_callback()
 async def user_groups_ui(callback: types.CallbackQuery):
-    user_id = int(callback.data.split("_")[-1])
-    user_name = db.get_user_name(user_id)
-    await callback.message.edit_text(f"🔐 Настройка доступа: <b>{user_name}</b>",
-                                     reply_markup=kb.user_groups_edit_kb(user_id), parse_mode="HTML")
+    parts = callback.data.split("_pg_")
+    page = int(parts[1]) if len(parts) > 1 else 1
+    user_id = int(parts[0].replace("user_groups_manage_", ""))
+    u_name = db.get_user_name(user_id)
+    await callback.message.edit_text(f"Разрешения супер-групп пользователя {u_name}:",
+                                     reply_markup=kb.user_groups_edit_kb(user_id, page=page), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("u_gr_"))
@@ -370,17 +388,27 @@ async def list_users_with_roles(callback: types.CallbackQuery):
         await callback.message.edit_text("👥 Нет пользователей в системе.")
         return
 
-    from config import ADMIN_ID  # добавьте в начало файла, если еще нет
     text_lines = ["👥 <b>Пользователи и их роли:</b>\n"]
     for user_id, first_name, last_name in users:
         roles = db.get_user_roles(user_id)
-        # Если это суперадмин по ID, но роль не прописана, добавляем явно
-        if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in roles):
-            roles.append(('superadmin', None))
-        roles_str = ", ".join([f"{r[0]}{' (топик '+str(r[1])+')' if r[1] is not None else ''}" for r in roles]) or "нет ролей"
+            
+        if not roles:
+            continue
+            
+        roles_str_parts = []
+        for r_name, t_id in roles:
+            if t_id is not None:
+                t_name = db.get_topic_name(t_id)
+                roles_str_parts.append(f"{r_name} (топик: {t_name} ID:{t_id})")
+            else:
+                roles_str_parts.append(r_name)
+        roles_str = ", ".join(roles_str_parts)
         text_lines.append(f"• {first_name} {last_name} (ID: <code>{user_id}</code>): {roles_str}")
 
     text = "\n".join(text_lines)
+    if len(text_lines) == 1:
+        text += "Пока ни у кого нет назначенных ролей."
+        
     await callback.message.edit_text(
         text,
         reply_markup=kb.back_to_manage_roles_kb(),
@@ -392,112 +420,119 @@ async def list_users_with_roles(callback: types.CallbackQuery):
 @safe_callback()
 async def assign_role_start(callback: types.CallbackQuery, state: FSMContext):
     """Начало назначения роли: запрос ID пользователя."""
-    await callback.message.answer(
-        "✍️ Введи ID пользователя, которому нужно назначить роль:"
+    await callback.message.edit_text(
+        "✍️ Введи ID пользователя, его Имя или Фамилию, которому нужно назначить роль:"
     )
+    await state.update_data(last_menu_id=callback.message.message_id)
     await state.set_state(AdminStates.waiting_for_new_role_user)
 
 
 @router.message(AdminStates.waiting_for_new_role_user)
 async def process_role_user_id(message: types.Message, state: FSMContext):
-    """Получение ID пользователя и переход к выбору топика (если роль модератор)."""
-    try:
-        user_id = int(message.text.strip())
-    except ValueError:
-        await message.answer("❌ Некорректный ID. Введи число.")
-        return
-
-    if not db.user_exists(user_id):
-        await message.answer("❌ Пользователь с таким ID не найден.")
-        return
-
-    await state.update_data(role_target_user=user_id)
-    await state.set_state(AdminStates.waiting_for_role_topic)
-    await message.answer(
-        f"Пользователь найден. Теперь выбери топик (если роль 'moderator'), или введи <code>global</code> для глобальной роли (admin).",
-        parse_mode="HTML"
-    )
-
-
-@router.message(AdminStates.waiting_for_role_topic)
-async def process_role_topic(message: types.Message, state: FSMContext):
-    """Получение топика и вызов клавиатуры выбора роли."""
-    text = message.text.strip().lower()
-    data = await state.get_data()
-    user_id = data.get("role_target_user")
-
-    if text == "global":
-        topic_id = None
+    """Получение ID или ФИО пользователя и переход к выбору роли."""
+    text = message.text.strip()
+    
+    async def _on_user_found(u_id):
+        await message.answer(
+            f"Пользователь {db.get_user_name(u_id)} найден. Выберите роль:",
+            reply_markup=kb.role_selection_kb(u_id)
+        )
+        await UIService.finish_input(state, message)
+        
+    if text.isdigit():
+        user_id = int(text)
+        if not db.user_exists(user_id):
+            await message.answer("❌ Пользователь с таким ID не найден.")
+            return
+        await _on_user_found(user_id)
     else:
-        try:
-            topic_id = int(text)
-        except ValueError:
-            await message.answer("❌ Введи числовой ID топика или 'global'.")
+        results = db.find_users_by_query(text)
+        if not results:
+            await message.answer("❌ Никого не найдено.")
             return
-        if topic_id not in db.get_all_unique_topics() and topic_id != -1:
-            await message.answer("❌ Топик с таким ID не найден в системе.")
-            return
-
-    await state.update_data(role_target_topic=topic_id)
-    await state.set_state(None)
-    await message.answer(
-        f"Выбери роль для пользователя {user_id}:",
-        reply_markup=kb.role_selection_kb(user_id, topic_id)
-    )
+        elif len(results) == 1:
+            await _on_user_found(results[0][0])
+        else:
+            await state.update_data(
+                disambig_query=text, 
+                disambig_action="admin_role_target", 
+                disambig_context=None
+            )
+            import math
+            total_pages = math.ceil(len(results)/7)
+            markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
+            await UIService.finish_input(state, message)
+            await message.answer("👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith("role_assign_user_"))
 @safe_callback()
-async def assign_role_choose_user(callback: types.CallbackQuery):
+async def role_assign_choose_user(callback: types.CallbackQuery):
     """Обработчик кнопки 'Назначить роль' из карточки пользователя."""
     user_id = int(callback.data.split("_")[-1])
-    await callback.message.answer(
-        f"Введи ID топика для роли 'moderator' или <code>global</code> для глобальной роли (admin):",
-        parse_mode="HTML"
+    await callback.message.edit_text(
+        f"Выберите роль для пользователя {db.get_user_name(user_id)}:",
+        reply_markup=kb.role_selection_kb(user_id)
     )
-    await callback.answer()
-    # Устанавливаем состояние для получения топика
-    from aiogram.fsm.context import FSMContext
-    state = FSMContext(
-        bot=callback.bot,
-        chat_id=callback.from_user.id,
-        user_id=callback.from_user.id
+
+
+@router.callback_query(F.data.startswith("user_roles_manage_"))
+@safe_callback()
+async def user_roles_manage_handler(callback: types.CallbackQuery):
+    """Меню управления ролями конкретного пользователя."""
+    user_id = int(callback.data.split("_")[-1])
+    await callback.message.edit_text(
+        f"Управление ролями пользователя {user_id}",
+        reply_markup=kb.user_roles_manage_kb(user_id)
     )
-    await state.update_data(role_target_user=user_id)
-    await state.set_state(AdminStates.waiting_for_role_topic)
+
+
+@router.callback_query(F.data.startswith("role_pick_"))
+@safe_callback()
+async def role_pick_handler(callback: types.CallbackQuery):
+    """Обработчик после выбора роли из role_selection_kb."""
+    parts = callback.data.split("_")
+    user_id = int(parts[2])
+    role_id = int(parts[3])
+    role_name = db.get_role_name_by_id(role_id)
+    
+    if role_name == 'moderator':
+        await callback.message.edit_text(
+            f"📍 Выбери топик для назначения модератором:",
+            reply_markup=kb.topic_selection_for_role_kb(user_id)
+        )
+    else:
+        success = db.grant_role(user_id, role_id, None)
+        if success:
+            await callback.answer("✅ Роль назначена.")
+        else:
+            await callback.answer("❌ Не удалось назначить роль (возможно, уже есть).")
+            
+        await callback.message.edit_text(
+            f"Управление ролями пользователя {user_id}",
+            reply_markup=kb.user_roles_manage_kb(user_id)
+        )
 
 
 @router.callback_query(F.data.startswith("role_assign_topic_"))
 @safe_callback()
-async def role_assign_topic_selected(callback: types.CallbackQuery, state: FSMContext):
-    """Выбор топика из инлайн-клавиатуры (альтернативный путь)."""
+async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMContext):
+    """Назначение роли модератора после выбора топика в инлайн-клавиатуре."""
     parts = callback.data.split("_")
     user_id = int(parts[3])
     topic_id = int(parts[4])
-    await callback.message.edit_text(
-        f"Выбери роль для пользователя {user_id} (топик {topic_id}):",
-        reply_markup=kb.role_selection_kb(user_id, topic_id)
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data.startswith("role_assign_"))
-@safe_callback()
-async def role_assign_confirm(callback: types.CallbackQuery):
-    """Назначение роли после выбора в инлайн-клавиатуре."""
-    parts = callback.data.split("_")
-    # role_assign_<user_id>_<role_id>[_<topic_id>]
-    user_id = int(parts[2])
-    role_id = int(parts[3])
-    topic_id = int(parts[4]) if len(parts) > 4 and parts[4] != "None" else None
-
-    success = db.grant_role(user_id, role_id, topic_id)
+    mod_role_id = db.get_role_id("moderator")
+    
+    if mod_role_id == 0:
+        await callback.answer("❌ Системная ошибка: роль модератора не найдена.")
+        return
+        
+    success = db.grant_role(user_id, mod_role_id, topic_id)
     if success:
-        await callback.answer("✅ Роль назначена.")
+        await callback.answer("✅ Роль модератора назначена.")
     else:
-        await callback.answer("❌ Не удалось назначить роль (возможно, уже есть).")
+        await callback.answer("❌ Ошибка (возможно, уже модератор этого топика).")
 
-    # Возвращаемся к управлению ролями пользователя
     await callback.message.edit_text(
         f"Управление ролями пользователя {user_id}",
         reply_markup=kb.user_roles_manage_kb(user_id)
@@ -523,26 +558,4 @@ async def role_revoke_handler(callback: types.CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=kb.user_roles_manage_kb(user_id))
 
 
-@router.callback_query(F.data == "create_role_start")
-@safe_callback()
-async def create_role_start(callback: types.CallbackQuery, state: FSMContext):
-    """Начало создания новой роли."""
-    await callback.message.answer("✍️ Введи название новой роли:")
-    await state.set_state(AdminStates.waiting_for_new_role_name)
 
-
-@router.message(AdminStates.waiting_for_new_role_name)
-async def process_create_role(message: types.Message, state: FSMContext):
-    """Создание новой роли."""
-    role_name = message.text.strip()
-    if not role_name:
-        await message.answer("❌ Название не может быть пустым.")
-        return
-
-    role_id = db.add_role(role_name)
-    if role_id:
-        await message.answer(f"✅ Роль '{role_name}' создана (ID: {role_id}).")
-    else:
-        await message.answer("❌ Не удалось создать роль (возможно, уже существует).")
-
-    await state.set_state(None)
