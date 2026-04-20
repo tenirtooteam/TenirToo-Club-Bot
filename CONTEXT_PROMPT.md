@@ -16,6 +16,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
 - **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
 - **Callback Guarding**: `safe_callback` decorator prevents crashes on double-clicks.
+- **Native Notifications**: The `@all` mention triggers a silent push notification for all authorized topic members (or all users if public) via zero-width character HTML mentions, limited to 50 users per message.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
 

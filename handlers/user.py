@@ -1,12 +1,13 @@
 # Файл: handlers/user.py
 import logging
-from aiogram import Router, types, F
+from aiogram import Router, types, F, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 import keyboards as kb
 from database import db
 from services.ui_service import UIService
 from services.callback_guard import safe_callback
+from services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -86,3 +87,30 @@ async def user_topic_detail(callback: types.CallbackQuery):
         f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
     )
     await callback.message.edit_text(text, reply_markup=kb.user_topic_detail_kb(), parse_mode="HTML")
+
+
+@router.message(F.chat.type != "private", F.text.startswith("@all"))
+async def handle_all_mention(message: types.Message, bot: Bot):
+    """Хендлер для нативного оповещения всех участников топика."""
+    topic_id = message.message_thread_id if message.message_thread_id else -1
+
+    # Сразу удаляем сообщение-триггер для чистоты чата
+    await UIService.delete_msg(message)
+
+    # Подготовка текста (убираем сам тег из сообщения)
+    raw_text = message.text or ""
+    clean_text = raw_text.replace("@all", "", 1).strip()
+
+    if not clean_text:
+        clean_text = "Внимание! Срочное сообщение."
+
+    sender_name = message.from_user.first_name
+
+    # Запускаем рассылку через сервис
+    await NotificationService.send_native_all(
+        bot=bot,
+        chat_id=message.chat.id,
+        topic_id=topic_id,
+        sender_name=sender_name,
+        text=clean_text
+    )

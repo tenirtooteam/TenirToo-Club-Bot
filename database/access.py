@@ -230,3 +230,32 @@ def is_topic_restricted(topic_id: int) -> bool:
         c = conn.cursor()
         c.execute("SELECT 1 FROM group_topics WHERE topic_id = ? LIMIT 1", (topic_id,))
         return c.fetchone() is not None
+
+
+def get_topic_authorized_users(topic_id: int) -> list:
+    """
+    Универсальная функция: возвращает (id, first_name, last_name) всех пользователей,
+    имеющих доступ к топику. Если топик публичный — возвращает всех юзеров системы.
+    """
+    with get_conn() as conn:
+        c = conn.cursor()
+
+        # Проверяем, ограничен ли топик
+        c.execute("SELECT 1 FROM group_topics WHERE topic_id = ? LIMIT 1", (topic_id,))
+        is_restricted = c.fetchone() is not None
+
+        if is_restricted:
+            # Выборка через пересечение групп и пользователей
+            c.execute("""
+                SELECT DISTINCT u.user_id, u.first_name, u.last_name
+                FROM users u
+                JOIN user_groups ug ON u.user_id = ug.user_id
+                JOIN group_topics gt ON ug.group_id = gt.group_id
+                WHERE gt.topic_id = ?
+                ORDER BY u.last_name, u.first_name
+            """, (topic_id,))
+        else:
+            # Для публичного топика возвращаем всех
+            c.execute("SELECT user_id, first_name, last_name FROM users ORDER BY last_name")
+
+        return c.fetchall()
