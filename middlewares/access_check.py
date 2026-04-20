@@ -60,8 +60,13 @@ class AccessGuardMiddleware(BaseMiddleware):
         if event.chat.type == "private" or event.from_user.id == event.bot.id:
             return await handler(event, data)
 
-        topic_id = event.message_thread_id if event.message_thread_id else -1
         user_id = event.from_user.id
+        from config import IMMUNITY_FOR_ADMINS
+        from services.permission_service import PermissionService
+        if IMMUNITY_FOR_ADMINS and PermissionService.is_global_admin(user_id):
+            return await handler(event, data)
+
+        topic_id = event.message_thread_id if event.message_thread_id else -1
         user_fullname = f"{event.from_user.first_name} {event.from_user.last_name or ''}".strip()
         topic_name = db.get_topic_name(topic_id)
         log_base = f"{user_fullname} (ID: {user_id}) -> {topic_name} (ID: {topic_id})"

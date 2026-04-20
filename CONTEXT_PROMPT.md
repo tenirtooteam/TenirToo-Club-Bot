@@ -9,7 +9,9 @@ You are an Expert Python Developer specializing in aiogram 3 and modular softwar
 The bot manages user access to forum topics within a Telegram Supergroup and handles club administrative tasks for **«Теңир-Тоо»**.
 
 **Implemented features:**
-- **Transactional DB (WAL mode)**: High-concurrency support for SQLite.
+- **Transactional DB (WAL mode)**: High-concurrency support for SQLite, split into modular functional layers (topics, groups, roles, permissions).
+- **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
+- **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware`, with a naming fallback if no Telegram name is available.
 - **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
@@ -38,10 +40,10 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 5. **GROUP FILTER**: Every middleware operating on group messages must begin with the guard: `if event.chat.type == "private": return await handler(event, data)`. The `GROUP_ID` constant must NOT be used as a middleware guard — it is reserved exclusively for Telegram API calls (e.g., `bot.edit_forum_topic`). Do not add inline admin-ID checks inside handlers — use the `IsAdmin` router-level filter instead.
    > Rationale: The `chat.type == "private"` guard ensures middleware logic executes only in group contexts across all groups. Using `GROUP_ID` as a guard would incorrectly restrict the bot to a single hardcoded group ID and contradicts the documented pattern in `PROJECT_LOGIC.md § 4`.
 
-6. **DATABASE FACADE**: Never import directly from `database/access.py` or `database/members.py`. All data calls must go through the `database.db` facade (`from database import db`).
+6. **DATABASE FACADE**: Never import directly from internal DB files (`database/topics.py`, `database/groups.py`, `database/roles.py`, `database/permissions.py`, `database/members.py`). All data calls must go through the `database.db` facade (`from database import db`).
    > Rationale: Direct imports bypass the single architectural control point, making refactors and audits unreliable. A violation here is undetectable at runtime — it only breaks when the facade interface changes.
 
-7. **KEYBOARD FACADE**: Never import directly from `keyboards/admin_kb.py` or `keyboards/user_kb.py`. All keyboard builders must be accessed via `import keyboards as kb`.
+7. **KEYBOARD FACADE**: Never import directly from `keyboards/admin_kb.py`, `keyboards/moderator_kb.py` or `keyboards/user_kb.py`. All keyboard builders must be accessed via `import keyboards as kb`.
    > Rationale: `keyboards/__init__.py` is the wildcard re-export facade for the entire keyboard layer, mirroring the role of `database/db.py`. Bypassing it breaks the established two-facade architecture and makes keyboard refactors unreliable.
 
 8. **DESTRUCTIVE OPERATIONS**: Any **new** admin action that permanently deletes data (group, user, topic) must include a confirmation step before execution. Note: the existing `delete_group` and `delete_user` handlers are a known exception — they execute immediately without confirmation (Destructive Confirmation Gap, documented in `PROJECT_LOGIC.md § 6`). Do not replicate this pattern.

@@ -1,7 +1,7 @@
 # Файл: handlers/admin.py
 import logging
 from aiogram import Router, F, types
-from aiogram.filters import Command
+from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import keyboards as kb
@@ -9,40 +9,45 @@ from database import db
 from config import ADMIN_ID, GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
-from aiogram.filters import Filter
+from services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
-class IsAdmin(Filter):
+
+class IsGlobalAdmin(Filter):
+    """Фильтр для глобальных администраторов (superadmin + admin)."""
     async def __call__(self, event: types.Message | types.CallbackQuery) -> bool:
         user_id = event.from_user.id
-        if user_id != ADMIN_ID:
+        if not PermissionService.is_global_admin(user_id):
             logger.warning(f"🚫 Несанкционированный доступ к админке: {user_id}")
             return False
         return True
 
-router = Router()
-router.message.filter(IsAdmin())
-router.callback_query.filter(IsAdmin())
 
+router = Router()
+router.message.filter(IsGlobalAdmin())
+router.callback_query.filter(IsGlobalAdmin())
 
 class AdminStates(StatesGroup):
     waiting_for_group_name = State()
     waiting_for_topic_name = State()
     waiting_for_user_data = State()
     waiting_for_new_name = State()
-
+    # Новые состояния для управления ролями
+    waiting_for_new_role_user = State()      # выбор пользователя для назначения роли
+    waiting_for_role_topic = State()         # выбор топика для модератора
+    waiting_for_new_role_name = State()      # создание новой роли (для суперадмина)
 
 # --- ГЛАВНОЕ МЕНЮ ---
 
 @router.message(Command("admin"))
 async def admin_dashboard(message: types.Message, state: FSMContext):
-    # Закрываем старое меню и чистим команду пользователя
     await UIService.finish_input(state, message)
 
+    is_superadmin = PermissionService.is_superadmin(message.from_user.id)
     sent_message = await message.answer(
         "🛠 <b>Панель управления</b>",
-        reply_markup=kb.main_admin_kb(),
+        reply_markup=kb.main_admin_kb(is_superadmin=is_superadmin),
         parse_mode="HTML"
     )
     await state.update_data(last_menu_id=sent_message.message_id)
@@ -51,7 +56,12 @@ async def admin_dashboard(message: types.Message, state: FSMContext):
 @router.callback_query(F.data == "admin_main")
 @safe_callback()
 async def back_to_main(callback: types.CallbackQuery):
-    await callback.message.edit_text("🛠 <b>Панель управления</b>", reply_markup=kb.main_admin_kb(), parse_mode="HTML")
+    is_superadmin = PermissionService.is_superadmin(callback.from_user.id)
+    await callback.message.edit_text(
+        "🛠 <b>Панель управления</b>",
+        reply_markup=kb.main_admin_kb(is_superadmin=is_superadmin),
+        parse_mode="HTML"
+    )
 
 
 # --- УПРАВЛЕНИЕ ГРУППАМИ ---
@@ -337,3 +347,202 @@ async def user_delete_handler(callback: types.CallbackQuery):
     db.delete_user(user_id)
     await callback.answer("Пользователь удален")
     await show_users(callback)
+
+# --- УПРАВЛЕНИЕ РОЛЯМИ ---
+
+@router.callback_query(F.data == "manage_roles")
+@safe_callback()
+async def manage_roles_menu(callback: types.CallbackQuery):
+    """Меню управления ролями (только для суперадмина)."""
+    await callback.message.edit_text(
+        "👑 <b>Управление ролями</b>",
+        reply_markup=kb.manage_roles_kb(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "list_users_roles")
+@safe_callback()
+async def list_users_with_roles(callback: types.CallbackQuery):
+    """Показывает список всех пользователей с указанием их ролей."""
+    users = db.get_all_users()
+    if not users:
+        await callback.message.edit_text("👥 Нет пользователей в системе.")
+        return
+
+    from config import ADMIN_ID  # добавьте в начало файла, если еще нет
+    text_lines = ["👥 <b>Пользователи и их роли:</b>\n"]
+    for user_id, first_name, last_name in users:
+        roles = db.get_user_roles(user_id)
+        # Если это суперадмин по ID, но роль не прописана, добавляем явно
+        if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in roles):
+            roles.append(('superadmin', None))
+        roles_str = ", ".join([f"{r[0]}{' (топик '+str(r[1])+')' if r[1] is not None else ''}" for r in roles]) or "нет ролей"
+        text_lines.append(f"• {first_name} {last_name} (ID: <code>{user_id}</code>): {roles_str}")
+
+    text = "\n".join(text_lines)
+    await callback.message.edit_text(
+        text,
+        reply_markup=kb.back_to_manage_roles_kb(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "assign_role_start")
+@safe_callback()
+async def assign_role_start(callback: types.CallbackQuery, state: FSMContext):
+    """Начало назначения роли: запрос ID пользователя."""
+    await callback.message.answer(
+        "✍️ Введи ID пользователя, которому нужно назначить роль:"
+    )
+    await state.set_state(AdminStates.waiting_for_new_role_user)
+
+
+@router.message(AdminStates.waiting_for_new_role_user)
+async def process_role_user_id(message: types.Message, state: FSMContext):
+    """Получение ID пользователя и переход к выбору топика (если роль модератор)."""
+    try:
+        user_id = int(message.text.strip())
+    except ValueError:
+        await message.answer("❌ Некорректный ID. Введи число.")
+        return
+
+    if not db.user_exists(user_id):
+        await message.answer("❌ Пользователь с таким ID не найден.")
+        return
+
+    await state.update_data(role_target_user=user_id)
+    await state.set_state(AdminStates.waiting_for_role_topic)
+    await message.answer(
+        f"Пользователь найден. Теперь выбери топик (если роль 'moderator'), или введи <code>global</code> для глобальной роли (admin).",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AdminStates.waiting_for_role_topic)
+async def process_role_topic(message: types.Message, state: FSMContext):
+    """Получение топика и вызов клавиатуры выбора роли."""
+    text = message.text.strip().lower()
+    data = await state.get_data()
+    user_id = data.get("role_target_user")
+
+    if text == "global":
+        topic_id = None
+    else:
+        try:
+            topic_id = int(text)
+        except ValueError:
+            await message.answer("❌ Введи числовой ID топика или 'global'.")
+            return
+        if topic_id not in db.get_all_unique_topics() and topic_id != -1:
+            await message.answer("❌ Топик с таким ID не найден в системе.")
+            return
+
+    await state.update_data(role_target_topic=topic_id)
+    await state.set_state(None)
+    await message.answer(
+        f"Выбери роль для пользователя {user_id}:",
+        reply_markup=kb.role_selection_kb(user_id, topic_id)
+    )
+
+
+@router.callback_query(F.data.startswith("role_assign_user_"))
+@safe_callback()
+async def assign_role_choose_user(callback: types.CallbackQuery):
+    """Обработчик кнопки 'Назначить роль' из карточки пользователя."""
+    user_id = int(callback.data.split("_")[-1])
+    await callback.message.answer(
+        f"Введи ID топика для роли 'moderator' или <code>global</code> для глобальной роли (admin):",
+        parse_mode="HTML"
+    )
+    await callback.answer()
+    # Устанавливаем состояние для получения топика
+    from aiogram.fsm.context import FSMContext
+    state = FSMContext(
+        bot=callback.bot,
+        chat_id=callback.from_user.id,
+        user_id=callback.from_user.id
+    )
+    await state.update_data(role_target_user=user_id)
+    await state.set_state(AdminStates.waiting_for_role_topic)
+
+
+@router.callback_query(F.data.startswith("role_assign_topic_"))
+@safe_callback()
+async def role_assign_topic_selected(callback: types.CallbackQuery, state: FSMContext):
+    """Выбор топика из инлайн-клавиатуры (альтернативный путь)."""
+    parts = callback.data.split("_")
+    user_id = int(parts[3])
+    topic_id = int(parts[4])
+    await callback.message.edit_text(
+        f"Выбери роль для пользователя {user_id} (топик {topic_id}):",
+        reply_markup=kb.role_selection_kb(user_id, topic_id)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("role_assign_"))
+@safe_callback()
+async def role_assign_confirm(callback: types.CallbackQuery):
+    """Назначение роли после выбора в инлайн-клавиатуре."""
+    parts = callback.data.split("_")
+    # role_assign_<user_id>_<role_id>[_<topic_id>]
+    user_id = int(parts[2])
+    role_id = int(parts[3])
+    topic_id = int(parts[4]) if len(parts) > 4 and parts[4] != "None" else None
+
+    success = db.grant_role(user_id, role_id, topic_id)
+    if success:
+        await callback.answer("✅ Роль назначена.")
+    else:
+        await callback.answer("❌ Не удалось назначить роль (возможно, уже есть).")
+
+    # Возвращаемся к управлению ролями пользователя
+    await callback.message.edit_text(
+        f"Управление ролями пользователя {user_id}",
+        reply_markup=kb.user_roles_manage_kb(user_id)
+    )
+
+
+@router.callback_query(F.data.startswith("role_revoke_"))
+@safe_callback()
+async def role_revoke_handler(callback: types.CallbackQuery):
+    """Отзыв роли у пользователя."""
+    parts = callback.data.split("_")
+    user_id = int(parts[2])
+    role_id = int(parts[3])
+    topic_id_str = parts[4]
+    topic_id = None if topic_id_str == "None" else int(topic_id_str)
+
+    success = db.revoke_role(user_id, role_id, topic_id)
+    if success:
+        await callback.answer("✅ Роль отозвана.")
+    else:
+        await callback.answer("❌ Ошибка при отзыве роли.")
+
+    await callback.message.edit_reply_markup(reply_markup=kb.user_roles_manage_kb(user_id))
+
+
+@router.callback_query(F.data == "create_role_start")
+@safe_callback()
+async def create_role_start(callback: types.CallbackQuery, state: FSMContext):
+    """Начало создания новой роли."""
+    await callback.message.answer("✍️ Введи название новой роли:")
+    await state.set_state(AdminStates.waiting_for_new_role_name)
+
+
+@router.message(AdminStates.waiting_for_new_role_name)
+async def process_create_role(message: types.Message, state: FSMContext):
+    """Создание новой роли."""
+    role_name = message.text.strip()
+    if not role_name:
+        await message.answer("❌ Название не может быть пустым.")
+        return
+
+    role_id = db.add_role(role_name)
+    if role_id:
+        await message.answer(f"✅ Роль '{role_name}' создана (ID: {role_id}).")
+    else:
+        await message.answer("❌ Не удалось создать роль (возможно, уже существует).")
+
+    await state.set_state(None)

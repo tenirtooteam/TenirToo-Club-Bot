@@ -3,11 +3,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
 
 
-def main_admin_kb():
+def main_admin_kb(is_superadmin: bool = False):
     builder = InlineKeyboardBuilder()
     builder.button(text="📂 Группы доступа", callback_data="manage_groups")
     builder.button(text="📍 Все топики (Имена/Доступ)", callback_data="all_topics_list")
     builder.button(text="👥 Пользователи", callback_data="manage_users")
+    if is_superadmin:
+        builder.button(text="👑 Управление ролями", callback_data="manage_roles")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -113,6 +115,119 @@ def user_groups_edit_kb(user_id):
         action = "rev" if g_id in user_groups else "gra"
         builder.button(text=f"{status} {g_name}", callback_data=f"u_gr_{action}_{user_id}_{g_id}")
     builder.button(text="⬅️ Назад", callback_data=f"user_info_{user_id}")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def manage_roles_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="👤 Назначить роль пользователю", callback_data="assign_role_start")
+    builder.button(text="📋 Список пользователей с ролями", callback_data="list_users_roles")
+    builder.button(text="➕ Создать новую роль", callback_data="create_role_start")
+    builder.button(text="⬅️ Назад", callback_data="admin_main")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def role_selection_kb(user_id: int, topic_id: int = None):
+    """Клавиатура выбора роли для пользователя."""
+    builder = InlineKeyboardBuilder()
+    roles = db.get_all_roles()  # Новая функция, которую добавим позже
+    for role_id, role_name in roles:
+        # Не даём назначать superadmin через интерфейс (только суперадмин сам может, но упростим)
+        if role_name == 'superadmin':
+            continue
+        callback_data = f"role_assign_{user_id}_{role_id}"
+        if topic_id is not None:
+            callback_data += f"_{topic_id}"
+        builder.button(text=role_name.capitalize(), callback_data=callback_data)
+    builder.button(text="⬅️ Назад", callback_data=f"user_roles_manage_{user_id}")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def user_roles_manage_kb(user_id: int):
+    """Клавиатура управления ролями конкретного пользователя."""
+    builder = InlineKeyboardBuilder()
+    from config import ADMIN_ID  # добавьте в начало файла
+    user_roles = list(db.get_user_roles(user_id))
+    if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in user_roles):
+        user_roles.append(('superadmin', None))
+    for role_name, topic_id in user_roles:
+        if topic_id is None:
+            display = f"✅ {role_name} (глобально)"
+            callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_None"
+        else:
+            topic_name = db.get_topic_name(topic_id)
+            display = f"✅ {role_name} топика {topic_name}"
+            callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_{topic_id}"
+        builder.button(text=display, callback_data=callback)
+    builder.button(text="➕ Назначить роль", callback_data=f"role_assign_user_{user_id}")
+    builder.button(text="⬅️ Назад", callback_data="manage_users")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def topic_selection_for_role_kb(user_id: int):
+    """Клавиатура выбора топика для роли модератора."""
+    builder = InlineKeyboardBuilder()
+    topics = db.get_all_unique_topics()
+    for t_id in topics:
+        t_name = db.get_topic_name(t_id)
+        builder.button(text=f"{t_name}", callback_data=f"role_assign_topic_{user_id}_{t_id}")
+    builder.button(text="⬅️ Назад", callback_data=f"role_assign_user_{user_id}")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def back_to_manage_roles_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data="manage_roles")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    builder = InlineKeyboardBuilder()
+    users = db.get_all_users()
+    
+    direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
+    all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
+    has_access = direct_users | all_authorized
+    
+    for u_id, f_name, l_name in users:
+        if u_id not in has_access:
+            builder.button(
+                text=f"❌ {f_name} {l_name}",
+                callback_data=f"mod_tgl_dir_{u_id}_{topic_id}"
+            )
+            
+    builder.button(
+        text="⬅️ Назад",
+        callback_data=f"mod_users_manage_{topic_id}"
+    )
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def moderator_topic_moderators_kb(topic_id: int):
+    """Список модераторов топика с возможностью добавить/удалить."""
+    builder = InlineKeyboardBuilder()
+    moderators = db.get_moderators_of_topic(topic_id)
+    for u_id, f_name, l_name in moderators:
+        builder.button(
+            text=f"👑 {f_name} {l_name}",
+            callback_data=f"mod_moderator_remove_{u_id}_{topic_id}"
+        )
+    builder.button(
+        text="➕ Назначить модератора",
+        callback_data=f"mod_moderator_add_{topic_id}"
+    )
+    builder.button(
+        text="⬅️ Назад",
+        callback_data=f"mod_topic_select_{topic_id}"
+    )
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
