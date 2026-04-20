@@ -5,7 +5,7 @@ from aiogram.exceptions import TelegramBadRequest
 
 logger = logging.getLogger(__name__)
 
-def safe_callback(extract_id_func=None):
+def safe_callback():
     """
     Декоратор для безопасной обработки колбэков.
     - Игнорирует ошибки "message is not modified".

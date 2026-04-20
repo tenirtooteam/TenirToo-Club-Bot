@@ -1,9 +1,7 @@
 # Файл: keyboards/admin_kb.py
-import logging
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
 
-logger = logging.getLogger(__name__)
 
 def main_admin_kb():
     builder = InlineKeyboardBuilder()

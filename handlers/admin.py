@@ -37,10 +37,6 @@ class AdminStates(StatesGroup):
 
 @router.message(Command("admin"))
 async def admin_dashboard(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        logger.warning(f"🚫 Попытка доступа к админке: {message.from_user.id}")
-        return
-
     # Закрываем старое меню и чистим команду пользователя
     await UIService.finish_input(state, message)
 
@@ -115,10 +111,19 @@ async def show_all_topics(callback: types.CallbackQuery):
                                      parse_mode="HTML")
 
 
-@router.callback_query(F.data.startswith("topic_global_view_"))
+@router.callback_query(
+    F.data.startswith("topic_global_view_") | F.data.startswith("topic_in_group_")
+)
 @safe_callback()
-async def topic_global_detail(callback: types.CallbackQuery):
-    topic_id = int(callback.data.split("_")[-1])
+async def topic_detail(callback: types.CallbackQuery):
+    data = callback.data
+    if data.startswith("topic_global_view_"):
+        topic_id = int(data.split("_")[-1])
+        group_id = 0
+    else:
+        parts = data.split("_")
+        topic_id, group_id = int(parts[3]), int(parts[4])
+
     t_name = db.get_topic_name(topic_id)
     access_groups = db.get_groups_by_topic(topic_id)
     groups_str = ", ".join(access_groups) if access_groups else "НЕТ ДОСТУПА"
@@ -128,7 +133,7 @@ async def topic_global_detail(callback: types.CallbackQuery):
         f"<b>ID:</b> <code>{topic_id}</code>\n"
         f"<b>Доступ имеют:</b> {groups_str}"
     )
-    await callback.message.edit_text(text, reply_markup=kb.topic_edit_kb(topic_id, group_id=0), parse_mode="HTML")
+    await callback.message.edit_text(text, reply_markup=kb.topic_edit_kb(topic_id, group_id=group_id), parse_mode="HTML")
 
 
 @router.callback_query(F.data.startswith("group_topics_list_"))
@@ -221,23 +226,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
     await state.update_data(last_menu_id=sent_message.message_id)
 
 
-@router.callback_query(F.data.startswith("topic_in_group_"))
-@safe_callback()
-async def topic_in_group_detail(callback: types.CallbackQuery):
-    parts = callback.data.split("_")
-    topic_id, group_id = int(parts[3]), int(parts[4])
-    t_name = db.get_topic_name(topic_id)
-    access_groups = db.get_groups_by_topic(topic_id)
-    groups_str = ", ".join(access_groups) if access_groups else "НЕТ ДОСТУПА"
-    text = (
-        f"📍 <b>Информация о топике</b>\n\n"
-        f"<b>Наименование:</b> {t_name}\n"
-        f"<b>ID:</b> <code>{topic_id}</code>\n"
-        f"<b>Доступ имеют:</b> {groups_str}"
-    )
-    await callback.message.edit_text(
-        text, reply_markup=kb.topic_edit_kb(topic_id, group_id=group_id), parse_mode="HTML"
-    )
+
 
 
 @router.callback_query(F.data.startswith("global_topic_del_"))
@@ -300,7 +289,7 @@ async def user_detail(callback: types.CallbackQuery):
 async def user_rename_init(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split("_")[-1])
     await state.update_data(edit_user_id=user_id)
-    await callback.message.answer(f"✍️ Введи новое Имя и Фамилию:", parse_mode="HTML")
+    await callback.message.answer("✍️ Введи новое Имя и Фамилию:")
     await state.set_state(AdminStates.waiting_for_new_name)
 
 
@@ -316,7 +305,7 @@ async def process_user_rename(message: types.Message, state: FSMContext):
 
     await UIService.finish_input(state, message)
 
-    sent_message = await message.answer(f"✅ Данные обновлены.", reply_markup=kb.users_list_kb(), parse_mode="HTML")
+    sent_message = await message.answer("✅ Данные обновлены.", reply_markup=kb.users_list_kb())
     await state.update_data(last_menu_id=sent_message.message_id)
 
 

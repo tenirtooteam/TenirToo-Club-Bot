@@ -22,3 +22,7 @@ env/
 
 # РЎРєСЂРёРїС‚С‹
 local_scripts/
+# Внутренние AI-инструкции
+MASTER_INSTRUCTION.md
+DOCS_UPDATE_PROMPT.md
+PROPOSAL_ANALYSIS_PROMPT.md

@@ -1,5 +1,5 @@
 # Файл: database/db.py
-import logging
+
 from .connection import init_db, get_conn
 from .members import (
     add_user, get_all_users, delete_user, update_user_name,
@@ -12,5 +12,4 @@ from .access import (
     get_user_groups, grant_group, revoke_group, can_write, is_topic_restricted,
     get_group_name, register_topic_if_not_exists, get_user_available_topics, delete_topic
 )
-
-logger = logging.getLogger(__name__)
+

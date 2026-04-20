@@ -72,7 +72,7 @@ async def user_topic_detail(callback: types.CallbackQuery):
     topic_id = int(callback.data.split("_")[-1])
     t_name = db.get_topic_name(topic_id)
     access_groups = db.get_groups_by_topic(topic_id)
-    groups_str = "\n".join([f"— {g}" for g in access_groups]) if access_groups else "Доступ не настроен"
+    groups_str = "\n".join(f"— {g}" for g in access_groups) if access_groups else "Доступ не настроен"
 
     has_access = db.can_write(callback.from_user.id, topic_id)
     access_status = "✅ У тебя есть доступ." if has_access else "❌ У тебя нет доступа."

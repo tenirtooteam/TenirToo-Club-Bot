@@ -18,7 +18,6 @@ class AccessService:
             # Логика именования по умолчанию
             if not f_name and not l_name:
                 f_name = f"Пользователь_{user_id}"
-                l_name = ""
             elif not f_name:
                 f_name = l_name
                 l_name = ""
