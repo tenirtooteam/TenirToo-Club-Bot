@@ -226,24 +226,4 @@ def user_disambiguation_kb(users_page: list, page: int, total_pages: int):
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="close_menu"))
     return builder.as_markup()
 
-
-def moderator_topic_moderators_kb(topic_id: int):
-    """Список модераторов топика с возможностью добавить/удалить."""
-    builder = InlineKeyboardBuilder()
-    moderators = db.get_moderators_of_topic(topic_id)
-    for u_id, f_name, l_name in moderators:
-        builder.button(
-            text=f"👑 {f_name} {l_name}",
-            callback_data=f"mod_moderator_remove_{u_id}_{topic_id}"
-        )
-    builder.button(
-        text="➕ Назначить модератора",
-        callback_data=f"mod_moderator_add_{topic_id}"
-    )
-    builder.button(
-        text="⬅️ Назад",
-        callback_data=f"mod_topic_select_{topic_id}"
-    )
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
-    return builder.as_markup()
+

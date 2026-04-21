@@ -21,12 +21,12 @@ Decoupled concerns across five layers:
 ### 2.2. Module Registry
 Complete file list with individual responsibilities and full function inventory:
 
-- **main.py** — Entry point: `setup_logging` (RotatingFileHandler, 5MB limit, 5 backup files, dual console+file output to `logs/bot.log`), DB initialization via `db.init_db()`, router registration (common → user → admin), outer middleware chaining (UserManager → ForumUtility → AccessGuard), bot polling with `drop_pending_updates=True`.
+- **main.py** — Entry point: `setup_logging` (RotatingFileHandler, 5MB limit, 5 backup files, dual console+file output to `logs/bot.log`), DB initialization via `db.init_db()`, router registration (common → user → admin → moderator), outer middleware chaining (UserManager → ForumUtility → AccessGuard), bot polling with `drop_pending_updates=True`.
 - **loader.py** — Initializes `Bot` and `Dispatcher` with `MemoryStorage`.
 - **config.py** — Helper `get_env_or_raise(key)`: reads env var, raises `ValueError` on missing/empty value. Exposes constants: `BOT_TOKEN` (str), `ADMIN_ID` (int), `GROUP_ID` (int), `IMMUNITY_FOR_ADMINS` (bool, default False). Raises on missing values at import time.
 - **database/__init__.py** — Package initializer: `from . import db`. Enables the `from database import db` import pattern used across the codebase. No logic of its own.
 - **database/connection.py** — SQLite connection context manager `get_conn`: opens connection with `check_same_thread=False`, activates WAL on every connection, guarantees closure in `finally`. `DB_PATH` is resolved relative to `connection.py`'s own file location (`os.path.dirname(__file__)`), placing `bot.db` inside the `database/` directory. `init_db()`: creates all tables and indexes in a single transaction; re-raises any exception after logging (fail-closed).
-- **database/members.py** — Transactional CRUD for users: `add_user`, `delete_user`, `update_user_name`, `get_user_name`, `get_all_users`, `user_exists`.
+- **database/members.py** — Transactional CRUD for users: `add_user`, `delete_user`, `update_user_name`, `get_user_name`, `get_all_users`, `user_exists`, `find_users_by_query` (case-insensitive exact-match search on `first_name`/`last_name` fields; filtering is performed in Python rather than SQL because SQLite's `LOWER()` does not handle Cyrillic characters correctly; accepts a 1- or 2-word query string; returns a list of `(user_id, first_name, last_name)` tuples). Note: `delete_user` cascades into `user_groups` only — orphan records in `user_roles` and `direct_topic_access` are **not** purged (see § 6).
 - **database/topics.py** — Transactional CRUD for topics (registration, renaming, deletion): `get_all_unique_topics`, `update_topic_name`, `get_topic_name`, `delete_topic`, `register_topic_if_not_exists`.
 - **database/groups.py** — Transactional CRUD for global groups and group-topic/user-group linkages: `create_group`, `get_all_groups`, `delete_group`, `get_topics_of_group`, `add_topic_to_group`, `remove_topic_from_group`, `get_groups_by_topic`, `get_user_groups`, `grant_group`, `revoke_group`, `get_group_name`, `get_user_available_topics`.
 - **database/roles.py** — Roles definitions, issuance to users, and role scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles` (dynamically resolves virtual `superadmin` role for `config.ADMIN_ID`), `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
@@ -34,19 +34,19 @@ Complete file list with individual responsibilities and full function inventory:
 - **database/db.py** — Single facade re-exporting functions from `members.py`, `topics.py`, `groups.py`, `roles.py`, `permissions.py`, and `init_db`/`get_conn` from `connection.py` as a unified module. **The only permitted import point for data operations.**
 - **services/ui_service.py** — Centralized UI lifecycle via `UIService` class (all methods `@staticmethod`): `clear_last_menu(state, bot, chat_id)` (delete tracked menu via `bot.delete_message`, nullify `last_menu_id` in FSM state in `finally` block), `delete_msg(message)` (safe single-message delete, exceptions silently swallowed), `finish_input(state, message)` (atomic sequence: `clear_last_menu` → `delete_msg` → `state.set_state(None)`).
 - **services/access_service.py** — Business logic via `AccessService` class (all methods `@staticmethod`): `ensure_user_registered(user)` (auto-registration on first contact; naming fallback hierarchy applied), `can_user_write_in_topic(user_id, topic_id)` (write-permission check: unrestricted topics return `True` immediately, restricted topics delegate to `db.can_write`).
-- **services/permission_service.py** — Higher level business abstraction for roles. Fetches user's manageable topics (`get_manageable_topics`), or checks admin override.
+- **services/permission_service.py** — Higher-level authorization abstraction via `PermissionService` class (all methods `@staticmethod`): `is_superadmin(user_id)` (checks `user_id == ADMIN_ID` first, then verifies `superadmin` role presence in DB; grants access by ID even if DB record is missing, with a warning log); `is_global_admin(user_id)` (fast-path: returns `True` immediately for `ADMIN_ID`, otherwise delegates to `db.is_global_admin`; used by `IsGlobalAdmin` filter); `is_moderator_of_topic(user_id, topic_id)` (delegates to `db.is_moderator_of_topic`); `can_manage_topic(user_id, topic_id)` (returns `True` for global admins or topic moderators); `can_manage_user_roles(user_id, target_user_id, topic_id)` (global admins can manage all roles; moderators may only manage roles within their own topic; `topic_id=None` always returns `False` for moderators); `get_manageable_topics(user_id)` (returns all topics from DB for global admins; returns only moderated topic IDs from `user_roles` for moderators).
 - **services/notification_service.py** — Feature extension via `NotificationService` class (methods `@staticmethod`): `send_native_all(bot, chat_id, topic_id, sender_name, text)` (sends a single message containing invisible mentions up to 50 authorized users via `db.get_topic_authorized_users`).
 - **services/callback_guard.py** — `safe_callback()` decorator factory (no parameters): suppresses `TelegramBadRequest` with "message is not modified" (calls `callback.answer()` silently), catches all other `TelegramBadRequest` and unknown exceptions with user-facing `show_alert=True` error message.
-- **handlers/common.py** — Global `close_menu` callback handler (`F.data == "close_menu"`) and global role-aware `/help` command: deletes the menu message via `UIService.delete_msg(callback.message)`, nullifies `last_menu_id` in FSM state via `state.update_data(last_menu_id=None)`, answers callback with «Закрыто». Note: uses `delete_msg` directly on `callback.message`, not `clear_last_menu`. Also handles global user disambiguation pagination (`usr_pg_`) and pick (`usr_pick_`).
+- **handlers/common.py** — Unfiltered router (no role filter). Global `close_menu` callback handler (`F.data == "close_menu"`): deletes the menu message via `UIService.delete_msg(callback.message)`, nullifies `last_menu_id` in FSM state via `state.update_data(last_menu_id=None)`, answers callback with «Закрыто». Note: uses `delete_msg` directly on `callback.message`, not `clear_last_menu`. Global role-aware `/help` command: builds help text dynamically — base section shown to all users; moderator section added if `PermissionService.get_manageable_topics` returns results; admin section added if `PermissionService.is_global_admin` is `True`. Global user disambiguation pagination (`usr_pg_`) and pick (`usr_pick_`) handlers: read `disambig_query`, `disambig_action`, and `disambig_context` from FSM state and route the picked user to the appropriate action (`dir_add`, `mod_add`, `admin_role_target`).
 - **handlers/admin.py** — All admin flows protected at router level by `IsGlobalAdmin` filter (custom `aiogram.filters.Filter`; checks `PermissionService.is_global_admin`; applied to both `router.message` and `router.callback_query`). FSM states defined in `AdminStates(StatesGroup)`: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`, `waiting_for_new_role_user`. Flows: admin dashboard (`/admin`), parameter management for groups, topics, user access, robust user inline search assignment, and role revocation.
-- **handlers/moderator.py** — Moderator flows protected by `IsTopicManager` filter. Commands: `/mod`. Allows moderators to toggle direct access (`direct_topic_access`) for users in their assigned topic, view attached groups, and switch between user management modes (view existing access vs `➕ Выдать доступ`).
+- **handlers/moderator.py** — Moderator flows protected by `IsTopicManager` filter (passes if user is global admin or has at least one manageable topic; rejects non-private `Message` events immediately). FSM states defined in `ModeratorStates(StatesGroup)`: `waiting_for_topic_name` (topic rename flow), `waiting_for_user_data` (assign moderator flow), `waiting_for_direct_access_user` (grant direct access flow). Commands: `/mod`. Allows moderators to rename topics (with Telegram API sync), manage attached groups, toggle direct access for users (`mod_tgl_dir_`), view and assign/remove topic moderators, and switch between user management modes.
 - **handlers/user.py** — User-facing flows: `/start` (clears old menu, deletes command message, sends main menu, tracks `last_menu_id`), `back_to_user_main` (`F.data == "user_main"`), `user_profile_callback` (`F.data == "user_profile_view"`: shows name from DB, user ID, active groups), `show_user_topics` (`F.data == "user_topics"`: shows all topics with ✅/❌ access status), `user_topic_detail` (`F.data.startswith("u_topic_info_")`: shows topic name, ID, which groups have access, user's own access status), `handle_all_mention` (handles `@all` prefix in non-private chats, triggers `NotificationService.send_native_all` and deletes trigger message).
 - **middlewares/access_check.py** — Three-middleware sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`. All three are registered as `outer_middleware` on `dp.message`.
-- **keyboards/__init__.py** — Keyboard layer facade: `from .admin_kb import *`, `from .moderator_kb import *`, `from .user_kb import *`. Wildcard re-export enables the `import keyboards as kb` pattern.
-- **keyboards/admin_kb.py** — Inline keyboard builders for all admin menus. Functions: `main_admin_kb()`, `all_topics_kb()`, `topic_edit_kb()`, `group_topics_list_kb()`, `available_topics_kb()` (renders `"noop"` callback button when no topics are available — intentional silent no-op), `groups_list_kb()`, `group_edit_kb()`, `users_list_kb()`, `user_edit_kb()`, `user_groups_edit_kb()`, role and disambiguation keyboards.
-- **keyboards/moderator_kb.py** — Inline keyboard builders for topic moderators. Includes user management split (existing access vs '➕ Выдать доступ').
+- **keyboards/__init__.py** — Keyboard layer facade with wildcard re-exports in fixed order: `from .admin_kb import *`, `from .user_kb import *`, `from .moderator_kb import *`. The import order is architecturally critical for correct operation and conflict resolution. Exposes `build_paginated_menu` from `pagination_util` as a direct named export. Enables the `import keyboards as kb` pattern.
+- **keyboards/admin_kb.py** — Inline keyboard builders for all admin menus. Functions: `main_admin_kb(is_superadmin)`, `all_topics_kb(page)`, `topic_edit_kb(topic_id, group_id)`, `group_topics_list_kb(group_id, page)`, `available_topics_kb(group_id, page)` (renders `"noop"` callback button when no topics are available — intentional silent no-op), `groups_list_kb(page)`, `group_edit_kb(group_id)`, `users_list_kb(page)`, `user_edit_kb(user_id)`, `user_groups_edit_kb(user_id, page)`, `manage_roles_kb()`, `role_selection_kb(user_id)`, `user_roles_manage_kb(user_id)`, `topic_selection_for_role_kb(user_id, page)`, `back_to_manage_roles_kb()`, `user_disambiguation_kb(users_page, page, total_pages)`.
+- **keyboards/moderator_kb.py** — Inline keyboard builders for topic moderators. Functions: `moderator_topics_list_kb(topics, page)`, `moderator_topic_menu_kb(topic_id)`, `moderator_group_list_kb(topic_id, page)`, `moderator_available_groups_kb(topic_id, page)`, `moderator_users_list_kb(topic_id, page)`, `moderator_users_to_add_kb(topic_id, page)`, `moderator_topic_moderators_kb(topic_id, page)` (paginated list of topic moderators with add/remove controls).
 - **keyboards/pagination_util.py** — Helper logic for pagination: `build_paginated_menu(item_buttons, static_buttons, page, limit, callback_prefix, adjust_items)` — universally standardizes pagination navigation interface.
-- **keyboards/user_kb.py** — Inline keyboard builders for user menus. Imports from `database.db`. Functions: `user_main_kb()`, `user_topics_list_kb()`, `user_topic_detail_kb()`.
+- **keyboards/user_kb.py** — Inline keyboard builders for user menus. Imports from `database.db`. Functions: `user_main_kb()`, `user_topics_list_kb(user_id)`, `user_topic_detail_kb()`.
 - **local_scripts/dev_run.py** — Developer-only hot-reload runner.
 - **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
 
@@ -63,13 +63,11 @@ database/db.py          →  database/connection.py (init_db, get_conn re-export
                         →  database/(members|topics|groups|roles|permissions).py
 ~~~
 
-Direct imports from internal DB files (`database/*.py`) in any layer above `database/db.py` are a critical violation of the Facade pattern. Direct imports from individual keyboard files bypassing `keyboards/__init__.py` break the keyboard layer contract.
-
 ### 2.4. Database Facade
 `database/db.py` is the exclusive interface for all data operations. Direct imports from files like `database/topics.py` or `database/members.py` are a critical architectural violation.
 
 ### 2.5. Keyboard Facade
-`keyboards/__init__.py` is the exclusive import point for all keyboard builders. Handlers must use `import keyboards as kb` and access all functions via `kb.*`. This mirrors the Database Facade pattern at the keyboard layer.
+`keyboards/__init__.py` is the exclusive import point for all keyboard builders. Handlers must use `import keyboards as kb` and access all functions via `kb.*`. This mirrors the Database Facade pattern at the keyboard layer. The strict top-down wildcard import order within `__init__.py` determines conflict resolution.
 
 ### 2.6. Context Manager Connectivity
 `database/connection.py` uses a custom `@contextmanager` (`get_conn`) for deterministic connection handling and guaranteed closure on both success and exception. WAL mode is activated on every individual connection open, not globally at startup. `DB_PATH` is resolved relative to `connection.py`'s own location, always placing `bot.db` inside the `database/` directory regardless of the working directory at launch.
@@ -137,12 +135,12 @@ CREATE INDEX IF NOT EXISTS idx_user_groups_user_id   ON user_groups(user_id);
 CREATE INDEX IF NOT EXISTS idx_group_topics_topic_id ON group_topics(topic_id);
 ~~~
 
-> Note: SQLite FK enforcement is disabled by default. Cascading deletes are implemented manually within transactions in `access.py`. Do not rely on `ON DELETE CASCADE`.
+> Note: SQLite FK enforcement is disabled by default. Cascading deletes are implemented manually within transactions in the respective CRUD modules (`groups.py`, `topics.py`, `members.py`). Do not rely on `ON DELETE CASCADE`.
 
 ### 3.2. Access Control Logic
-- **Default State**: A topic is "Public" if absent from the `group_topics` registry — all users may write.
-- **Restricted State**: A topic becomes "Private" once associated with any group. Write access is granted only if the user shares a common group linkage with the topic.
-- **Transactional Integrity**: Manual cascading deletion — removing a Group or Topic explicitly purges all orphan records in `user_groups` and `group_topics` within the same transaction. SQLite FK cascades are not relied upon (disabled by default in SQLite).
+- **Default State**: A topic is "Public" if absent from both the `group_topics` and `direct_topic_access` registries — all users may write.
+- **Restricted State**: A topic becomes "Private" once it appears in either `group_topics` (linked to an access group) or `direct_topic_access` (at least one direct-access grant exists). The `is_topic_restricted` function evaluates both tables via a `UNION` query. Write access is granted if the user shares a common group linkage with the topic OR holds a direct access record.
+- **Transactional Integrity**: Manual cascading deletion is implemented within transactions: `delete_group` purges `group_topics` and `user_groups` before removing the group record; `delete_topic` purges `group_topics`, `direct_topic_access`, and `topic_names`; `delete_user` purges `user_groups` before removing the user record. Orphan records in `user_roles` are **not** cleaned up by any of these operations (see § 6).
 
 ### 3.3. Upsert Pattern
 `update_topic_name(topic_id, name)` uses `INSERT OR REPLACE INTO topic_names` — an upsert pattern. This means the function both inserts new topic name records and updates existing ones atomically. This is the only function in the codebase that uses this pattern; all other mutations use standard `INSERT` or `UPDATE`.
@@ -157,7 +155,7 @@ CREATE INDEX IF NOT EXISTS idx_group_topics_topic_id ON group_topics(topic_id);
 Sequential 3-stage pipeline registered as `outer_middleware` on `dp.message` — order is fixed and must not be changed.
 
 ### Stage 1 — UserManagerMiddleware
-Operates on all chat types. Guard: skips processing if `event.from_user` is absent or is a bot (`event.from_user.is_bot`). For all real users: calls `AccessService.ensure_user_registered(event.from_user)` — auto-registers the user in `users` table if not present. Naming fallback hierarchy: (1) if no name at all → `Пользователь_{user_id}`; (2) if only `last_name` present → promoted to `first_name`. Always passes to the next handler regardless of registration outcome.
+Operates on all chat types (no private-chat guard — intentional, registration is useful from any chat context). Guard: skips processing if `event.from_user` is absent or is a bot (`event.from_user.is_bot`). For all real users: calls `AccessService.ensure_user_registered(event.from_user)` — auto-registers the user in `users` table if not present. Naming fallback hierarchy: (1) if no name at all → `Пользователь_{user_id}`; (2) if only `last_name` present → promoted to `first_name`. Always passes to the next handler regardless of registration outcome.
 
 ### Stage 2 — ForumUtilityMiddleware
 Guard: if `event.chat.type == "private"` → passes. Branching logic for groups:
@@ -169,7 +167,7 @@ Guard: if `event.chat.type == "private"` → passes. Branching logic for groups:
 Guard: if `event.chat.type == "private"` or `event.from_user.id == event.bot.id` → passes. If user is global admin and `config.IMMUNITY_FOR_ADMINS` is True, passes. For all other messages: resolves `topic_id`, calls `AccessService.can_user_write_in_topic`. If access denied → silently deletes message and returns. All decisions logged: denied messages at `INFO` (❌), permitted messages at `INFO` (✅).
 
 ### Private Chat Guard Pattern
-None of the three middlewares use `GROUP_ID` as a guard condition. The real guard pattern is `event.chat.type == "private"` for early pass-through. The `GROUP_ID` constant is used only in `handlers/admin.py` for API calls (`bot.edit_forum_topic`).
+`ForumUtilityMiddleware` and `AccessGuardMiddleware` use `event.chat.type == "private"` as an early pass-through guard. `UserManagerMiddleware` is exempt from this guard — it operates on all chat types by design. The `GROUP_ID` constant is used only in `handlers/admin.py` and `handlers/moderator.py` for API calls (`bot.edit_forum_topic`), never as a middleware guard condition.
 
 ### Error Handling
 All three stages follow a **fail-open** strategy: non-critical exceptions are caught, logged, and the pipeline continues.
@@ -187,8 +185,13 @@ All three stages follow a **fail-open** strategy: non-critical exceptions are ca
 ### 5.2. FSM Data Keys
 All keys stored in FSM state across the application:
 - `last_menu_id`: Tracks active inline keyboard message ID for cleanup.
-- `edit_topic_id`, `edit_group_id`, `edit_user_id`: Stores specific ID context between FSM states during rename flows.
-- `disambig_query`, `disambig_action`, `disambig_context`, `moderator_direct_access_topic`: Keys used for cross-handler disambiguation logic.
+- `edit_topic_id`, `edit_group_id`, `edit_user_id`: Stores specific ID context between FSM states during admin rename flows.
+- `disambig_query`, `disambig_action`, `disambig_context`: Keys used for cross-handler user search disambiguation logic. `disambig_action` values: `"dir_add"` (grant direct access), `"mod_add"` (assign moderator), `"admin_role_target"` (role assignment flow).
+- `disambig_role_id`: Referenced in disambiguation state cleanup but never set by any current handler — ghost key from an incomplete refactor. Safe to ignore; cleared on every disambiguation resolution.
+- `moderator_direct_access_topic`: Set in `moderator.py` (`mod_add_user_list_` flow) to carry the target topic ID into the `waiting_for_direct_access_user` FSM state.
+- `moderator_edit_topic_id`: Set in `moderator.py` (`mod_topic_rename_` flow) to carry the target topic ID into the `waiting_for_topic_name` FSM state.
+- `moderator_add_target_topic`: Set in `moderator.py` (`mod_moderator_add_` flow) to carry the target topic ID into the `waiting_for_user_data` FSM state.
+- `moderator_current_topic`: Set in `moderator.py` (`mod_topic_select_` flow) to track the currently selected topic in the moderator session.
 
 ### 5.3. FSM Hygiene Rule
 `state.clear()` is **forbidden** — it destroys all FSM data including `last_menu_id`, breaking the Sterile Interface. Always use `state.set_state(None)` to nullify state while preserving data.
@@ -209,8 +212,11 @@ All keys stored in FSM state across the application:
 - **noop Callback**: The `"noop"` callback data produced by `available_topics_kb()` has no registered handler. This is intentional.
 - **Destructive Confirmation Gap**: Operations like `delete_group` and `delete_user` currently execute immediately on callback. Destructive operations MUST include a confirmation step to prevent data loss.
 - **AdminStates Scope**: FSM states (`AdminStates`) are defined and used exclusively within `handlers/admin.py`. Never reference or set `AdminStates` from outside this file.
-- **Keyboard Data Access**: `keyboards/admin_kb.py` and `keyboards/user_kb.py` are permitted to import from `database.db` directly for rendering live data. This is the only sanctioned exception.
+- **ModeratorStates Scope**: FSM states (`ModeratorStates`) are defined and used exclusively within `handlers/moderator.py`. Never reference or set `ModeratorStates` from outside this file.
+- **Keyboard Data Access**: `keyboards/admin_kb.py`, `keyboards/moderator_kb.py`, and `keyboards/user_kb.py` are permitted to import from `database.db` directly for rendering live data. This is the only sanctioned exception to the Facade rule for the keyboard layer.
 - **Virtual Superadmin Encapsulation**: The logic for granting the virtual `superadmin` role based on config `ADMIN_ID` resides safely inside `database/roles.py`'s `get_user_roles(user_id)`. UI handlers must not manipulate `ADMIN_ID` directly to append this role manually, since the DB response is pre-enriched.
+- **Keyboard Import Order Criticality**: The import sequence in `keyboards/__init__.py` (`admin_kb` → `user_kb` → `moderator_kb`) is an architectural invariant. Modifying this order can lead to unpredictable runtime behavior due to wildcard exports shadowing identically named functions.
+- **Known Defect — Incomplete delete_user Cascade**: `database/members.py::delete_user` purges `user_groups` but does not clean up `user_roles` or `direct_topic_access`. Deleting a user who holds a moderator role or direct topic access leaves orphan records in these tables that cannot be reached or cleaned via the UI.
 
 ---
 
@@ -221,3 +227,5 @@ All keys stored in FSM state across the application:
 - **GROUP_ID** — `int`. Source: `.env` → `config.py`. Used exclusively in `handlers/admin.py` and `handlers/moderator.py` as the `chat_id` argument for Telegram API calls. Expected to be a negative integer (Telegram supergroup convention). **Not used as a middleware guard condition.**
 - **Topic ID `-1`** — Logical mapping for the "General" topic in a forum-enabled Telegram chat.
 - **DB_PATH** — Not an env variable. Hardcoded in `database/connection.py` relative to the source file, guaranteeing path independence.
+
+

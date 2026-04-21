@@ -346,15 +346,18 @@ async def user_groups_ui(callback: types.CallbackQuery):
                                      reply_markup=kb.user_groups_edit_kb(user_id, page=page), parse_mode="HTML")
 
 
-@router.callback_query(F.data.startswith("u_gr_"))
+@router.callback_query(F.data.startswith("user_group_toggle_"))
 @safe_callback()
 async def toggle_group(callback: types.CallbackQuery):
     parts = callback.data.split("_")
-    action, user_id, group_id = parts[2], int(parts[3]), int(parts[4])
-    if action == "gra":
-        db.grant_group(user_id, group_id)
-    else:
+    user_id, group_id = int(parts[3]), int(parts[4])
+    
+    user_groups = set(g[0] for g in db.get_user_groups(user_id))
+    if group_id in user_groups:
         db.revoke_group(user_id, group_id)
+    else:
+        db.grant_group(user_id, group_id)
+        
     await callback.message.edit_reply_markup(reply_markup=kb.user_groups_edit_kb(user_id))
 
 
