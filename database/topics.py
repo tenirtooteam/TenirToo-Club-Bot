@@ -57,3 +57,14 @@ def register_topic_if_not_exists(topic_id: int):
                     logger.info(f"🔍 Зарегистрирован новый топик ID: {topic_id}")
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка при авторегистрации топика: {e}")
+
+
+def find_topics_by_query(query: str) -> list:
+    """Поиск топиков по вхождению строки в название (регистронезависимо)."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT topic_id, name FROM topic_names")
+        rows = c.fetchall()
+        query = query.lower()
+        # Возвращаем список (topic_id, name)
+        return [(r[0], r[1]) for r in rows if query in r[1].lower()]

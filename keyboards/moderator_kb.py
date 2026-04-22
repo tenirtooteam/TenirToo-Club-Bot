@@ -17,9 +17,13 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
         ))
         
     static_buttons = [
+        InlineKeyboardButton(text="🛡 Роли", callback_data="roles_dashboard"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "moderator")
+    return build_paginated_menu(
+        item_buttons, static_buttons, page, limit, "moderator",
+        search_type="topic", search_action="mod_select"
+    )
 
 
 def moderator_topic_menu_kb(topic_id: int):

@@ -28,45 +28,47 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 @router.callback_query(F.data == "user_main")
 @safe_callback()
-async def back_to_user_main(callback: types.CallbackQuery):
-    await callback.message.edit_text(
+async def back_to_user_main(callback: types.CallbackQuery, state: FSMContext):
+    await UIService.show_menu(
+        state, callback, 
         "Главное меню участника:",
-        reply_markup=kb.user_main_kb(),
-        parse_mode="HTML"
+        reply_markup=kb.user_main_kb()
     )
 
 
 @router.callback_query(F.data == "user_profile_view")
 @safe_callback()
-async def user_profile_callback(callback: types.CallbackQuery):
+async def user_profile_callback(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     db_name = db.get_user_name(user_id)
     user_groups = db.get_user_groups(user_id)
     groups_str = ", ".join(g[1] for g in user_groups) if user_groups else "нет активных групп"
+    
+    # Собираем роли и топики
+    roles = list(db.get_user_roles(user_id))
+    
+    # Доступные топики (ID и Названия)
+    available_ids = db.get_user_available_topics(user_id)
+    available_topics = [(t_id, db.get_topic_name(t_id)) for t_id in available_ids]
 
-    text = (
-        f"👤 <b>Профиль участника</b>\n\n"
-        f"<b>Имя в системе:</b> {db_name}\n"
-        f"<b>Твой ID:</b> <code>{user_id}</code>\n"
-        f"<b>Доступные группы:</b> {groups_str}"
-    )
-    await callback.message.edit_text(text, reply_markup=kb.user_topic_detail_kb(), parse_mode="HTML")
+    text = UIService.format_user_card(user_id, db_name, groups_str, roles, available_topics)
+    await UIService.show_menu(state, callback, text, reply_markup=kb.user_profile_kb())
 
 
 @router.callback_query(F.data == "user_topics")
 @safe_callback()
-async def show_user_topics(callback: types.CallbackQuery):
+async def show_user_topics(callback: types.CallbackQuery, state: FSMContext):
     """Список топиков, к которым у юзера есть доступ."""
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         "📍 <b>Топики, в которых ты можешь писать:</b>",
-        reply_markup=kb.user_topics_list_kb(callback.from_user.id),
-        parse_mode="HTML"
+        reply_markup=kb.user_topics_list_kb(callback.from_user.id)
     )
 
 
 @router.callback_query(F.data.startswith("u_topic_info_"))
 @safe_callback()
-async def user_topic_detail(callback: types.CallbackQuery):
+async def user_topic_detail(callback: types.CallbackQuery, state: FSMContext):
     """Информация о любом топике в системе."""
     topic_id = int(callback.data.split("_")[-1])
     t_name = db.get_topic_name(topic_id)
@@ -80,11 +82,11 @@ async def user_topic_detail(callback: types.CallbackQuery):
         f"📍 <b>Информация о топике</b>\n\n"
         f"<b>Название:</b> {t_name}\n"
         f"<b>ID:</b> <code>{topic_id}</code>\n\n"
-        f"👥 <b>Доступ имеют группы:</b>\n{groups_str}\n\n"
+        f"👥 <b>Доступ имеют:</b>\n{groups_str}\n\n"
         f"🔐 <b>Твой статус:</b> {access_status}\n\n"
         f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
     )
-    await callback.message.edit_text(text, reply_markup=kb.user_topic_detail_kb(), parse_mode="HTML")
+    await UIService.show_menu(state, callback, text, reply_markup=kb.user_topic_detail_kb())
 
 
 @router.message(F.chat.type != "private", F.text.startswith("@all"))

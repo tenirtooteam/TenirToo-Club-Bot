@@ -9,8 +9,7 @@ def main_admin_kb(is_superadmin: bool = False):
     builder.button(text="📂 Группы доступа", callback_data="manage_groups")
     builder.button(text="📍 Все топики (Имена/Доступ)", callback_data="all_topics_list")
     builder.button(text="👥 Пользователи", callback_data="manage_users")
-    if is_superadmin:
-        builder.button(text="👑 Управление ролями", callback_data="manage_roles")
+    builder.button(text="🛡 Роли", callback_data="roles_dashboard")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -26,7 +25,10 @@ def all_topics_kb(page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "all_topics_list")
+    return build_paginated_menu(
+        item_buttons, static_buttons, page, limit, "all_topics_list",
+        search_type="topic", search_action="info"
+    )
 
 def topic_edit_kb(topic_id, group_id=0):
     builder = InlineKeyboardBuilder()
@@ -88,7 +90,10 @@ def groups_list_kb(page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     from keyboards.pagination_util import build_paginated_menu
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "manage_groups")
+    return build_paginated_menu(
+        item_buttons, static_buttons, page, limit, "manage_groups",
+        search_type="group", search_action="info"
+    )
 
 def group_edit_kb(group_id):
     builder = InlineKeyboardBuilder()
@@ -111,12 +116,16 @@ def users_list_kb(page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     from keyboards.pagination_util import build_paginated_menu
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "manage_users")
+    return build_paginated_menu(
+        item_buttons, static_buttons, page, limit, "manage_users",
+        search_type="user", search_action="info"
+    )
 
 def user_edit_kb(user_id):
     builder = InlineKeyboardBuilder()
     builder.button(text="🏷 Переименовать", callback_data=f"user_rename_{user_id}")
     builder.button(text="🔐 Управление группами", callback_data=f"user_groups_manage_{user_id}")
+    builder.button(text="👑 Управление ролями", callback_data=f"user_roles_manage_{user_id}")
     builder.button(text="🗑 Удалить пользователя", callback_data=f"user_delete_{user_id}")
     builder.button(text="⬅️ Назад", callback_data="manage_users")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
@@ -139,11 +148,12 @@ def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_groups_manage_{user_id}")
 
-def manage_roles_kb():
+def roles_dashboard_kb(is_admin: bool):
     builder = InlineKeyboardBuilder()
-    builder.button(text="👤 Назначить роль пользователю", callback_data="assign_role_start")
+    builder.button(text="ℹ️ Описание ролей (FAQ)", callback_data="roles_faq")
     builder.button(text="📋 Список пользователей с ролями", callback_data="list_users_roles")
-    builder.button(text="⬅️ Назад", callback_data="admin_main")
+    back_data = "admin_main" if is_admin else "moderator"
+    builder.button(text="⬅️ Назад", callback_data=back_data)
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -152,14 +162,23 @@ def manage_roles_kb():
 def role_selection_kb(user_id: int):
     """Клавиатура выбора роли для пользователя."""
     builder = InlineKeyboardBuilder()
-    roles = db.get_all_roles()  
+    roles = db.get_all_roles()
+    existing_roles = db.get_user_roles(user_id)
+    existing_role_names = set(r[0] for r in existing_roles)
+
     for role_id, role_name in roles:
-        # Не даём назначать superadmin через интерфейс 
+        # Не даём назначать superadmin через интерфейс
         if role_name == 'superadmin':
             continue
+        
+        # Если роль глобальная (админ) и она уже есть - скрываем
+        if role_name == 'admin' and 'admin' in existing_role_names:
+            continue
+            
         callback_data = f"role_pick_{user_id}_{role_id}"
         display_name = "👑 Админ" if role_name == "admin" else "🛡 Модератор" if role_name == "moderator" else role_name.capitalize()
         builder.button(text=display_name, callback_data=callback_data)
+        
     builder.button(text="⬅️ Назад", callback_data=f"user_roles_manage_{user_id}")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
@@ -180,7 +199,7 @@ def user_roles_manage_kb(user_id: int):
             callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_{topic_id}"
         builder.button(text=display, callback_data=callback)
     builder.button(text="➕ Назначить роль", callback_data=f"role_assign_user_{user_id}")
-    builder.button(text="⬅️ Назад", callback_data="manage_users")
+    builder.button(text="⬅️ Назад", callback_data=f"user_info_{user_id}")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -201,9 +220,9 @@ def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"topic_assign_pg_{user_id}")
 
-def back_to_manage_roles_kb():
+def back_to_roles_dashboard_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад", callback_data="manage_roles")
+    builder.button(text="⬅️ Назад", callback_data="roles_dashboard")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
@@ -225,5 +244,22 @@ def user_disambiguation_kb(users_page: list, page: int, total_pages: int):
         
     builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="close_menu"))
     return builder.as_markup()
+
+
+def search_results_kb(results, search_type, search_action, search_context=None, page: int = 1, limit: int = 7):
+    """Клавиатура для отображения результатов глобального поиска."""
+    from keyboards.pagination_util import build_paginated_menu
+    item_buttons = []
+    for item_id, name in results:
+        item_buttons.append(InlineKeyboardButton(
+            text=name, 
+            callback_data=f"search_pick_{search_type}_{search_action}_{item_id}"
+        ))
+        
+    static_buttons = [
+        InlineKeyboardButton(text="🔎 Искать заново", callback_data=f"search_start_{search_type}_{search_action}_{search_context if search_context else ''}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, "search")
 
 

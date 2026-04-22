@@ -9,11 +9,11 @@ from .groups import (
     create_group, get_all_groups, delete_group,
     get_topics_of_group, add_topic_to_group, remove_topic_from_group,
     get_groups_by_topic, get_user_groups, grant_group, revoke_group,
-    get_group_name, get_user_available_topics
+    get_group_name, get_user_available_topics, find_groups_by_query
 )
 from .topics import (
     get_all_unique_topics, update_topic_name, get_topic_name,
-    delete_topic, register_topic_if_not_exists
+    delete_topic, register_topic_if_not_exists, find_topics_by_query
 )
 from .roles import (
     get_role_id, grant_role, revoke_role, get_user_roles,

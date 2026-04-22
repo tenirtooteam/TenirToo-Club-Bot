@@ -18,13 +18,16 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware`.
-- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command(redirect, error_prefix)` decorator allows enabling/disabling group-to-PM redirection and automatic UI cleanup for any command handler by adding a single line. Temporary messages (errors, prompts) are self-cleaning — tracked via `last_menu_id` and replaced on the next interaction.
+- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles with role-specific visual decoration (crowns/shields). Temporary messages are self-cleaning via `last_menu_id`.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
 - **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
 - **Callback Guarding**: `safe_callback` decorator prevents crashes on double-clicks.
 - **Native Notifications**: The `@all` mention triggers a silent push notification for all authorized topic members.
 - **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
+- **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
+- **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and `perform_search_pick` router in `handlers/common.py`, supporting User, Group, and Topic entity types.
+- **Strict DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
 
@@ -67,6 +70,20 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 
 12. **ROLE ENCAPSULATION**: Never manually inject system privileges (e.g., `superadmin` checks against `config.ADMIN_ID`) within UI handlers or keyboard builders. Use the database facade (e.g. `db.get_user_roles(user_id)`) which is designed to internally resolve and append virtual roles.
     > Rationale: Hardcoding admin IDs into the UI/presentation layer violates encapsulation. If the rules for admin detection change, all UI files would require auditing, leading to hard-to-trace bugs.
+13. **USER CARD CONSISTENCY**: All handlers displaying user profile details (Admin view, User view, Search results) MUST use `UIService.format_user_card` to ensure consistent visual styling and information architecture.
+    > Rationale: Fragmented profile formatting leads to UI drift. Standardizing through a service method guarantees that role decorations and topic lists are always rendered identically.
+
+14. **STRICT DATABASE FUSE**: Do not attempt to bypass or weaken the Foreign Key check in `init_db()`.
+    > Rationale: Native `ON DELETE CASCADE` is critical for data integrity. Running on a system without FK support will result in orphaned records and silent database corruption.
+
+15. **UIService.show_menu AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` are prohibited in handlers.
+    > Rationale: `UIService.show_menu` is the single source of truth for menu rendering. It handles `last_menu_id` tracking, sterile cleanup, and fallback logic automatically. Bypassing it breaks the Sterile UI Protocol and introduces untraceable side effects.
+
+16. **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
+    > Rationale: aiogram's DI injects `state` only if explicitly declared. Silent failure without it crashes the handler at the first `UIService` call.
+
+17. **KNOWN TECHNICAL DEBT — HANDLER DB ACCESS**: Handlers currently access `database.db` directly. This is a known architectural limitation (SoC violation). Do NOT treat it as a pattern to follow. The intended solution is a service layer (`EntityService`, `AdminService`, etc.) that mediates between handlers and the DB. This refactor is deferred until explicitly requested.
+    > Rationale: The correct architecture dictates that handlers only parse input, call services, and render UI. They must not contain data access logic.
 
 ---
 

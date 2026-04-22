@@ -37,6 +37,14 @@ def user_topics_list_kb(user_id: int):
     return builder.as_markup()
 
 
+def user_profile_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data="user_main")
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def user_topic_detail_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="⬅️ К списку топиков", callback_data="user_topics")

@@ -1,5 +1,6 @@
 # Файл: handlers/moderator.py
 import logging
+import math
 from aiogram import Router, F, types
 from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
@@ -74,13 +75,13 @@ async def back_to_moderator_main(callback: types.CallbackQuery, state: FSMContex
     manageable_topics = PermissionService.get_manageable_topics(user_id)
 
     if not manageable_topics:
-        await callback.message.edit_text("❌ У вас нет прав на управление каким-либо топиком.")
+        await UIService.show_menu(state, callback, "❌ У вас нет прав на управление каким-либо топиком.")
         return
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         "🛠 <b>Панель модератора</b>\nВыберите топик для управления:",
-        reply_markup=kb.moderator_topics_list_kb(manageable_topics, page=page),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_topics_list_kb(manageable_topics, page=page)
     )
 
 @router.callback_query(F.data.startswith("mod_topic_select_"))
@@ -97,10 +98,10 @@ async def moderator_topic_selected(callback: types.CallbackQuery, state: FSMCont
     await state.update_data(moderator_current_topic=topic_id)
     topic_name = db.get_topic_name(topic_id)
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"📍 <b>Управление топиком: {topic_name}</b> (ID: {topic_id})",
-        reply_markup=kb.moderator_topic_menu_kb(topic_id),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_topic_menu_kb(topic_id)
     )
 
 
@@ -140,14 +141,11 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
             logger.warning(f"⚠️ Ошибка API: {e}")
             status = f"\n⚠️ Только в БД (Ошибка API)"
 
-    await UIService.finish_input(state, message)
-
-    sent_message = await message.answer(
+    await UIService.show_menu(
+        state, message, 
         f"✅ Топик {topic_id} переименован в '{new_name}'.{status}",
-        reply_markup=kb.moderator_topic_menu_kb(topic_id),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_topic_menu_kb(topic_id)
     )
-    await state.update_data(last_menu_id=sent_message.message_id)
 
 
 @router.callback_query(F.data.startswith("mod_topic_groups_"))
@@ -163,10 +161,10 @@ async def moderator_show_groups(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"📂 <b>Группы доступа для топика {db.get_topic_name(topic_id)}</b>",
-        reply_markup=kb.moderator_group_list_kb(topic_id, page=page),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_group_list_kb(topic_id, page=page)
     )
 
 
@@ -184,10 +182,10 @@ async def moderator_show_unattached_groups(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         "🔗 <b>Выберите глобальную группу для привязки:</b>",
-        reply_markup=kb.moderator_available_groups_kb(topic_id, page=page),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_available_groups_kb(topic_id, page=page)
     )
 
 @router.callback_query(F.data.startswith("mod_gr_link_"))
@@ -206,10 +204,10 @@ async def moderator_link_group(callback: types.CallbackQuery):
     db.add_topic_to_group(group_id, topic_id)
     await callback.answer("✅ Группа привязана.")
     
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"📂 <b>Группы доступа для топика {db.get_topic_name(topic_id)}</b>",
-        reply_markup=kb.moderator_group_list_kb(topic_id),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_group_list_kb(topic_id)
     )
 
 @router.callback_query(F.data.startswith("mod_group_remove_"))
@@ -227,12 +225,16 @@ async def moderator_remove_group(callback: types.CallbackQuery):
 
     db.remove_topic_from_group(group_id, topic_id)
     await callback.answer("✅ Группа отвязана.")
-    await callback.message.edit_reply_markup(reply_markup=kb.moderator_group_list_kb(topic_id))
+    await UIService.show_menu(
+        state, callback,
+        f"📂 <b>Группы доступа для топика {db.get_topic_name(topic_id)}</b>",
+        reply_markup=kb.moderator_group_list_kb(topic_id)
+    )
 
 
 @router.callback_query(F.data.startswith("mod_users_manage_"))
 @safe_callback()
-async def moderator_manage_users(callback: types.CallbackQuery):
+async def moderator_manage_users(callback: types.CallbackQuery, state: FSMContext):
     """Управление пользователями в группах топика."""
     parts = callback.data.split("_pg_")
     page = int(parts[1]) if len(parts) > 1 else 1
@@ -243,16 +245,16 @@ async def moderator_manage_users(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"👥 <b>Пользователи и группы топика {db.get_topic_name(topic_id)}</b>",
-        reply_markup=kb.moderator_users_list_kb(topic_id, page=page),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_users_list_kb(topic_id, page=page)
     )
 
 
 @router.callback_query(F.data.startswith("mod_tgl_dir_"))
 @safe_callback()
-async def moderator_toggle_direct_access(callback: types.CallbackQuery):
+async def moderator_toggle_direct_access(callback: types.CallbackQuery, state: FSMContext):
     """Выдает или забирает прямой доступ пользователя к топику."""
     parts = callback.data.split("_")
     target_user_id = int(parts[3])
@@ -278,7 +280,7 @@ async def moderator_toggle_direct_access(callback: types.CallbackQuery):
         db.grant_direct_access(target_user_id, topic_id)
         await callback.answer("✅ Прямой доступ выдан.")
 
-    await callback.message.edit_reply_markup(reply_markup=kb.moderator_users_list_kb(topic_id))
+    await UIService.show_menu(state, callback, f"👥 <b>Пользователи и группы топика {db.get_topic_name(topic_id)}</b>", reply_markup=kb.moderator_users_list_kb(topic_id))
 
 
 @router.callback_query(F.data.startswith("mod_add_user_list_"))
@@ -296,7 +298,8 @@ async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMConte
 
     await state.update_data(moderator_direct_access_topic=topic_id)
     await state.set_state(ModeratorStates.waiting_for_direct_access_user)
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:\n\nИли выберите из списка:",
         reply_markup=kb.moderator_users_to_add_kb(topic_id, page=page)
     )
@@ -314,14 +317,11 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
             return
             
         db.grant_direct_access(target_user_id, topic_id)
-        await UIService.finish_input(state, message)
-
-        sent_message = await message.answer(
+        await UIService.show_menu(
+            state, message, 
             f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
-            reply_markup=kb.moderator_users_list_kb(topic_id),
-            parse_mode="HTML"
+            reply_markup=kb.moderator_users_list_kb(topic_id)
         )
-        await state.update_data(last_menu_id=sent_message.message_id)
     else:
         results = db.find_users_by_query(text)
         if not results:
@@ -330,29 +330,25 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
         elif len(results) == 1:
             target_user_id = results[0][0]
             db.grant_direct_access(target_user_id, topic_id)
-            await UIService.finish_input(state, message)
-
-            sent_message = await message.answer(
+            await UIService.show_menu(
+                state, message, 
                 f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
-                reply_markup=kb.moderator_users_list_kb(topic_id),
-                parse_mode="HTML"
+                reply_markup=kb.moderator_users_list_kb(topic_id)
             )
-            await state.update_data(last_menu_id=sent_message.message_id)
         else:
             await state.update_data(
-                disambig_query=text, 
-                disambig_action="dir_add", 
+                disambig_query=text,
+                disambig_action="dir_add",
                 disambig_context=topic_id
             )
-            import math
             total_pages = math.ceil(len(results)/7)
             markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
-            await message.answer("👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
+            await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith("mod_back_to_topic_"))
 @safe_callback()
-async def moderator_back_to_topic(callback: types.CallbackQuery):
+async def moderator_back_to_topic(callback: types.CallbackQuery, state: FSMContext):
     """Возврат в меню топика."""
     topic_id = extract_topic_id_from_callback(callback)
     user_id = callback.from_user.id
@@ -362,17 +358,17 @@ async def moderator_back_to_topic(callback: types.CallbackQuery):
         return
 
     topic_name = db.get_topic_name(topic_id)
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"📍 <b>Управление топиком: {topic_name}</b> (ID: {topic_id})",
-        reply_markup=kb.moderator_topic_menu_kb(topic_id),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_topic_menu_kb(topic_id)
     )
 
 # --- УПРАВЛЕНИЕ МОДЕРАТОРАМИ ТОПИКА ---
 
 @router.callback_query(F.data.startswith("mod_topic_moderators_"))
 @safe_callback()
-async def moderator_show_moderators(callback: types.CallbackQuery):
+async def moderator_show_moderators(callback: types.CallbackQuery, state: FSMContext):
     """Показывает список модераторов топика."""
     parts = callback.data.split("_pg_")
     page = int(parts[1]) if len(parts) > 1 else 1
@@ -383,10 +379,10 @@ async def moderator_show_moderators(callback: types.CallbackQuery):
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    await callback.message.edit_text(
+    await UIService.show_menu(
+        state, callback, 
         f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
-        reply_markup=kb.moderator_topic_moderators_kb(topic_id, page=page),
-        parse_mode="HTML"
+        reply_markup=kb.moderator_topic_moderators_kb(topic_id, page=page)
     )
 
 
@@ -427,18 +423,16 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
             await UIService.show_temp_message(state, message, "❌ Роль 'moderator' не найдена в БД.")
             return
 
+        success = db.grant_role(target_user_id, role_id, topic_id)
         if not success:
-            await UIService.show_temp_message(state, message, "❌ Не удалось назначить модератора.")
+            await UIService.show_temp_message(state, message, "❌ Не удалось назначить модератора (возможно, роль уже есть).")
             return
 
-        await UIService.finish_input(state, message)
-
-        sent_message = await message.answer(
+        await UIService.show_menu(
+            state, message, 
             f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
-            reply_markup=kb.moderator_topic_moderators_kb(topic_id),
-            parse_mode="HTML"
+            reply_markup=kb.moderator_topic_moderators_kb(topic_id)
         )
-        await state.update_data(last_menu_id=sent_message.message_id)
 
     else:
         results = db.find_users_by_query(text)
@@ -450,29 +444,26 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
             role_id = db.get_role_id("moderator")
             if role_id != 0:
                 db.grant_role(target_user_id, role_id, topic_id)
-            await UIService.finish_input(state, message)
             
-            sent_message = await message.answer(
+            await UIService.show_menu(
+                state, message, 
                 f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
-                reply_markup=kb.moderator_topic_moderators_kb(topic_id),
-                parse_mode="HTML"
+                reply_markup=kb.moderator_topic_moderators_kb(topic_id)
             )
-            await state.update_data(last_menu_id=sent_message.message_id)
         else:
             await state.update_data(
-                disambig_query=text, 
-                disambig_action="mod_add", 
+                disambig_query=text,
+                disambig_action="mod_add",
                 disambig_context=topic_id
             )
-            import math
             total_pages = math.ceil(len(results)/7)
             markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
-            await message.answer("👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
+            await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith("mod_moderator_remove_"))
 @safe_callback()
-async def moderator_remove_moderator(callback: types.CallbackQuery):
+async def moderator_remove_moderator(callback: types.CallbackQuery, state: FSMContext):
     """Снятие роли модератора с пользователя в этом топике."""
     parts = callback.data.split("_")
     target_user_id = int(parts[3])
@@ -495,7 +486,9 @@ async def moderator_remove_moderator(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ Не удалось удалить модератора.")
 
-    await callback.message.edit_reply_markup(
+    await UIService.show_menu(
+        state, callback, 
+        f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
         reply_markup=kb.moderator_topic_moderators_kb(topic_id)
     )
 

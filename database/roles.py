@@ -16,6 +16,15 @@ def get_role_id(name: str) -> int:
 def grant_role(user_id: int, role_id: int, topic_id: int = None) -> bool:
     try:
         with get_conn() as conn:
+            # Проверяем, нет ли уже такой роли у пользователя
+            c = conn.cursor()
+            c.execute(
+                "SELECT 1 FROM user_roles WHERE user_id = ? AND role_id = ? AND (topic_id IS ? OR topic_id = ?)",
+                (user_id, role_id, topic_id, topic_id)
+            )
+            if c.fetchone():
+                return False # Роль уже назначена
+
             with conn:
                 conn.execute(
                     "INSERT INTO user_roles (user_id, role_id, topic_id) VALUES (?, ?, ?)",

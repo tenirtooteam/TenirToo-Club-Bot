@@ -26,9 +26,16 @@ def get_conn():
 
 
 def init_db():
-    """Создает таблицы с поддержкой каскадного удаления на уровне БД."""
+    """Создает таблицы и проверяет поддержку Foreign Keys."""
     try:
         with get_conn() as conn:
+            # Строгая проверка поддержки FK
+            fk_check = conn.execute("PRAGMA foreign_keys;").fetchone()
+            if not fk_check or fk_check[0] != 1:
+                error_msg = "❌ КРИТИЧЕСКАЯ ОШИБКА: SQLite не поддерживает Foreign Keys или PRAGMA не сработала. Запуск невозможен."
+                logger.critical(error_msg)
+                raise RuntimeError(error_msg)
+
             with conn:
                 c = conn.cursor()
                 
