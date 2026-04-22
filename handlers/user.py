@@ -14,18 +14,16 @@ router = Router()
 
 
 @router.message(Command("start"))
+@UIService.sterile_command(redirect=True, error_prefix="меню")
 async def cmd_start(message: types.Message, state: FSMContext):
-    """Главное меню пользователя с предварительной очисткой."""
-    await UIService.clear_last_menu(state, message.bot, message.chat.id)
-    await UIService.delete_msg(message)
-
+    """Главное меню пользователя с поддержкой перехода из групп в ЛС."""
     welcome_text = (
         f"Привет, {message.from_user.first_name}! 👋\n\n"
         f"Добро пожаловать в систему управления доступом клуба <b>«Теңир-Too»</b>.\n\n"
         f"Используй кнопки ниже для навигации:"
     )
-    sent_message = await message.answer(welcome_text, reply_markup=kb.user_main_kb(), parse_mode="HTML")
-    await state.update_data(last_menu_id=sent_message.message_id)
+
+    return welcome_text, kb.user_main_kb()
 
 
 @router.callback_query(F.data == "user_main")

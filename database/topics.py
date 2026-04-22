@@ -33,13 +33,12 @@ def get_topic_name(topic_id: int) -> str:
     return row[0] if row else f"Топик {topic_id}"
 
 def delete_topic(topic_id: int):
+    """Удаляет топик. Каскадное удаление (роли, доступы) выполняется на уровне БД."""
     try:
         with get_conn() as conn:
             with conn:
-                conn.execute("DELETE FROM group_topics WHERE topic_id = ?", (topic_id,))
                 conn.execute("DELETE FROM topic_names WHERE topic_id = ?", (topic_id,))
-                conn.execute("DELETE FROM direct_topic_access WHERE topic_id = ?", (topic_id,))
-        logger.warning(f"🗑 Топик ID: {topic_id} полностью удален из базы")
+        logger.warning(f"🗑 Топик ID: {topic_id} и все его связи полностью удалены БД каскадно.")
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка при удалении топика {topic_id}: {e}")
 

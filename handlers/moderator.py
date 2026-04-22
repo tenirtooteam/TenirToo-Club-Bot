@@ -15,12 +15,16 @@ logger = logging.getLogger(__name__)
 
 
 class IsTopicManager(Filter):
-    """Фильтр: суперадмин, глобальный админ или модератор конкретного топика."""
+    """Фильтр: суперадмин, глобальный admin или модератор конкретного топика."""
     async def __call__(self, event: types.Message | types.CallbackQuery) -> bool:
         user_id = event.from_user.id
-        # Для сообщений из групп игнорируем (модератор работает только в ЛС)
+        
+        # Если это сообщение из группы, разрешаем только команду /mod
         if isinstance(event, types.Message) and event.chat.type != "private":
-            return False
+            if not (event.text and event.text.startswith("/mod")):
+                return False
+        
+        # Проверка прав доступа через PermissionService
         if PermissionService.is_global_admin(user_id):
             return True
         return len(PermissionService.get_manageable_topics(user_id)) > 0
@@ -48,23 +52,16 @@ def extract_topic_id_from_callback(callback: types.CallbackQuery) -> int:
 
 
 @router.message(Command("mod"))
+@UIService.sterile_command(redirect=True, error_prefix="панель модератора")
 async def moderator_dashboard(message: types.Message, state: FSMContext):
-    """Главное меню модератора (выбор своего топика)."""
-    await UIService.finish_input(state, message)
-
+    """Главное меню модератора (выбор своего топика). Поддерживает переход из групп в ЛС."""
     user_id = message.from_user.id
     manageable_topics = PermissionService.get_manageable_topics(user_id)
 
     if not manageable_topics:
-        await message.answer("❌ У вас нет прав на управление каким-либо топиком.")
-        return
+        return "❌ У вас нет прав на управление каким-либо топиком.", None
 
-    sent_message = await message.answer(
-        "🛠 <b>Панель модератора</b>\nВыберите топик для управления:",
-        reply_markup=kb.moderator_topics_list_kb(manageable_topics),
-        parse_mode="HTML"
-    )
-    await state.update_data(last_menu_id=sent_message.message_id)
+    return "🛠 <b>Панель модератора</b>\nВыберите топик для управления:", kb.moderator_topics_list_kb(manageable_topics)
 
 
 @router.callback_query(F.data.startswith("moderator"))
@@ -119,8 +116,7 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
         return
 
     await state.update_data(moderator_edit_topic_id=topic_id)
-    await state.set_state(ModeratorStates.waiting_for_topic_name)
-    await callback.message.answer("✍️ Введите новое название топика:")
+    await UIService.ask_input(state, callback, "✍️ Введите новое название топика:", ModeratorStates.waiting_for_topic_name)
 
 
 @router.message(ModeratorStates.waiting_for_topic_name)
@@ -131,7 +127,7 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
     new_name = message.text.strip()
 
     if not new_name:
-        await message.answer("❌ Название не может быть пустым.")
+        await UIService.show_temp_message(state, message, "❌ Название не может быть пустым.")
         return
 
     db.update_topic_name(topic_id, new_name)
@@ -314,13 +310,12 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
     if text.isdigit():
         target_user_id = int(text)
         if not db.user_exists(target_user_id):
-            await message.answer("❌ Пользователь не найден в системе.")
+            await UIService.show_temp_message(state, message, "❌ Пользователь не найден в системе.")
             return
             
         db.grant_direct_access(target_user_id, topic_id)
-        await message.answer("✅ Прямой доступ выдан.")
         await UIService.finish_input(state, message)
-        
+
         sent_message = await message.answer(
             f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
             reply_markup=kb.moderator_users_list_kb(topic_id),
@@ -330,14 +325,13 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
     else:
         results = db.find_users_by_query(text)
         if not results:
-            await message.answer("❌ Никого не найдено по этому запросу.")
+            await UIService.show_temp_message(state, message, "❌ Никого не найдено по этому запросу.")
             return
         elif len(results) == 1:
             target_user_id = results[0][0]
             db.grant_direct_access(target_user_id, topic_id)
-            await message.answer("✅ Прямой доступ выдан.")
             await UIService.finish_input(state, message)
-            
+
             sent_message = await message.answer(
                 f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
                 reply_markup=kb.moderator_users_list_kb(topic_id),
@@ -408,10 +402,7 @@ async def moderator_add_moderator_start(callback: types.CallbackQuery, state: FS
         return
 
     await state.update_data(moderator_add_target_topic=topic_id)
-    await state.set_state(ModeratorStates.waiting_for_user_data)
-    await callback.message.answer(
-        "✍️ Введите ID пользователя, которого хотите сделать модератором этого топика:"
-    )
+    await UIService.ask_input(state, callback, "✍️ Введите ID пользователя, которого хотите сделать модератором этого топика:", ModeratorStates.waiting_for_user_data)
 
 
 @router.message(ModeratorStates.waiting_for_user_data)
@@ -424,25 +415,21 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
     if text.isdigit():
         target_user_id = int(text)
         if not db.user_exists(target_user_id):
-            await message.answer("❌ Пользователь с таким ID не найден в системе.")
+            await UIService.show_temp_message(state, message, "❌ Пользователь с таким ID не найден в системе.")
             return
 
         if PermissionService.is_moderator_of_topic(target_user_id, topic_id):
-            await message.answer("❌ Этот пользователь уже является модератором данного топика.")
+            await UIService.show_temp_message(state, message, "❌ Этот пользователь уже является модератором данного топика.")
             return
 
         role_id = db.get_role_id("moderator")
         if role_id == 0:
-            await message.answer("❌ Роль 'moderator' не найдена в БД.")
+            await UIService.show_temp_message(state, message, "❌ Роль 'moderator' не найдена в БД.")
             return
 
-        success = db.grant_role(target_user_id, role_id, topic_id)
-        if success:
-            await message.answer(
-                f"✅ Пользователь {db.get_user_name(target_user_id)} назначен модератором топика {db.get_topic_name(topic_id)}."
-            )
-        else:
-            await message.answer("❌ Не удалось назначить модератора.")
+        if not success:
+            await UIService.show_temp_message(state, message, "❌ Не удалось назначить модератора.")
+            return
 
         await UIService.finish_input(state, message)
 
@@ -456,14 +443,13 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
     else:
         results = db.find_users_by_query(text)
         if not results:
-            await message.answer("❌ Никого не найдено. Уточните запрос.")
+            await UIService.show_temp_message(state, message, "❌ Никого не найдено. Уточните запрос.")
             return
         elif len(results) == 1:
             target_user_id = results[0][0]
             role_id = db.get_role_id("moderator")
             if role_id != 0:
                 db.grant_role(target_user_id, role_id, topic_id)
-                await message.answer(f"✅ Пользователь назначен модератором.")
             await UIService.finish_input(state, message)
             
             sent_message = await message.answer(

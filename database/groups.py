@@ -34,14 +34,12 @@ def get_group_name(group_id: int) -> str:
     return row[0] if row else "Неизвестная группа"
 
 def delete_group(group_id: int):
+    """Удаляет группу. Каскадное удаление (топики, юзеры) выполняется на уровне БД."""
     try:
         with get_conn() as conn:
             with conn:
-                c = conn.cursor()
-                c.execute("DELETE FROM group_topics WHERE group_id = ?", (group_id,))
-                c.execute("DELETE FROM user_groups WHERE group_id = ?", (group_id,))
-                c.execute("DELETE FROM groups WHERE id = ?", (group_id,))
-        logger.warning(f"🗑 Удалена группа ID: {group_id} и все её связи")
+                conn.execute("DELETE FROM groups WHERE id = ?", (group_id,))
+        logger.warning(f"🗑 Удалена группа ID: {group_id}. Все связи очищены БД каскадно.")
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка при удалении группы {group_id}: {e}")
 

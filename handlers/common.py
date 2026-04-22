@@ -12,28 +12,37 @@ from services.ui_service import UIService
 router = Router()
 
 @router.message(Command("help"))
-async def cmd_help(message: types.Message):
-    """Глобальная команда помощи, адаптирующаяся под роль пользователя."""
+@UIService.sterile_command(redirect=True, error_prefix="справку")
+async def cmd_help(message: types.Message, state: FSMContext):
+    """Глобальная команда помощи: отправка в ЛС и чистка в группе."""
     user_id = message.from_user.id
     
-    # Собираем текст помощи в зависимости от прав
-    help_text = "🆘 <b>Справка по командам бота:</b>\n\n"
-    
-    help_text += "👤 <b>Основные (Для всех):</b>\n"
-    help_text += "🔹 /start — Главное меню пользователя\n"
-    help_text += "🔹 /help — Эта справка\n\n"
-    
-    if PermissionService.get_manageable_topics(user_id):
-        help_text += "🛡 <b>Для модераторов:</b>\n"
-        help_text += "🔹 /mod — Панель управления модерируемыми топиками (выдача доступов, управление пользователями)\n\n"
-        
+    # Сборка текста справки согласно ролям [cite: 113, 231, 232]
+    help_text = (
+        "📖 <b>Справочник команд Tenir-Too Bot</b>\n\n"
+        "<b>Общие:</b>\n"
+        "— /start : Главное меню\n"
+        "— /help  : Показать эту справку\n"
+    )
+
+    # Добавляем блок для модераторов
+    manageable_topics = PermissionService.get_manageable_topics(user_id)
+    if manageable_topics:
+        help_text += (
+            "\n<b>Модератор:</b>\n"
+            "— /mod   : Панель управления топиками\n"
+        )
+
+    # Добавляем блок для админов
     if PermissionService.is_global_admin(user_id):
-        help_text += "👑 <b>Для администраторов:</b>\n"
-        help_text += "🔹 /admin — Панель управления ролями, группами доступа и привязкой топиков\n\n"
-        
-    help_text += "<i>💡 Подсказка: Бот удаляет старые меню для поддержания чистоты чата. Если меню пропало, просто введите нужную команду заново.</i>"
+        help_text += (
+            "\n<b>Администратор:</b>\n"
+            "— /admin : Глобальная панель управления\n"
+        )
     
-    await message.answer(help_text, parse_mode="HTML")
+    help_text += "\n<i>Все меню открываются в личных сообщениях для чистоты общих чатов.</i>"
+
+    return help_text, None
 
 
 

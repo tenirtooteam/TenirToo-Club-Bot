@@ -39,16 +39,13 @@ class AdminStates(StatesGroup):
 # --- ГЛАВНОЕ МЕНЮ ---
 
 @router.message(Command("admin"))
+@UIService.sterile_command(redirect=True, error_prefix="админ-панель")
 async def admin_dashboard(message: types.Message, state: FSMContext):
-    await UIService.finish_input(state, message)
-
-    is_superadmin = PermissionService.is_superadmin(message.from_user.id)
-    sent_message = await message.answer(
-        "🛠 <b>Панель управления</b>",
-        reply_markup=kb.main_admin_kb(is_superadmin=is_superadmin),
-        parse_mode="HTML"
-    )
-    await state.update_data(last_menu_id=sent_message.message_id)
+    """Панель управления администратора с поддержкой перехода из групп в ЛС."""
+    user_id = message.from_user.id
+    is_superadmin = PermissionService.is_superadmin(user_id)
+    
+    return "🛠 <b>Панель управления</b>", kb.main_admin_kb(is_superadmin=is_superadmin)
 
 
 @router.callback_query(F.data == "admin_main")
@@ -96,8 +93,7 @@ async def group_detail(callback: types.CallbackQuery):
 @router.callback_query(F.data == "add_group_start")
 @safe_callback()
 async def add_group_init(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("✍️ Введи название для новой группы:")
-    await state.set_state(AdminStates.waiting_for_group_name)
+    await UIService.ask_input(state, callback, "✍️ Введи название для новой группы:", AdminStates.waiting_for_group_name)
 
 
 @router.message(AdminStates.waiting_for_group_name)
@@ -217,8 +213,7 @@ async def topic_rename_init(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     t_id, g_id = int(parts[2]), int(parts[3])
     await state.update_data(edit_topic_id=t_id, edit_group_id=g_id)
-    await callback.message.answer(f"✍️ Введи новое название для ID: {t_id}:")
-    await state.set_state(AdminStates.waiting_for_topic_name)
+    await UIService.ask_input(state, callback, f"✍️ Введи новое название для ID: {t_id}:", AdminStates.waiting_for_topic_name)
 
 
 @router.message(AdminStates.waiting_for_topic_name)
@@ -229,7 +224,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
 
     if t_id is None:
         await state.set_state(None)
-        await message.answer("❌ Ошибка: данные топика потеряны.")
+        await UIService.show_temp_message(state, message, "❌ Ошибка: данные топика потеряны.")
         return
 
     db.update_topic_name(t_id, new_name)
@@ -276,15 +271,14 @@ async def show_users(callback: types.CallbackQuery):
 @router.callback_query(F.data == "add_user_start")
 @safe_callback()
 async def add_user_init(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("✍️ Введи: <code>ID Имя Фамилия</code>", parse_mode="HTML")
-    await state.set_state(AdminStates.waiting_for_user_data)
+    await UIService.ask_input(state, callback, "✍️ Введи: <code>ID Имя Фамилия</code>", AdminStates.waiting_for_user_data)
 
 
 @router.message(AdminStates.waiting_for_user_data)
 async def process_user_add(message: types.Message, state: FSMContext):
     parts = message.text.split()
     if len(parts) < 3 or not parts[0].isdigit():
-        await message.answer("❌ Формат: ID Имя Фамилия")
+        await UIService.show_temp_message(state, message, "❌ Формат: ID Имя Фамилия")
         return
 
     db.add_user(int(parts[0]), parts[1], parts[2])
@@ -315,15 +309,14 @@ async def user_detail(callback: types.CallbackQuery):
 async def user_rename_init(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split("_")[-1])
     await state.update_data(edit_user_id=user_id)
-    await callback.message.answer("✍️ Введи новое Имя и Фамилию:")
-    await state.set_state(AdminStates.waiting_for_new_name)
+    await UIService.ask_input(state, callback, "✍️ Введи новое Имя и Фамилию:", AdminStates.waiting_for_new_name)
 
 
 @router.message(AdminStates.waiting_for_new_name)
 async def process_user_rename(message: types.Message, state: FSMContext):
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("❌ Введи Имя и Фамилию!")
+        await UIService.show_temp_message(state, message, "❌ Введи Имя и Фамилию!")
         return
 
     data = await state.get_data()
@@ -445,13 +438,13 @@ async def process_role_user_id(message: types.Message, state: FSMContext):
     if text.isdigit():
         user_id = int(text)
         if not db.user_exists(user_id):
-            await message.answer("❌ Пользователь с таким ID не найден.")
+            await UIService.show_temp_message(state, message, "❌ Пользователь с таким ID не найден.")
             return
         await _on_user_found(user_id)
     else:
         results = db.find_users_by_query(text)
         if not results:
-            await message.answer("❌ Никого не найдено.")
+            await UIService.show_temp_message(state, message, "❌ Никого не найдено.")
             return
         elif len(results) == 1:
             await _on_user_found(results[0][0])

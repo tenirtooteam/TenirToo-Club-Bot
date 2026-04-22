@@ -18,12 +18,13 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware`.
-- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol).
+- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command(redirect, error_prefix)` decorator allows enabling/disabling group-to-PM redirection and automatic UI cleanup for any command handler by adding a single line. Temporary messages (errors, prompts) are self-cleaning — tracked via `last_menu_id` and replaced on the next interaction.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
 - **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
 - **Callback Guarding**: `safe_callback` decorator prevents crashes on double-clicks.
 - **Native Notifications**: The `@all` mention triggers a silent push notification for all authorized topic members.
+- **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
 
@@ -58,8 +59,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 9. **TOPIC RENAME SYNC**: When renaming a topic via the admin panel, the change must be applied to both the local DB (`db.update_topic_name`) **and** the Telegram API (`bot.edit_forum_topic`).
    > Rationale: A DB-only rename creates a divergence causing user-visible inconsistency.
 
-10. **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.finish_input(state, message)`.
-    > Rationale: Failing to clean up the previous generation prompt or keyboard before deploying a new one leads to 'stuck' or 'leaking' phantom windows in the chat history, violating the Sterile Interface Protocol.
+10. **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.finish_input(state, message)`. For command-level handlers (`@router.message(Command(...))`), use the `@UIService.sterile_command(redirect=True/False, error_prefix="...")` decorator instead of calling `UIService.send_redirected_menu` directly. The decorated handler must return a `(text, reply_markup)` tuple or just `text`.
+    > Rationale: The decorator centralizes redirect logic, PM error fallback, trigger cleanup, and `last_menu_id` tracking into a single declarative line. Bypassing the decorator and calling `send_redirected_menu` manually is redundant and error-prone.
 
 11. **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
     > Rationale: Duplicated handlers cause router dispatch conflicts, leading to unpredictable double-executions or arbitrary routing based on aiogram load order.

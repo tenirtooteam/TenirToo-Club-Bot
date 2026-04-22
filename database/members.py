@@ -31,13 +31,12 @@ def add_user(user_id: int, first_name: str, last_name: str) -> bool:
 
 
 def delete_user(user_id: int):
+    """Удаляет пользователя. Каскадное удаление (роли, группы) выполняется на уровне БД."""
     try:
         with get_conn() as conn:
             with conn:
-                c = conn.cursor()
-                c.execute("DELETE FROM user_groups WHERE user_id = ?", (user_id,))
-                c.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
-        logger.warning(f"🗑 Удален пользователь ID: {user_id} и все его доступы")
+                conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+        logger.warning(f"🗑 Удален пользователь ID: {user_id}. Все связанные данные удалены БД каскадно.")
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка при удалении пользователя {user_id}: {e}")
 
