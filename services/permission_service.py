@@ -83,3 +83,12 @@ class PermissionService:
             if role_name == 'moderator' and topic_id is not None:
                 topics.append(topic_id)
         return topics
+
+    @staticmethod
+    def can_user_write_in_topic(user_id: int, topic_id: int) -> bool:
+        """Проверка прав на запись в конкретный топик."""
+        # Если топик не ограничен — писать можно всем
+        if not db.is_topic_restricted(topic_id):
+            return True
+        # Если ограничен — проверяем права
+        return db.can_write(user_id, topic_id)

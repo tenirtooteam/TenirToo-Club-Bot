@@ -10,6 +10,7 @@ from config import ADMIN_ID, GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
 from services.permission_service import PermissionService
+from services.management_service import ManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -103,12 +104,12 @@ async def add_group_init(callback: types.CallbackQuery, state: FSMContext):
 
 @router.message(AdminStates.waiting_for_group_name)
 async def process_group_add(message: types.Message, state: FSMContext):
-    db.create_group(message.text)
-    await UIService.show_menu(
-        state, message, 
-        f"✅ Группа <b>{message.text}</b> создана!", 
-        reply_markup=kb.main_admin_kb()
-    )
+    success, text = ManagementService.create_group(message.text)
+    if not success:
+        await UIService.show_temp_message(state, message, text)
+        return
+
+    await UIService.show_menu(state, message, text, reply_markup=kb.main_admin_kb())
 
 
 @router.callback_query(F.data.startswith("del_group_"))
@@ -280,17 +281,12 @@ async def add_user_init(callback: types.CallbackQuery, state: FSMContext):
 
 @router.message(AdminStates.waiting_for_user_data)
 async def process_user_add(message: types.Message, state: FSMContext):
-    parts = message.text.split()
-    if len(parts) < 3 or not parts[0].isdigit():
-        await UIService.show_temp_message(state, message, "❌ Формат: ID Имя Фамилия")
+    success, text = ManagementService.add_user(message.text)
+    if not success:
+        await UIService.show_temp_message(state, message, text)
         return
 
-    db.add_user(int(parts[0]), parts[1], parts[2])
-    await UIService.show_menu(
-        state, message, 
-        f"✅ Пользователь {parts[1]} добавлен!", 
-        reply_markup=kb.users_list_kb()
-    )
+    await UIService.show_menu(state, message, text, reply_markup=kb.users_list_kb())
 
 
 @router.callback_query(F.data.startswith("user_info_"))

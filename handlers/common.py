@@ -9,6 +9,7 @@ import keyboards as kb
 from services.callback_guard import safe_callback
 from services.permission_service import PermissionService
 from services.ui_service import UIService
+from services.management_service import ManagementService
 
 router = Router()
 
@@ -91,15 +92,11 @@ async def process_user_pick(callback: types.CallbackQuery, state: FSMContext):
     user_name = db.get_user_name(target_user_id)
 
     if action == "dir_add":
-        db.grant_direct_access(target_user_id, context_id)
-        await UIService.show_menu(state, callback, f"✅ Прямой доступ выдан пользователю: {user_name}")
+        success, result = ManagementService.grant_direct_access(str(target_user_id), context_id)
+        await UIService.show_menu(state, callback, result)
     elif action == "mod_add":
-        role_id = db.get_role_id("moderator")
-        if role_id != 0:
-            db.grant_role(target_user_id, role_id, context_id)
-            await UIService.show_menu(state, callback, f"✅ {user_name} назначен модератором.")
-        else:
-            await UIService.show_menu(state, callback, "❌ Ошибка роли.")
+        success, result = ManagementService.assign_moderator_role(str(target_user_id), context_id)
+        await UIService.show_menu(state, callback, result)
     elif action == "admin_role_target":
         await state.set_state(None)
         await UIService.show_menu(

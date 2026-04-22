@@ -17,7 +17,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Static Core Roles**: Built-in static roles (`superadmin`, `admin`, `moderator`). `superadmin` is virtually mapped directly in the DB response for the configurated creator.
 - **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
-- **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware`.
+- **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware` delegating to `ManagementService.ensure_user_registered`.
 - **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles with role-specific visual decoration (crowns/shields). Temporary messages are self-cleaning via `last_menu_id`.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
@@ -27,6 +27,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
 - **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
 - **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and `perform_search_pick` router in `handlers/common.py`, supporting User, Group, and Topic entity types.
+- **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. This consolidation (absorbing legacy Access/Admin/Moderator services) ensures absolute SoC and protects the database from malformed inputs.
 - **Strict DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
@@ -82,8 +83,10 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 16. **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
     > Rationale: aiogram's DI injects `state` only if explicitly declared. Silent failure without it crashes the handler at the first `UIService` call.
 
-17. **KNOWN TECHNICAL DEBT — HANDLER DB ACCESS**: Handlers currently access `database.db` directly. This is a known architectural limitation (SoC violation). Do NOT treat it as a pattern to follow. The intended solution is a service layer (`EntityService`, `AdminService`, etc.) that mediates between handlers and the DB. This refactor is deferred until explicitly requested.
-    > Rationale: The correct architecture dictates that handlers only parse input, call services, and render UI. They must not contain data access logic.
+17. **MANAGEMENT SERVICE MUTATION PROTOCOL**: All entity mutations (adding users, creating groups, granting/revoking access or roles) MUST traverse `ManagementService`. Handlers are strictly prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` mutation calls.
+    > Rationale: The service layer sanitizes intent and returns user-ready messages. Centralizing this logic prevents code duplication and ensures that business rules (like duplicate ID handling) are applied consistently.
+18. **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
+    > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
 
 ---
 

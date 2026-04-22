@@ -4,7 +4,8 @@ from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import Message
 from database import db
-from services.access_service import AccessService
+from services.management_service import ManagementService
+from services.permission_service import PermissionService
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ class UserManagerMiddleware(BaseMiddleware):
     async def __call__(self, handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
                        event: Message, data: Dict[str, Any]) -> Any:
         if event.from_user and not event.from_user.is_bot:
-            await AccessService.ensure_user_registered(event.from_user)
+            await ManagementService.ensure_user_registered(event.from_user)
         return await handler(event, data)
 
 
@@ -62,7 +63,6 @@ class AccessGuardMiddleware(BaseMiddleware):
 
         user_id = event.from_user.id
         from config import IMMUNITY_FOR_ADMINS
-        from services.permission_service import PermissionService
         if IMMUNITY_FOR_ADMINS and PermissionService.is_global_admin(user_id):
             return await handler(event, data)
 
@@ -71,7 +71,7 @@ class AccessGuardMiddleware(BaseMiddleware):
         topic_name = db.get_topic_name(topic_id)
         log_base = f"{user_fullname} (ID: {user_id}) -> {topic_name} (ID: {topic_id})"
 
-        if not AccessService.can_user_write_in_topic(user_id, topic_id):
+        if not PermissionService.can_user_write_in_topic(user_id, topic_id):
             try:
                 await event.delete()
                 logger.info(f"❌ {log_base} | Сообщение УДАЛЕНО (нет доступа)")

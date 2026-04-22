@@ -11,6 +11,7 @@ from config import GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
 from services.permission_service import PermissionService
+from services.management_service import ManagementService
 
 logger = logging.getLogger(__name__)
 
@@ -309,41 +310,28 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
     text = message.text.strip()
     data = await state.get_data()
     topic_id = data.get("moderator_direct_access_topic")
-    
-    if text.isdigit():
-        target_user_id = int(text)
-        if not db.user_exists(target_user_id):
-            await UIService.show_temp_message(state, message, "❌ Пользователь не найден в системе.")
-            return
-            
-        db.grant_direct_access(target_user_id, topic_id)
-        await UIService.show_menu(
-            state, message, 
-            f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
-            reply_markup=kb.moderator_users_list_kb(topic_id)
-        )
-    else:
+
+    success, result = ManagementService.grant_direct_access(text, topic_id)
+    if success:
+        await UIService.show_menu(state, message, result, reply_markup=kb.moderator_users_list_kb(topic_id))
+        return
+
+    if result == "SEARCH_REQUIRED":
         results = db.find_users_by_query(text)
         if not results:
             await UIService.show_temp_message(state, message, "❌ Никого не найдено по этому запросу.")
             return
         elif len(results) == 1:
-            target_user_id = results[0][0]
-            db.grant_direct_access(target_user_id, topic_id)
-            await UIService.show_menu(
-                state, message, 
-                f"👥 <b>Пользователи топика {db.get_topic_name(topic_id)}</b>",
-                reply_markup=kb.moderator_users_list_kb(topic_id)
-            )
+            # Снова вызываем сервис, но уже с ID
+            success, result = ManagementService.grant_direct_access(str(results[0][0]), topic_id)
+            await UIService.show_menu(state, message, result, reply_markup=kb.moderator_users_list_kb(topic_id))
         else:
-            await state.update_data(
-                disambig_query=text,
-                disambig_action="dir_add",
-                disambig_context=topic_id
-            )
+            await state.update_data(disambig_query=text, disambig_action="dir_add", disambig_context=topic_id)
             total_pages = math.ceil(len(results)/7)
             markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
             await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
+    else:
+        await UIService.show_temp_message(state, message, result)
 
 
 @router.callback_query(F.data.startswith("mod_back_to_topic_"))
@@ -408,57 +396,26 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
     data = await state.get_data()
     topic_id = data.get("moderator_add_target_topic")
 
-    if text.isdigit():
-        target_user_id = int(text)
-        if not db.user_exists(target_user_id):
-            await UIService.show_temp_message(state, message, "❌ Пользователь с таким ID не найден в системе.")
-            return
+    success, result = ManagementService.assign_moderator_role(text, topic_id)
+    if success:
+        await UIService.show_menu(state, message, result, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
+        return
 
-        if PermissionService.is_moderator_of_topic(target_user_id, topic_id):
-            await UIService.show_temp_message(state, message, "❌ Этот пользователь уже является модератором данного топика.")
-            return
-
-        role_id = db.get_role_id("moderator")
-        if role_id == 0:
-            await UIService.show_temp_message(state, message, "❌ Роль 'moderator' не найдена в БД.")
-            return
-
-        success = db.grant_role(target_user_id, role_id, topic_id)
-        if not success:
-            await UIService.show_temp_message(state, message, "❌ Не удалось назначить модератора (возможно, роль уже есть).")
-            return
-
-        await UIService.show_menu(
-            state, message, 
-            f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
-            reply_markup=kb.moderator_topic_moderators_kb(topic_id)
-        )
-
-    else:
+    if result == "SEARCH_REQUIRED":
         results = db.find_users_by_query(text)
         if not results:
             await UIService.show_temp_message(state, message, "❌ Никого не найдено. Уточните запрос.")
             return
         elif len(results) == 1:
-            target_user_id = results[0][0]
-            role_id = db.get_role_id("moderator")
-            if role_id != 0:
-                db.grant_role(target_user_id, role_id, topic_id)
-            
-            await UIService.show_menu(
-                state, message, 
-                f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
-                reply_markup=kb.moderator_topic_moderators_kb(topic_id)
-            )
+            success, result = ManagementService.assign_moderator_role(str(results[0][0]), topic_id)
+            await UIService.show_menu(state, message, result, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
         else:
-            await state.update_data(
-                disambig_query=text,
-                disambig_action="mod_add",
-                disambig_context=topic_id
-            )
+            await state.update_data(disambig_query=text, disambig_action="mod_add", disambig_context=topic_id)
             total_pages = math.ceil(len(results)/7)
             markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
             await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
+    else:
+        await UIService.show_temp_message(state, message, result)
 
 
 @router.callback_query(F.data.startswith("mod_moderator_remove_"))
@@ -491,4 +448,4 @@ async def moderator_remove_moderator(callback: types.CallbackQuery, state: FSMCo
         f"👑 <b>Модераторы топика {db.get_topic_name(topic_id)}</b>",
         reply_markup=kb.moderator_topic_moderators_kb(topic_id)
     )
-
+
