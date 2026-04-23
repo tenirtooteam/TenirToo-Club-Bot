@@ -18,7 +18,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware` delegating to `ManagementService.ensure_user_registered`.
-- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles with role-specific visual decoration (crowns/shields). Temporary messages are self-cleaning via `last_menu_id`.
+- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
 - **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
@@ -87,6 +87,9 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
     > Rationale: The service layer sanitizes intent and returns user-ready messages. Centralizing this logic prevents code duplication and ensures that business rules (like duplicate ID handling) are applied consistently.
 18. **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
     > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
+
+19. **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)` instead of direct calls to `UIService.show_menu` or manual keyboard creation.
+    > Rationale: Centralizing routing logic in the service layer prevents "UI logic leak" into handlers and ensures that role-based visibility (e.g., superadmin buttons) is handled consistently in a single point of failure.
 
 ---
 

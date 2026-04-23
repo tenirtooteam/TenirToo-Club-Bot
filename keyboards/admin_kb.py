@@ -14,6 +14,11 @@ def main_admin_kb(is_superadmin: bool = False):
     builder.adjust(1)
     return builder.as_markup()
 
+def back_to_main_kb():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ В панель управления", callback_data="admin_main")
+    return builder.as_markup()
+
 def all_topics_kb(page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     topic_ids = db.get_all_unique_topics()
@@ -121,12 +126,15 @@ def users_list_kb(page: int = 1, limit: int = 7):
         search_type="user", search_action="info"
     )
 
-def user_edit_kb(user_id):
+def user_edit_kb(user_id, is_superadmin: bool = False):
     builder = InlineKeyboardBuilder()
     builder.button(text="🏷 Переименовать", callback_data=f"user_rename_{user_id}")
     builder.button(text="🔐 Управление группами", callback_data=f"user_groups_manage_{user_id}")
     builder.button(text="👑 Управление ролями", callback_data=f"user_roles_manage_{user_id}")
-    builder.button(text="🗑 Удалить пользователя", callback_data=f"user_delete_{user_id}")
+    
+    if is_superadmin:
+        builder.button(text="🗑 Удалить пользователя", callback_data=f"user_delete_{user_id}")
+        
     builder.button(text="⬅️ Назад", callback_data="manage_users")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
@@ -261,5 +269,21 @@ def search_results_kb(results, search_type, search_action, search_context=None, 
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, "search")
+
+
+def confirmation_kb(action_type: str, target_id: int, back_callback: str, extra_id: int = 0):
+    """
+    Универсальная клавиатура подтверждения.
+    action_type: group_del, topic_del, global_topic_del, user_del
+    """
+    builder = InlineKeyboardBuilder()
+    
+    # Используем двоеточие как разделитель для параметров, чтобы не конфликтовать с подчеркиваниями в action_type
+    callback_data = f"confirm_exe_{action_type}:{target_id}:{extra_id}"
+        
+    builder.button(text="❌ Да, удалить", callback_data=callback_data)
+    builder.button(text="🔙 Отмена", callback_data=back_callback)
+    builder.adjust(1)
+    return builder.as_markup()
 
 
