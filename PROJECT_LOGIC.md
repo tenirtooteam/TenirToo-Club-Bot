@@ -2,8 +2,11 @@
 
 ## 1. PROJECT IDENTITY & STACK
 - **System Name**: Tenir-Too Access Control Bot.
+- **Python Version**: 3.11 (Required for optimal stability and dependency compatibility).
+- **Virtual Environment**: Mandatory `venv` isolation to prevent dependency conflicts and ensure consistent environment across development and production.
 - **Framework**: aiogram 3.4.1 (Asynchronous Python framework).
-- **Database Engine**: SQLite 3 with Write-Ahead Logging (WAL), `PRAGMA journal_mode=WAL` for concurrent access.
+- **Testing Suite**: pytest 8.1.1 with pytest-asyncio, pytest-mock and pytest-cov.
+- **Database Engine**: SQLite 3 with Write-Ahead Logging (WAL).
 - **Core Purpose**: Granular access control and stealth moderation for Telegram Forum Topics within a Supergroup.
 
 ---
@@ -17,6 +20,7 @@ Decoupled concerns across five layers:
 - **Services** — Business logic.
 - **Keyboards** — Inline keyboard builders. Import from `database.db` directly to render data-driven menus. Exposed via wildcard re-export facade (`keyboards/__init__.py`).
 - **Database** — Persistence via Facade pattern.
+- **Tests** — Automated test suite using in-memory database and mocks.
 
 ### 2.2. Module Registry
 Complete file list with individual responsibilities and full function inventory:
@@ -240,6 +244,28 @@ All keys stored in FSM state across the application:
 - **ADMIN_ID** — `int`. Source: `.env` → `config.py` (cast via `int`). Used via `PermissionService.is_global_admin` to route handlers in the `IsGlobalAdmin` filter. Also enriched dynamically within `db.get_user_roles`.
 - **GROUP_ID** — `int`. Source: `.env` → `config.py`. Used exclusively in `handlers/admin.py` and `handlers/moderator.py` as the `chat_id` argument for Telegram API calls. Expected to be a negative integer (Telegram supergroup convention). **Not used as a middleware guard condition.**
 - **Topic ID `-1`** — Logical mapping for the "General" topic in a forum-enabled Telegram chat.
-- **DB_PATH** — Not an env variable. Hardcoded in `database/connection.py` relative to the source file, guaranteeing path independence.
+
+---
+
+## 8. TESTING INFRASTRUCTURE
+Comprehensive automated testing suite using `pytest`. Tests are an integral part of the codebase.
+
+### 8.1. Configuration (`tests/conftest.py`)
+- **Database Isolation**: `mock_db_path` (autouse) redirects `connection.DB_PATH` to a temporary file in `tmp_path` and runs `init_db()`. This ensures a clean schema and WAL support for every test.
+- **Mocked Bot**: `mock_bot` fixture provides an `AsyncMock(spec=Bot)`. Crucially, `bot.return_value` is mocked to support the `bot(method)` call pattern in aiogram 3.
+- **Mocks**: `mock_dispatcher`, `mock_state` (FSMContext) available for handler/middleware testing.
+
+### 8.2. Test Categories
+- **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
+- **tests/test_services/**: Tests for `ManagementService` and `PermissionService`. Focus: Validation logic, Search-Or-Action protocol, and role resolution.
+- **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
+- **tests/test_integration/**: End-to-End flow tests using a real `Dispatcher` but mocked `Bot`. Focus: Full update processing chain from middleware to final handler response.
+
+### 8.3. Testing Rules
+1. **Repository Standards**: The `tests/` directory is a permanent part of the repository.
+2. **Ephemeral DB**: Always use the `mock_db_path` fixture. Writing to `bot.db` during testing is strictly prohibited.
+3. **No Network**: All external API calls (Telegram) MUST be mocked via `mock_bot`.
+4. **Router Detach**: When using global routers in integration tests, use `router._parent_router = None` before including them in a test-local `Dispatcher` to prevent `RuntimeError`.
+5. **Pydantic Validation**: All mocked `Message` and `Update` objects must include valid data (e.g., `date=datetime.now()`) to pass Pydantic V2 validation used by aiogram 3.
 
 

@@ -28,6 +28,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
 - **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and `perform_search_pick` router in `handlers/common.py`, supporting User, Group, and Topic entity types.
 - **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. This consolidation (absorbing legacy Access/Admin/Moderator services) ensures absolute SoC and protects the database from malformed inputs.
+- **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
 - **Strict DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
@@ -93,6 +94,12 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 
 20. **VERIFY BEFORE CHANGE**: BEFORE making any code changes, it is mandatory to view the target file and all related signatures (methods, keyboards, DB tables). Writing calls without confirming their existence in the current code context is strictly prohibited.
     > Rationale: Relying on memory or "ghost" signatures from conversation history leads to cascading bugs and regressions. Direct verification of the source code is the only way to ensure functional truth.
+
+21. **AUTOMATED TESTING**: All modifications to core logic (Database, Services, Handlers) MUST be verified against the existing test suite using `pytest`. New features or critical bug fixes MUST include corresponding tests in the `tests/` directory.
+    > Rationale: The test suite is the single source of functional truth and the only way to prevent regressions in a complex, multi-layered bot architecture.
+
+22. **VENV ISOLATION**: All development, testing, and execution MUST occur within a virtual environment (`venv`). Commands provided to the user must assume an active environment or include activation steps.
+    > Rationale: Global package installations lead to version conflicts and unpredictable behavior. Mandatory `venv` ensures environment parity between development and production.
 
 ---
 
