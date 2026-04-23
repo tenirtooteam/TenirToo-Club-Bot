@@ -15,10 +15,10 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 
 - **Transactional DB (WAL mode)**: High-concurrency support for SQLite, split into modular functional layers (topics, groups, roles, permissions).
 - **Static Core Roles**: Built-in static roles (`superadmin`, `admin`, `moderator`). `superadmin` is virtually mapped directly in the DB response for the configurated creator.
-- **Hybrid Access Control**: Dual-layer permission model combining global cross-topic Groups and Direct granular per-topic user access.
+- **Template-Based Access Control**: Access is governed exclusively by granular per-topic user grants (`direct_topic_access`). Global groups serve as **non-runtime templates** for bulk assignment and synchronization, decoupling runtime permissions from group membership.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware` delegating to `ManagementService.ensure_user_registered`.
-- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
+- **UIService Interface**: Automatic cleaning of menus and user commands to prevent chat clutter (Sterile UI Protocol). The service uses a **Multi-Message Stack** (`last_menu_ids`) to track and delete multiple system alerts/menus in a single transition. The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
 - **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
 - **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
@@ -27,9 +27,9 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
 - **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
 - **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and `perform_search_pick` router in `handlers/common.py`, supporting User, Group, and Topic entity types.
-- **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. This consolidation (absorbing legacy Access/Admin/Moderator services) ensures absolute SoC and protects the database from malformed inputs.
+- **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. Consolidation includes template-based operations and **flexible name parsing** for users (supporting spaces and patronymics).
 - **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
-- **Strict DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible.
+- **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `group_topics`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
 
@@ -47,7 +47,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
    > Rationale: `state.clear()` wipes all FSM data keys, including `last_menu_id`, silently breaking the Sterile Interface Protocol with no runtime error — the next menu will be deployed without cleaning the previous one.
 
 4. **TILDE BLOCKS**: Use ONLY tilde-based code blocks (~~~). Triple backticks (```) are forbidden.
-   > Rationale: Triple backticks conflict with the output format required by `DOCS_UPDATE_PROMPT.md`.
+   > Rationale: Triple backticks conflict with the output format required by internal documentation maintenance tools.
 
 5. **GROUP FILTER**: `ForumUtilityMiddleware` and `AccessGuardMiddleware` must begin with the guard: `if event.chat.type == "private": return await handler(event, data)`. `UserManagerMiddleware` is explicitly exempt from this guard — it operates on all chat types by design (registration is valid regardless of chat context). The `GROUP_ID` constant must NOT be used as a middleware guard — it is reserved exclusively for Telegram API calls. Do not add inline admin-ID checks inside handlers — use `PermissionService.is_global_admin(user_id)` or router-level filters like `IsGlobalAdmin` instead.
    > Rationale: The `chat.type == "private"` guard ensures middleware logic executes correctly in the two middlewares that contain group-specific branching. `UserManagerMiddleware` has no group-specific logic and intentionally omits the guard. Using `GROUP_ID` as a guard would incorrectly restrict the bot. Hardcoding admin IDs into presentation layers violates MVC encapsulation.
@@ -101,18 +101,21 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 22. **VENV ISOLATION**: All development, testing, and execution MUST occur within a virtual environment (`venv`). Commands provided to the user must assume an active environment or include activation steps.
     > Rationale: Global package installations lead to version conflicts and unpredictable behavior. Mandatory `venv` ensures environment parity between development and production.
 
+23. **STRATEGIC PLANNING (RNA-BLUEPRINT)**: For any non-trivial logical change (features, refactoring, audit), an implementation plan using the **RNA-Blueprint** format must be established.
+    - **Header Logic**: The header must include both **Base DNA** (general project standards) and **Task RNA** (specific logic and risks for the current task). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
+    - **Incremental Principle**: Do not rewrite the entire plan for every correction; update only the affected parts.
+    - **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[PL-HI]`) referring to the header logic.
+    - **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
+    - **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
+    > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
+
 ---
 
 ## SCOPE BOUNDARY
 
-This file governs **code generation and bug-fixing only** (Route A per `MASTER_INSTRUCTION.md`).
-Tasks outside this scope are handled by dedicated files — do not conflate:
+This file governs **code generation and bug-fixing only**. Tasks outside this scope (such as architectural audits, documentation maintenance, or high-level session orchestration) are handled by dedicated internal instructions — do not conflate.
 
-- Architectural audit of proposals → `PROPOSAL_ANALYSIS_PROMPT.md`
-- Documentation maintenance → `DOCS_UPDATE_PROMPT.md`
-- Session orchestration and routing → `MASTER_INSTRUCTION.md`
-
-*(Relevant primarily when `MASTER_INSTRUCTION.md` is not loaded in the current context.)*
+*(Relevant primarily when the full system instruction set is not loaded in the current context.)*
 
 ---
 

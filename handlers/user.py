@@ -41,15 +41,15 @@ async def back_to_user_main(callback: types.CallbackQuery, state: FSMContext):
 async def user_profile_callback(callback: types.CallbackQuery, state: FSMContext):
     user_id = callback.from_user.id
     db_name = db.get_user_name(user_id)
-    user_groups = db.get_user_groups(user_id)
-    groups_str = ", ".join(g[1] for g in user_groups) if user_groups else "нет активных групп"
+    user_templates = db.get_user_group_templates(user_id)
+    groups_str = ", ".join(g[1] for g in user_templates) if user_templates else "нет назначенных шаблонов"
     
     # Собираем роли и топики
     roles = list(db.get_user_roles(user_id))
     
     # Доступные топики (ID и Названия)
-    available_ids = db.get_user_available_topics(user_id)
-    available_topics = [(t_id, db.get_topic_name(t_id)) for t_id in available_ids]
+    # Доступные топики (уже в формате (id, name))
+    available_topics = db.get_user_available_topics(user_id)
 
     text = UIService.format_user_card(user_id, db_name, groups_str, roles, available_topics)
     await UIService.show_menu(state, callback, text, reply_markup=kb.user_profile_kb())
@@ -82,7 +82,7 @@ async def user_topic_detail(callback: types.CallbackQuery, state: FSMContext):
         f"📍 <b>Информация о топике</b>\n\n"
         f"<b>Название:</b> {t_name}\n"
         f"<b>ID:</b> <code>{topic_id}</code>\n\n"
-        f"👥 <b>Доступ имеют:</b>\n{groups_str}\n\n"
+        f"👥 <b>Связанные шаблоны:</b>\n{groups_str}\n\n"
         f"🔐 <b>Твой статус:</b> {access_status}\n\n"
         f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
     )

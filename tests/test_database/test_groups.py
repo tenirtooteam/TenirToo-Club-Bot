@@ -21,37 +21,14 @@ def test_group_topic_linking():
     groups.remove_topic_from_group(g_id, t_id)
     assert t_id not in groups.get_topics_of_group(g_id)
 
-def test_user_group_access():
+def test_group_template_membership():
     u_id = 100
-    g_id = groups.create_group("Access Group")
+    g_id = groups.create_group("Template Group")
     members.add_user(u_id, "U", "1")
     
-    assert groups.grant_group(u_id, g_id) is True
-    user_groups = groups.get_user_groups(u_id)
-    assert any(g[0] == g_id for g in user_groups)
+    assert groups.add_to_group_template(g_id, u_id) is True
+    members_list = groups.get_group_template_members(g_id)
+    assert u_id in members_list
     
-    groups.revoke_group(u_id, g_id)
-    assert not any(g[0] == g_id for g in groups.get_user_groups(u_id))
-
-def test_get_user_available_topics():
-    u_id = 500
-    members.add_user(u_id, "U", "500")
-    
-    # Сценарий 1: Доступ через группу
-    g_id = groups.create_group("G500")
-    t1 = 501
-    topics.update_topic_name(t1, "T501")
-    groups.add_topic_to_group(g_id, t1)
-    groups.grant_group(u_id, g_id)
-    
-    # Сценарий 2: Прямой доступ
-    t2 = 502
-    topics.update_topic_name(t2, "T502")
-    permissions.grant_direct_access(u_id, t2)
-    
-    available = groups.get_user_available_topics(u_id)
-    # Должно быть 2 топика: 501 и 502
-    ids = [a[0] for a in available]
-    assert t1 in ids
-    assert t2 in ids
-    assert len(available) == 2
+    groups.remove_from_group_template(g_id, u_id)
+    assert u_id not in groups.get_group_template_members(g_id)

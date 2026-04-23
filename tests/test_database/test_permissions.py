@@ -21,13 +21,9 @@ def test_topic_restriction_logic():
     # Изначально публичный
     assert permissions.is_topic_restricted(t_id) is False
     
-    # Ограничиваем через группу
+    # В новой модели привязка к группе-шаблону НЕ делает топик ограниченным
     g_id = groups.create_group("G50")
     groups.add_topic_to_group(g_id, t_id)
-    assert permissions.is_topic_restricted(t_id) is True
-    
-    # Удаляем привязку к группе
-    groups.remove_topic_from_group(g_id, t_id)
     assert permissions.is_topic_restricted(t_id) is False
     
     # Ограничиваем через прямой доступ
@@ -48,15 +44,14 @@ def test_get_topic_authorized_users():
     auth_users = permissions.get_topic_authorized_users(t_id)
     assert len(auth_users) == 3
     
-    # Ограничиваем: только u1 через группу и u2 напрямую
+    # Ограничиваем: только u2 напрямую
+    # Наличие топика в группе G60 само по себе доступ не меняет
     g_id = groups.create_group("G60")
     groups.add_topic_to_group(g_id, t_id)
-    groups.grant_group(u1, g_id)
     permissions.grant_direct_access(u2, t_id)
     
     auth_users = permissions.get_topic_authorized_users(t_id)
-    assert len(auth_users) == 2
+    assert len(auth_users) == 1
     ids = [u[0] for u in auth_users]
-    assert u1 in ids
     assert u2 in ids
-    assert u3 not in ids
+    assert u1 not in ids

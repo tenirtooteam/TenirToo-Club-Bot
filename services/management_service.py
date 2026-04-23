@@ -1,6 +1,5 @@
 # Файл: services/management_service.py
 import logging
-import math
 import html
 from aiogram.types import User
 from database import db
@@ -60,18 +59,27 @@ class ManagementService:
 
     @staticmethod
     def add_user(user_data_text: str) -> tuple[bool, str]:
-        """Логика создания нового пользователя."""
-        parts = user_data_text.split()
-        if len(parts) < 3:
-            return False, "❌ Формат: ID Имя Фамилия"
+        """Логика создания нового пользователя с поддержкой пробелов в именах."""
+        parts = user_data_text.strip().split()
+        if len(parts) < 2:
+            return False, "❌ Формат: ID Имя [Фамилия]"
 
         user_id, err = ManagementService._parse_and_validate_id(parts[0])
         if err:
-            # Для добавления пользователя SEARCH_REQUIRED — это тоже ошибка формата
             msg = err if err != "SEARCH_REQUIRED" else "❌ ID должен быть числом."
             return False, msg
 
-        f_name, l_name = html.escape(parts[1]), html.escape(parts[2])
+        # Все, что после ID, считаем именем и фамилией
+        name_parts = parts[1:]
+        if len(name_parts) == 1:
+            f_name, l_name = name_parts[0], ""
+        else:
+            # Если частей больше двух, склеиваем в Имя и Фамилию (последнее слово — фамилия)
+            f_name = " ".join(name_parts[:-1])
+            l_name = name_parts[-1]
+
+        f_name, l_name = html.escape(f_name), html.escape(l_name)
+        
         if len(f_name) > ManagementService.MAX_NAME_LENGTH or len(l_name) > ManagementService.MAX_NAME_LENGTH:
             return False, f"❌ Ошибка: Имя/Фамилия не должны превышать {ManagementService.MAX_NAME_LENGTH} симв."
 
@@ -173,17 +181,6 @@ class ManagementService:
         return False, "❌ Не удалось привязать топик (возможно, уже привязан)."
 
     @staticmethod
-    def toggle_user_group(user_id: int, group_id: int) -> tuple[bool, str]:
-        """Переключает членство пользователя в группе."""
-        user_groups = set(g[0] for g in db.get_user_groups(user_id))
-        if group_id in user_groups:
-            db.revoke_group(user_id, group_id)
-            return True, "🔓 Группа отозвана."
-        else:
-            db.grant_group(user_id, group_id)
-            return True, "🔐 Группа выдана."
-
-    @staticmethod
     def grant_role(user_id: int, role_id: int, topic_id: int = None) -> tuple[bool, str]:
         """Выдает роль пользователю."""
         if db.grant_role(user_id, role_id, topic_id):
@@ -246,3 +243,53 @@ class ManagementService:
             return True, "✅ Модератор удалён", f"mod_topic_moderators_{extra_id}"
 
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
+
+    # --- НОВЫЕ ОПЕРАЦИИ ШАБЛОНОВ (ЭТАП 2) ---
+
+    @staticmethod
+    def toggle_user_group_template(user_id: int, group_id: int) -> tuple[bool, str]:
+        """Управляет членством пользователя в ШАБЛОНЕ группы."""
+        members = set(db.get_group_template_members(group_id))
+        if user_id in members:
+            db.remove_from_group_template(group_id, user_id)
+            return True, "🗑 Пользователь удален из шаблона."
+        else:
+            db.add_to_group_template(group_id, user_id)
+            return True, "📋 Пользователь добавлен в шаблон."
+
+    @staticmethod
+    def apply_group_to_topic(group_id: int, topic_id: int) -> tuple[bool, str]:
+        """Применяет шаблон группы к топику (добавление новых)."""
+        user_ids = db.get_group_template_members(group_id)
+        if not user_ids:
+            return False, "⚠️ Шаблон группы пуст."
+        
+        if db.grant_direct_access_bulk(user_ids, topic_id):
+            return True, f"✅ Шаблон применен! Добавлено {len(user_ids)} чел."
+        return False, "❌ Ошибка при применении шаблона."
+
+    @staticmethod
+    def sync_group_to_topic(group_id: int, topic_id: int) -> tuple[bool, str]:
+        """Синхронизирует топик с шаблоном (полная перезапись прав)."""
+        user_ids = db.get_group_template_members(group_id)
+        # Очищаем старый доступ
+        db.revoke_all_direct_access(topic_id)
+        
+        if not user_ids:
+            return True, "✅ Доступ очищен (шаблон пуст)."
+
+        if db.grant_direct_access_bulk(user_ids, topic_id):
+            return True, f"✅ Синхронизация завершена! Доступно {len(user_ids)} чел."
+        return False, "❌ Ошибка при синхронизации."
+
+    @staticmethod
+    def copy_topic_to_topic(source_topic_id: int, target_topic_id: int) -> tuple[bool, str]:
+        """Копирует права доступа из одного топика в другой."""
+        users = db.get_direct_access_users(source_topic_id)
+        if not users:
+            return False, "⚠️ Исходный топик не имеет прямого доступа."
+        
+        user_ids = [u[0] for u in users]
+        if db.grant_direct_access_bulk(user_ids, target_topic_id):
+            return True, f"✅ Права скопированы ({len(user_ids)} чел.)."
+        return False, "❌ Ошибка при копировании прав."

@@ -41,10 +41,10 @@ async def test_toggle_group_callback(mock_state):
     # Формат: user_group_toggle_{user_id}_{group_id}
     callback.data = "user_group_toggle_123_10"
     
-    with patch("services.management_service.ManagementService.toggle_user_group", return_value=(True, "🔓 Группа отозвана")) as mock_toggle:
+    with patch("services.management_service.ManagementService.toggle_user_group_template", return_value=(True, "📋 Добавлен в шаблон")) as mock_toggle:
         with patch("services.ui_service.UIService.generic_navigator", AsyncMock()) as mock_nav:
             await toggle_group(callback, mock_state)
             
             mock_toggle.assert_called_once_with(123, 10)
-            callback.answer.assert_called_once_with("🔓 Группа отозвана")
-            mock_nav.assert_called_once_with(mock_state, callback, "user_groups_manage_123")
+            callback.answer.assert_called_once_with("📋 Добавлен в шаблон")
+            mock_nav.assert_called_once_with(mock_state, callback, "user_templates_manage_123")

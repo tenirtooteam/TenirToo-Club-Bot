@@ -87,63 +87,6 @@ def get_groups_by_topic(topic_id: int) -> list:
         """, (topic_id,))
         return [row[0] for row in c.fetchall()]
 
-def get_user_groups(user_id: int) -> list:
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT g.id, g.name FROM user_groups ug
-            JOIN groups g ON ug.group_id = g.id
-            WHERE ug.user_id = ?
-        """, (user_id,))
-        return c.fetchall()
-
-def grant_group(user_id: int, group_id: int) -> bool:
-    try:
-        with get_conn() as conn:
-            with conn:
-                conn.execute(
-                    "INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)",
-                    (user_id, group_id)
-                )
-        logger.info(f"🔐 Пользователю {user_id} выдана группа {group_id}")
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    except sqlite3.Error as e:
-        logger.error(f"❌ Ошибка при выдаче группы: {e}")
-        return False
-
-def revoke_group(user_id: int, group_id: int):
-    try:
-        with get_conn() as conn:
-            with conn:
-                conn.execute(
-                    "DELETE FROM user_groups WHERE user_id = ? AND group_id = ?",
-                    (user_id, group_id)
-                )
-        logger.info(f"🔓 У пользователя {user_id} отозвана группа {group_id}")
-    except sqlite3.Error as e:
-        logger.error(f"❌ Ошибка при отзыве группы: {e}")
-
-def get_user_available_topics(user_id: int) -> list:
-    """Возвращает список кортежей (ID, Name) топиков, к которым у пользователя есть доступ."""
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("""
-            SELECT DISTINCT t.topic_id, t.name
-            FROM topic_names t
-            JOIN group_topics gt ON t.topic_id = gt.topic_id
-            JOIN user_groups ug ON gt.group_id = ug.group_id
-            WHERE ug.user_id = ?
-            UNION
-            SELECT t.topic_id, t.name
-            FROM topic_names t
-            JOIN direct_topic_access dta ON t.topic_id = dta.topic_id
-            WHERE dta.user_id = ?
-        """, (user_id, user_id))
-        return c.fetchall()
-
-
 def find_groups_by_query(query: str) -> list:
     """Поиск групп по вхождению строки в название (регистронезависимо)."""
     with get_conn() as conn:
@@ -153,3 +96,54 @@ def find_groups_by_query(query: str) -> list:
         query = query.lower()
         # Возвращаем список (id, name)
         return [(r[0], r[1]) for r in rows if query in r[1].lower()]
+
+
+# --- NEW TEMPLATE METHODS ---
+
+def add_to_group_template(group_id: int, user_id: int) -> bool:
+    """Добавляет пользователя в шаблон группы."""
+    try:
+        with get_conn() as conn:
+            with conn:
+                conn.execute(
+                    "INSERT INTO group_members (group_id, user_id) VALUES (?, ?)",
+                    (group_id, user_id)
+                )
+        logger.info(f"📋 Пользователь {user_id} добавлен в шаблон группы {group_id}")
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    except sqlite3.Error as e:
+        logger.error(f"❌ Ошибка при добавлении в шаблон группы: {e}")
+        return False
+
+def remove_from_group_template(group_id: int, user_id: int):
+    """Удаляет пользователя из шаблона группы."""
+    try:
+        with get_conn() as conn:
+            with conn:
+                conn.execute(
+                    "DELETE FROM group_members WHERE group_id = ? AND user_id = ?",
+                    (group_id, user_id)
+                )
+        logger.info(f"🗑 Пользователь {user_id} удален из шаблона группы {group_id}")
+    except sqlite3.Error as e:
+        logger.error(f"❌ Ошибка при удалении из шаблона группы: {e}")
+
+def get_group_template_members(group_id: int) -> list:
+    """Возвращает список ID пользователей, входящих в шаблон группы."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM group_members WHERE group_id = ?", (group_id,))
+        return [row[0] for row in c.fetchall()]
+
+def get_user_group_templates(user_id: int) -> list:
+    """Возвращает список (id, name) шаблонов групп, в которых состоит пользователь."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT g.id, g.name FROM group_members gm
+            JOIN groups g ON gm.group_id = g.id
+            WHERE gm.user_id = ?
+        """, (user_id,))
+        return c.fetchall()

@@ -6,7 +6,7 @@ from database import db
 
 def main_admin_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="📂 Группы доступа", callback_data="manage_groups")
+    builder.button(text="📂 Шаблоны доступа (Группы)", callback_data="manage_groups")
     builder.button(text="📍 Все топики (Имена/Доступ)", callback_data="all_topics_list")
     builder.button(text="👥 Пользователи", callback_data="manage_users")
     builder.button(text="🛡 Роли", callback_data="roles_dashboard")
@@ -57,7 +57,7 @@ def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
         item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_in_group_{t_id}_{group_id}"))
         
     static_buttons = [
-        InlineKeyboardButton(text="➕ Добавить топик (ID)", callback_data=f"add_topic_to_{group_id}"),
+        InlineKeyboardButton(text="➕ Добавить топик в шаблон", callback_data=f"add_topic_to_{group_id}"),
         InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
@@ -78,7 +78,7 @@ def available_topics_kb(group_id, page: int = 1, limit: int = 7):
             item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name} (ID: {t_id})", callback_data=f"topic_add_confirm_{t_id}_{group_id}"))
             
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_topics_list_{group_id}"),
+        InlineKeyboardButton(text="⬅️ К списку топиков шаблона", callback_data=f"group_topics_list_{group_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"add_topic_to_{group_id}")
@@ -90,7 +90,7 @@ def groups_list_kb(page: int = 1, limit: int = 7):
         item_buttons.append(InlineKeyboardButton(text=f"🔹 {g_name}", callback_data=f"group_info_{g_id}"))
         
     static_buttons = [
-        InlineKeyboardButton(text="➕ Создать группу", callback_data="add_group_start"),
+        InlineKeyboardButton(text="➕ Создать шаблон", callback_data="add_group_start"),
         InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
@@ -102,10 +102,24 @@ def groups_list_kb(page: int = 1, limit: int = 7):
 
 def group_edit_kb(group_id):
     builder = InlineKeyboardBuilder()
-    builder.button(text="📍 Список топиков", callback_data=f"group_topics_list_{group_id}")
-    builder.button(text="🗑 Удалить группу", callback_data=f"del_group_{group_id}")
+    builder.button(text="📍 Топики в шаблоне", callback_data=f"group_topics_list_{group_id}")
+    builder.button(text="⚡ Применить шаблон к топику", callback_data=f"tmpl_act_start_apply_{group_id}")
+    builder.button(text="🔄 Синхронизировать топик", callback_data=f"tmpl_act_start_sync_{group_id}")
+    builder.button(text="🗑 Удалить шаблон", callback_data=f"del_group_{group_id}")
     builder.button(text="⬅️ Назад", callback_data="manage_groups")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
+    builder.adjust(1)
+    return builder.as_markup()
+
+def template_action_topic_select_kb(group_id: int, action: str):
+    """Клавиатура выбора топика для применения или синхронизации шаблона."""
+    builder = InlineKeyboardBuilder()
+    topics = db.get_all_unique_topics()
+    for t_id in topics:
+        t_name = db.get_topic_name(t_id)
+        builder.button(text=f"📍 {t_name}", callback_data=f"tmpl_act_exec_{action}_{group_id}_{t_id}")
+    
+    builder.button(text="⬅️ Назад", callback_data=f"group_info_{group_id}")
     builder.adjust(1)
     return builder.as_markup()
 
@@ -129,7 +143,7 @@ def users_list_kb(page: int = 1, limit: int = 7):
 def user_edit_kb(user_id, is_superadmin: bool = False):
     builder = InlineKeyboardBuilder()
     builder.button(text="🏷 Переименовать", callback_data=f"user_rename_{user_id}")
-    builder.button(text="🔐 Управление группами", callback_data=f"user_groups_manage_{user_id}")
+    builder.button(text="📋 Состав шаблонов", callback_data=f"user_templates_manage_{user_id}")
     builder.button(text="👑 Управление ролями", callback_data=f"user_roles_manage_{user_id}")
     
     if is_superadmin:
@@ -143,18 +157,24 @@ def user_edit_kb(user_id, is_superadmin: bool = False):
 def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     all_groups = db.get_all_groups()
-    user_groups = set(g[0] for g in db.get_user_groups(user_id))
+    # Теперь проверяем членство в шаблоне (group_members)
+    user_in_templates = set(db.get_group_template_members(g[0]) for g in all_groups if user_id in db.get_group_template_members(g[0]))
+    # Оптимизируем: получим список всех ID групп, где есть юзер
+    user_template_ids = set()
+    for g_id, _ in all_groups:
+        if user_id in db.get_group_template_members(g_id):
+            user_template_ids.add(g_id)
     
     item_buttons = []
     for g_id, g_name in all_groups:
-        mark = "✅ " if g_id in user_groups else "❌ "
-        item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_group_toggle_{user_id}_{g_id}"))
+        mark = "✅ " if g_id in user_template_ids else "❌ "
+        item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_template_toggle_{user_id}_{g_id}"))
         
     static_buttons = [
         InlineKeyboardButton(text="⬅️ Назад", callback_data=f"user_info_{user_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_groups_manage_{user_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_templates_manage_{user_id}")
 
 def roles_dashboard_kb(is_admin: bool):
     builder = InlineKeyboardBuilder()

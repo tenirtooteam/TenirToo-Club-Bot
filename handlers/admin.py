@@ -34,8 +34,6 @@ class AdminStates(StatesGroup):
     waiting_for_topic_name = State()
     waiting_for_user_data = State()
     waiting_for_new_name = State()
-    # Новые состояния для управления ролями
-    waiting_for_new_role_user = State()      # выбор пользователя для назначения роли
 
 # --- ГЛАВНОЕ МЕНЮ ---
 
@@ -103,6 +101,40 @@ async def delete_group_init(callback: types.CallbackQuery, state: FSMContext):
 
 
 # --- УПРАВЛЕНИЕ ТОПИКАМИ ---
+
+# --- НОВЫЕ ОПЕРАЦИИ ШАБЛОНОВ (ПРИМЕНИТЬ/СИНХРО) ---
+
+@router.callback_query(F.data.startswith("tmpl_act_start_"))
+@safe_callback()
+async def group_template_action_choose_topic(callback: types.CallbackQuery, state: FSMContext):
+    """Выбор топика для применения или синхронизации шаблона."""
+    parts = callback.data.split("_")
+    action = parts[3] # apply или sync
+    group_id = int(parts[4])
+    
+    title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
+    await UIService.show_menu(state, callback, title, reply_markup=kb.template_action_topic_select_kb(group_id, action))
+
+
+@router.callback_query(F.data.startswith("tmpl_act_exec_"))
+@safe_callback()
+async def group_template_action_execute(callback: types.CallbackQuery, state: FSMContext):
+    """Выполнение операции применения или синхронизации."""
+    parts = callback.data.split("_")
+    action = parts[3]
+    group_id = int(parts[4])
+    topic_id = int(parts[5])
+    
+    if action == "apply":
+        success, msg = ManagementService.apply_group_to_topic(group_id, topic_id)
+    else:
+        success, msg = ManagementService.sync_group_to_topic(group_id, topic_id)
+        
+    await callback.answer(msg)
+    await UIService.generic_navigator(state, callback, f"group_info_{group_id}")
+
+
+# --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ---
 
 @router.callback_query(F.data.startswith("all_topics_list"))
 @safe_callback()
@@ -179,14 +211,12 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
 
     ManagementService.update_topic_name(t_id, new_name)
 
-    status = ""
-    if t_id != -1:
-        try:
-            await message.bot.edit_forum_topic(chat_id=GROUP_ID, message_thread_id=t_id, name=new_name)
-            status = "\n✅ Синхронизировано с Telegram."
-        except Exception as e:
-            logger.warning(f"⚠️ Ошибка API: {e}")
-            status = f"\n⚠️ Только в БД (Ошибка API)"
+    try:
+        await message.bot.edit_forum_topic(chat_id=GROUP_ID, message_thread_id=t_id, name=new_name)
+        status = "\n✅ Синхронизировано с Telegram."
+    except Exception as e:
+        logger.warning(f"⚠️ Ошибка API: {e}")
+        status = f"\n⚠️ Только в БД (Ошибка API)"
 
     await UIService.show_admin_dashboard(state, message, text=f"✅ Топик {t_id} обновлен.{status}")
 
@@ -258,21 +288,21 @@ async def process_user_rename(message: types.Message, state: FSMContext):
     await UIService.generic_navigator(state, message, "manage_users")
 
 
-@router.callback_query(F.data.startswith("user_groups_manage_"))
+@router.callback_query(F.data.startswith("user_templates_manage_"))
 @safe_callback()
 async def user_groups_ui(callback: types.CallbackQuery, state: FSMContext):
     await UIService.generic_navigator(state, callback, callback.data)
 
 
-@router.callback_query(F.data.startswith("user_group_toggle_"))
+@router.callback_query(F.data.startswith("user_template_toggle_"))
 @safe_callback()
 async def toggle_group(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     user_id, group_id = int(parts[3]), int(parts[4])
 
-    success, msg = ManagementService.toggle_user_group(user_id, group_id)
+    success, msg = ManagementService.toggle_user_group_template(user_id, group_id)
     await callback.answer(msg)
-    await UIService.generic_navigator(state, callback, f"user_groups_manage_{user_id}")
+    await UIService.generic_navigator(state, callback, f"user_templates_manage_{user_id}")
 
 
 @router.callback_query(F.data.startswith("user_delete_"))
@@ -342,11 +372,8 @@ async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMCon
         await callback.answer("❌ Системная ошибка: роль модератора не найдена.")
         return
         
-    success = ManagementService.grant_role(user_id, mod_role_id, topic_id)
-    if success:
-        await callback.answer("✅ Роль модератора назначена.")
-    else:
-        await callback.answer("❌ Ошибка (возможно, уже модератор этого топика).")
+    success, msg = ManagementService.grant_role(user_id, mod_role_id, topic_id)
+    await callback.answer(msg)
 
     await UIService.generic_navigator(state, callback, f"user_roles_manage_{user_id}")
 

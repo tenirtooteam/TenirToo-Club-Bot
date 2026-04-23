@@ -48,10 +48,10 @@ async def test_start_command_integration(dp, mock_bot):
 
 @pytest.mark.asyncio
 async def test_stealth_moderation_integration(dp, mock_bot):
-    # Группа, топик 10 ограничен
+    # Группа, топик 10 ограничен через прямой доступ другого юзера
     db.register_topic_if_not_exists(10)
-    db.create_group("Secret Group")
-    db.add_topic_to_group(1, 10) # Группа 1 привязана к топику 10
+    db.add_user(999, "Other", "User")
+    db.grant_direct_access(999, 10)
     
     # Юзер 666 без доступа пишет в топик 10
     user = types.User(id=666, is_bot=False, first_name="Intruder", last_name="")

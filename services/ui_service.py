@@ -13,17 +13,22 @@ class UIService:
 
     @staticmethod
     async def clear_last_menu(state: FSMContext, bot: Bot, chat_id: int):
-        """Удаляет последнее запомненное меню или системное сообщение из чата."""
+        """Удаляет все запомненные системные сообщения из чата."""
         data = await state.get_data()
-        last_id = data.get("last_menu_id")
-        if last_id:
+        last_ids = data.get("last_menu_ids", [])
+        
+        # Поддержка старого формата (если остался в FSM)
+        old_id = data.get("last_menu_id")
+        if old_id: last_ids.append(old_id)
+
+        for msg_id in last_ids:
             try:
-                await bot.delete_message(chat_id=chat_id, message_id=last_id)
-                logger.info(f"🧹 Удалено сообщение: {last_id}")
-            except Exception as e:
-                logger.error(f"❌ Ошибка удаления сообщения: {e}")
-            finally:
-                await state.update_data(last_menu_id=None)
+                await bot.delete_message(chat_id=chat_id, message_id=msg_id)
+                logger.info(f"🧹 Удалено сообщение: {msg_id}")
+            except Exception:
+                pass
+        
+        await state.update_data(last_menu_ids=[], last_menu_id=None)
 
     @staticmethod
     async def delete_msg(message: types.Message):
@@ -66,7 +71,7 @@ class UIService:
                     reply_markup=reply_markup,
                     parse_mode="HTML"
                 )
-                await state.update_data(last_menu_id=sent_message.message_id)
+                await state.update_data(last_menu_ids=[sent_message.message_id])
                 await UIService.delete_msg(message)
                 return sent_message
             except Exception:
@@ -75,7 +80,7 @@ class UIService:
                     f"Пожалуйста, сначала напишите мне в личные сообщения (нажмите /start)."
                 )
                 sent_error = await message.answer(error_msg, parse_mode="HTML")
-                await state.update_data(last_menu_id=sent_error.message_id)
+                await state.update_data(last_menu_ids=[sent_error.message_id])
                 await UIService.delete_msg(message)
                 return sent_error
         else:
@@ -86,22 +91,26 @@ class UIService:
                 reply_markup=reply_markup,
                 parse_mode="HTML"
             )
-            await state.update_data(last_menu_id=sent_message.message_id)
+            await state.update_data(last_menu_ids=[sent_message.message_id])
             return sent_message
 
     @staticmethod
     async def show_temp_message(state: FSMContext, event: types.Message | types.CallbackQuery, text: str, reply_markup=None):
-        """Отображает временное сообщение, заменяя/удаляя предыдущее меню."""
+        """Отображает временное сообщение БЕЗ удаления предыдущего (добавляет в стек)."""
         bot = event.bot if isinstance(event, types.Message) else event.message.bot
         chat_id = event.chat.id if isinstance(event, types.Message) else event.message.chat.id
         
-        await UIService.clear_last_menu(state, bot, chat_id)
         if isinstance(event, types.Message):
             await UIService.delete_msg(event)
             
         msg_source = event if isinstance(event, types.Message) else event.message
         sent = await msg_source.answer(text, reply_markup=reply_markup, parse_mode="HTML")
-        await state.update_data(last_menu_id=sent.message_id)
+        
+        # Добавляем в список для последующей зачистки
+        data = await state.get_data()
+        last_ids = data.get("last_menu_ids", [])
+        last_ids.append(sent.message_id)
+        await state.update_data(last_menu_ids=last_ids)
         return sent
 
     @staticmethod
@@ -128,8 +137,8 @@ class UIService:
                 # Fallback: сообщение нельзя редактировать (слишком старое или контент идентичен).
                 # Отправляем новое и удаляем старое.
                 new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
-                await state.update_data(last_menu_id=new_msg.message_id)
                 await UIService.delete_msg(event.message)
+                await state.update_data(last_menu_ids=[new_msg.message_id])
             # answer() вызывается ровно один раз, в конце, вне зависимости от пути выполнения
             try:
                 await event.answer()
@@ -140,7 +149,7 @@ class UIService:
             new_msg = await event.bot.send_message(
                 event.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode
             )
-            await state.update_data(last_menu_id=new_msg.message_id)
+            await state.update_data(last_menu_ids=[new_msg.message_id])
 
     @staticmethod
     async def ask_input(
@@ -163,7 +172,7 @@ class UIService:
         msg_source = event if isinstance(event, types.Message) else event.message
         sent = await msg_source.answer(text, parse_mode="HTML")
 
-        await state.update_data(last_menu_id=sent.message_id)
+        await state.update_data(last_menu_ids=[sent.message_id])
         if state_to_set:
             await state.set_state(state_to_set)
         return sent
@@ -235,9 +244,11 @@ class UIService:
             u_id = int(p[-1])
             return await UIService.show_menu(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
             
-        if cmd.startswith("user_groups_manage"):
-            u_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"🔐 <b>Группы пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
+        if cmd.startswith("user_templates_manage"):
+            parts = cmd.split("_")
+            u_id = int(parts[3])
+            page = int(parts[4]) if len(parts) > 4 else 1
+            return await UIService.show_menu(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
             
         if cmd.startswith("group_topics_list"):
             g_id = int(p[-1])
@@ -267,8 +278,8 @@ class UIService:
         import keyboards as kb
 
         user_name = db.get_user_name(user_id)
-        user_groups = db.get_user_groups(user_id)
-        groups_str = ", ".join(g[1] for g in user_groups) if user_groups else "нет активных групп"
+        user_templates = db.get_user_group_templates(user_id)
+        groups_str = ", ".join(g[1] for g in user_templates) if user_templates else "нет назначенных шаблонов"
         roles = db.get_user_roles(user_id)
         topics = db.get_user_available_topics(user_id)
         
@@ -465,7 +476,7 @@ class UIService:
             f"{roles_display}\n\n"
             f"👤 <b>Профиль:</b> {user_name}\n"
             f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
-            f"🔐 <b>Группы:</b> {groups_str}\n\n"
+            f"📂 <b>Шаблоны:</b> {groups_str}\n\n"
             f"📍 <b>Доступные топики:</b>\n{topics_display}"
         )
         return text
