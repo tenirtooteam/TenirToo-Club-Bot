@@ -57,8 +57,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 7. **KEYBOARD FACADE**: Never import directly from `keyboards/admin_kb.py`, etc. All keyboard builders must be accessed via `import keyboards as kb`.
    > Rationale: `keyboards/__init__.py` is the wildcard re-export facade for the entire keyboard layer.
 
-8. **DESTRUCTIVE OPERATIONS**: Any **new** admin action that permanently deletes data must include a confirmation step before execution.
-   > Rationale: Telegram bots have no undo. The existing gap is a tech debt, not a precedent.
+8. **DESTRUCTIVE CONFIRMATION PROTOCOL**: Any admin action that permanently deletes data (users, groups, roles) MUST include a confirmation step via `UIService.get_confirmation_ui` and be executed through `ManagementService.execute_deletion`.
+   > Rationale: Telegram bots have no undo. Forcing a confirmation step prevents accidental data loss from misclicks or rapid navigation.
 
 9. **TOPIC RENAME SYNC**: When renaming a topic via the admin panel, the change must be applied to both the local DB (`db.update_topic_name`) **and** the Telegram API (`bot.edit_forum_topic`).
    > Rationale: A DB-only rename creates a divergence causing user-visible inconsistency.
@@ -88,8 +88,11 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 18. **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
     > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
 
-19. **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)` instead of direct calls to `UIService.show_menu` or manual keyboard creation.
-    > Rationale: Centralizing routing logic in the service layer prevents "UI logic leak" into handlers and ensures that role-based visibility (e.g., superadmin buttons) is handled consistently in a single point of failure.
+19. **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)` instead of direct calls to `UIService.show_menu` or manual keyboard creation. The navigator uses the `PAGINATED_CMDS` class constant to explicitly determine call signatures.
+    > Rationale: Centralizing routing logic in the service layer prevents "UI logic leak" into handlers and ensures that role-based visibility (e.g., superadmin buttons) and pagination are handled consistently in a single point.
+
+20. **VERIFY BEFORE CHANGE**: BEFORE making any code changes, it is mandatory to view the target file and all related signatures (methods, keyboards, DB tables). Writing calls without confirming their existence in the current code context is strictly prohibited.
+    > Rationale: Relying on memory or "ghost" signatures from conversation history leads to cascading bugs and regressions. Direct verification of the source code is the only way to ensure functional truth.
 
 ---
 

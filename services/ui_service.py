@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class UIService:
+    # Команды, которые поддерживают пагинацию (принимают аргумент page)
+    PAGINATED_CMDS = {"manage_groups", "manage_users", "all_topics_list", "list_users_roles"}
 
     @staticmethod
     async def clear_last_menu(state: FSMContext, bot: Bot, chat_id: int):
@@ -18,8 +20,8 @@ class UIService:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=last_id)
                 logger.info(f"🧹 Удалено сообщение: {last_id}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"❌ Ошибка удаления сообщения: {e}")
             finally:
                 await state.update_data(last_menu_id=None)
 
@@ -165,26 +167,24 @@ class UIService:
         if state_to_set:
             await state.set_state(state_to_set)
         return sent
-
-        sent = await message.answer(text, reply_markup=reply_markup, parse_mode="HTML")
-        await state.update_data(last_menu_id=sent.message_id)
-        return sent
     @staticmethod
     async def generic_navigator(state: FSMContext, event: types.Message | types.CallbackQuery, callback_data: str):
         """Ультимативный роутер: callback_data -> UI экран."""
         from database import db
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         from services.permission_service import PermissionService
         
         user_id = event.from_user.id
         
         # 1. Глобальная навигация (Simple)
         simple = {
-            "admin_main": ("🛠 <b>Панель управления</b>", lambda: kb.main_admin_kb(is_superadmin=PermissionService.is_superadmin(user_id))),
+            "admin_main": ("🛠 <b>Панель управления</b>", kb.main_admin_kb),
             "manage_groups": ("📂 <b>Группы доступа:</b>", kb.groups_list_kb),
             "manage_users": ("👥 <b>Список пользователей:</b>", kb.users_list_kb),
             "all_topics_list": ("📍 <b>Все топики:</b>", kb.all_topics_kb),
             "roles_dashboard": ("🛡 <b>Центр ролей</b>", lambda: kb.roles_dashboard_kb(PermissionService.is_global_admin(user_id))),
+            "roles_faq": ("🛡 <b>Описание ролей</b>\n\n👑 <b>Админ</b>: Полный доступ к управлению группами, топиками и пользователями.\n🛡 <b>Модератор</b>: Управление доступом и модераторами в рамках конкретного топика.\n💎 <b>Суперадмин</b>: Системный владелец с неограниченными правами.", kb.back_to_roles_dashboard_kb),
+            "list_users_roles": ("📋 <b>Пользователи с ролями:</b>", kb.users_list_kb), # Можно заменить на спец. клавиатуру позже
             "moderator": ("🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id)))
         }
         
@@ -193,7 +193,12 @@ class UIService:
 
         if cmd in simple:
             text, kb_func = simple[cmd]
-            return await UIService.show_menu(state, event, text, reply_markup=kb_func() if callable(kb_func) and not hasattr(kb_func, "__code__") else kb_func(page=page))
+            
+            if cmd in UIService.PAGINATED_CMDS:
+                markup = kb_func(page=page)
+            else:
+                markup = kb_func()
+            return await UIService.show_menu(state, event, text, reply_markup=markup)
 
         # 2. Параметризованная навигация
         p = callback_data.split("_")
@@ -209,36 +214,57 @@ class UIService:
             t_id = int(p[-1])
             return await UIService.show_menu(state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_menu_kb(t_id))
         
-        if cmd.startswith("mod_topic_groups"): return await UIService.show_moderator_groups(state, event, int(p[-1]), page)
-        if cmd.startswith("mod_topic_moderators"): return await UIService.show_moderator_moderators(state, event, int(p[-1]))
-        if cmd.startswith("mod_gr_addlist"): return await UIService.show_menu(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(int(p[-1]), page))
-        if cmd.startswith("mod_users_manage"): return await UIService.show_menu(state, event, f"👥 <b>Юзеры топика {db.get_topic_name(int(p[-1]))}</b>", kb.moderator_users_list_kb(int(p[-1]), page))
+        if cmd.startswith("mod_topic_groups"):
+            t_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"📂 <b>Группы топика: {db.get_topic_name(t_id)}</b>", kb.moderator_group_list_kb(t_id, page=page))
+            
+        if cmd.startswith("mod_topic_moderators"):
+            t_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"👑 <b>Модераторы: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_moderators_kb(t_id))
+            
+        if cmd.startswith("mod_gr_addlist"):
+            t_id = int(p[-1])
+            return await UIService.show_menu(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(t_id, page=page))
+            
+        if cmd.startswith("mod_users_manage"):
+            t_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"👥 <b>Юзеры топика: {db.get_topic_name(t_id)}</b>", kb.moderator_users_list_kb(t_id, page=page))
 
         # Админка: управление ролями и правами
-        if cmd.startswith("user_roles_manage"): return await UIService.show_menu(state, event, f"Управление ролями {int(p[-1])}", kb.user_roles_manage_kb(int(p[-1])))
-        if cmd.startswith("user_groups_manage"): return await UIService.show_menu(state, event, f"Группы юзера {db.get_user_name(int(p[-1]))}", kb.user_groups_edit_kb(int(p[-1]), page))
-        if cmd.startswith("group_topics_list"): return await UIService.show_menu(state, event, f"📍 <b>Топики группы {db.get_group_name(int(p[-1]))}:</b>", kb.group_topics_list_kb(int(p[-1]), page))
-        if cmd.startswith("topic_assign_pg"): return await UIService.show_menu(state, event, f"📍 Выбор топика для {db.get_user_name(int(p[-1]))}:", kb.topic_selection_for_role_kb(int(p[-1]), page))
+        if cmd.startswith("user_roles_manage"):
+            u_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
+            
+        if cmd.startswith("user_groups_manage"):
+            u_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"🔐 <b>Группы пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
+            
+        if cmd.startswith("group_topics_list"):
+            g_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"📍 <b>Топики группы: {db.get_group_name(g_id)}</b>", kb.group_topics_list_kb(g_id, page=page))
+            
+        if cmd.startswith("topic_assign_pg"):
+            u_id = int(p[-1])
+            return await UIService.show_menu(state, event, f"📍 <b>Выбор топика для: {db.get_user_name(u_id)}</b>", kb.topic_selection_for_role_kb(u_id, page=page))
 
-        # Резервный возврат в админку
-        await UIService.show_admin_dashboard(state, event)
+        # Резервный лог и сброс на главное меню (если что-то пошло не так)
+        logger.warning(f"⚠️ [NAVIGATOR] Неизвестная команда или некорректные данные: {cmd} (data: {callback_data})")
+        await UIService.show_admin_dashboard(state, event, text="⚠️ Ошибка навигации. Возврат в главное меню:")
 
     @staticmethod
     async def show_admin_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery, text: str = "🛠 <b>Панель управления</b>"):
         """Отображает главную панель администратора."""
         from services.permission_service import PermissionService
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         
-        user_obj = event if isinstance(event, types.Message) else event.from_user
-        is_sa = PermissionService.is_superadmin(user_obj.id)
-        await UIService.show_menu(state, event, text, reply_markup=kb.main_admin_kb(is_superadmin=is_sa))
+        await UIService.show_menu(state, event, text, reply_markup=kb.main_admin_kb())
 
     @staticmethod
     async def show_user_detail(state: FSMContext, event: types.Message | types.CallbackQuery, user_id: int):
         """Отображает детальную карточку пользователя."""
         from database import db
         from services.permission_service import PermissionService
-        import keyboards.admin_kb as kb
+        import keyboards as kb
 
         user_name = db.get_user_name(user_id)
         user_groups = db.get_user_groups(user_id)
@@ -248,8 +274,7 @@ class UIService:
         
         text = UIService.format_user_card(user_id, user_name, groups_str, roles, topics)
         
-        user_obj = event if isinstance(event, types.Message) else event.from_user
-        is_sa = PermissionService.is_superadmin(user_obj.id)
+        is_sa = PermissionService.is_superadmin(event.from_user.id)
         
         await UIService.show_menu(state, event, text, reply_markup=kb.user_edit_kb(user_id, is_superadmin=is_sa))
 
@@ -257,10 +282,10 @@ class UIService:
     async def show_group_detail(state: FSMContext, event: types.Message | types.CallbackQuery, group_id: int):
         """Отображает информацию о группе."""
         from database import db
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         
         g_name = db.get_group_name(group_id)
-        topics_count = len(db.get_topics_by_group(group_id))
+        topics_count = len(db.get_topics_of_group(group_id))
         text = f"📂 <b>Группа:</b> {g_name}\n📍 <b>Топиков:</b> {topics_count}"
         await UIService.show_menu(state, event, text, reply_markup=kb.group_edit_kb(group_id))
 
@@ -268,7 +293,7 @@ class UIService:
     async def show_topic_detail(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int, group_id: int = 0):
         """Отображает информацию о топике."""
         from database import db
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         
         t_name = db.get_topic_name(topic_id)
         access_groups = db.get_groups_by_topic(topic_id)
@@ -285,7 +310,7 @@ class UIService:
     async def show_moderator_groups(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int, page: int = 1):
         """Отображает список групп для модератора топика."""
         from database import db
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         t_name = db.get_topic_name(topic_id)
         text = f"📂 <b>Группы доступа для топика {t_name}</b>"
         await UIService.show_menu(state, event, text, reply_markup=kb.moderator_group_list_kb(topic_id, page=page))
@@ -294,7 +319,7 @@ class UIService:
     async def show_moderator_moderators(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int):
         """Отображает список модераторов топика."""
         from database import db
-        import keyboards.admin_kb as kb
+        import keyboards as kb
         t_name = db.get_topic_name(topic_id)
         text = f"👑 <b>Модераторы топика {t_name}</b>"
         await UIService.show_menu(state, event, text, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
@@ -302,16 +327,7 @@ class UIService:
     @staticmethod
     async def show_moderator_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery, text: str = "🛠 <b>Панель модератора</b>\nВыберите топик для управления:"):
         """Отображает главную панель модератора."""
-        from services.permission_service import PermissionService
-        import keyboards.admin_kb as kb
-        
-        user_id = event.from_user.id if isinstance(event, types.Message) else event.from_user.id
-        manageable_topics = PermissionService.get_manageable_topics(user_id)
-        
-        if not manageable_topics:
-            return await UIService.show_menu(state, event, "❌ У вас нет прав на управление каким-либо топиком.")
-            
-        await UIService.show_menu(state, event, text, reply_markup=kb.moderator_topics_list_kb(manageable_topics))
+        return await UIService.generic_navigator(state, event, "moderator")
 
     @staticmethod
     def get_confirmation_ui(action: str, target_id: int, extra_id: int = 0) -> tuple[str, str]:
@@ -322,38 +338,33 @@ class UIService:
         from services.management_service import ManagementService
         from database import db
         
-        # Получаем имя сущности
-        if action == "mod_rem":
-            entity_type = "user"
-        else:
-            # Для экшенов типа group_del или mod_topic_del
-            entity_type = action.split("_")[-2] if "_" in action else action
-            entity_type = entity_type.replace("del", "").replace("rem", "").strip("_")
-
-        name = ManagementService.get_entity_name(entity_type, target_id)
-        
         # Логика текстов и навигации
         if action == "group_del":
+            name = ManagementService.get_entity_name("group", target_id)
             return (
                 f"⚠️ <b>ВНИМАНИЕ!</b>\n\nВы действительно хотите удалить группу <b>{name}</b>?\n<i>Это действие нельзя отменить!</i>",
                 f"group_info_{target_id}"
             )
         elif action == "topic_del" or action == "mod_topic_del":
+            name = ManagementService.get_entity_name("topic", target_id)
             g_name = ManagementService.get_entity_name("group", extra_id)
             back = f"topic_in_group_{target_id}_{extra_id}" if action == "topic_del" else f"mod_topic_groups_{target_id}"
             return (f"❓ Убрать топик <b>{name}</b> из группы <b>{g_name}</b>?", back)
             
         elif action == "global_topic_del":
+            name = ManagementService.get_entity_name("topic", target_id)
             return (
                 f"⚠️ <b>КРИТИЧЕСКОЕ ДЕЙСТВИЕ!</b>\n\nУдалить топик <b>{name}</b> из БД?\n<i>Это очистит все привязки и роли!</i>",
                 f"topic_global_view_{target_id}"
             )
         elif action == "user_del":
+            name = ManagementService.get_entity_name("user", target_id)
             return (
                 f"⚠️ <b>ВНИМАНИЕ!</b>\n\nУдалить пользователя <b>{name}</b> (ID: {target_id})?\n<i>Это аннулирует все его доступы!</i>",
                 f"user_info_{target_id}"
             )
         elif action.startswith("role_rev"):
+            name = ManagementService.get_entity_name("user", target_id)
             role_id = int(action.split("_")[-1]) if action != "role_rev" else 0
             role_name = db.get_role_name_by_id(role_id) if role_id else "роль"
             context = f"топика {db.get_topic_name(extra_id)}" if extra_id else "глобально"
@@ -362,6 +373,7 @@ class UIService:
                 f"user_roles_manage_{target_id}"
             )
         elif action == "mod_rem":
+            name = ManagementService.get_entity_name("user", target_id)
             t_name = ManagementService.get_entity_name("topic", extra_id)
             return (
                 f"❓ Снять права модератора с <b>{name}</b> в топике <b>{t_name}</b>?",

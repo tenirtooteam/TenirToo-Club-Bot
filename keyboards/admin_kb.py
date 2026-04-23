@@ -4,7 +4,7 @@ from aiogram.types import InlineKeyboardButton
 from database import db
 
 
-def main_admin_kb(is_superadmin: bool = False):
+def main_admin_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="📂 Группы доступа", callback_data="manage_groups")
     builder.button(text="📍 Все топики (Имена/Доступ)", callback_data="all_topics_list")

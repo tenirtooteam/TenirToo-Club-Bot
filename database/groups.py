@@ -126,18 +126,22 @@ def revoke_group(user_id: int, group_id: int):
         logger.error(f"❌ Ошибка при отзыве группы: {e}")
 
 def get_user_available_topics(user_id: int) -> list:
-    """Возвращает список ID топиков, к которым у пользователя есть доступ (группы + прямой доступ)."""
+    """Возвращает список кортежей (ID, Name) топиков, к которым у пользователя есть доступ."""
     with get_conn() as conn:
         c = conn.cursor()
         c.execute("""
-            SELECT DISTINCT gt.topic_id
-            FROM user_groups ug
-            JOIN group_topics gt ON ug.group_id = gt.group_id
+            SELECT DISTINCT t.topic_id, t.name
+            FROM topic_names t
+            JOIN group_topics gt ON t.topic_id = gt.topic_id
+            JOIN user_groups ug ON gt.group_id = ug.group_id
             WHERE ug.user_id = ?
             UNION
-            SELECT topic_id FROM direct_topic_access WHERE user_id = ?
+            SELECT t.topic_id, t.name
+            FROM topic_names t
+            JOIN direct_topic_access dta ON t.topic_id = dta.topic_id
+            WHERE dta.user_id = ?
         """, (user_id, user_id))
-        return [row[0] for row in c.fetchall()]
+        return c.fetchall()
 
 
 def find_groups_by_query(query: str) -> list:

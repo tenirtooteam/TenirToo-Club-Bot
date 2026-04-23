@@ -130,8 +130,70 @@ class ManagementService:
 
         if db.grant_direct_access(target_user_id, topic_id):
             return True, "✅ Прямой доступ выдан."
-
+        
         return False, "❌ Ошибка: Доступ уже есть или сбой БД."
+
+    @staticmethod
+    def revoke_direct_access(user_id: int, topic_id: int) -> tuple[bool, str]:
+        """Отзывает прямой доступ пользователя к топику."""
+        db.revoke_direct_access(user_id, topic_id)
+        logger.info(f"🚫 Прямой доступ пользователя {user_id} к топику {topic_id} отозван.")
+        return True, "✅ Прямой доступ отозван."
+
+    @staticmethod
+    def update_user_name(user_id: int, first_name: str, last_name: str) -> tuple[bool, str]:
+        """Обновляет имя пользователя с валидацией и экранированием."""
+        first_name, last_name = html.escape(first_name.strip()), html.escape(last_name.strip())
+        if not first_name or not last_name:
+            return False, "❌ Имя и Фамилия не могут быть пустыми."
+            
+        if len(first_name) > ManagementService.MAX_NAME_LENGTH or len(last_name) > ManagementService.MAX_NAME_LENGTH:
+            return False, f"❌ Максимум {ManagementService.MAX_NAME_LENGTH} символов."
+            
+        db.update_user_name(user_id, first_name, last_name)
+        return True, "✅ Данные пользователя обновлены."
+
+    @staticmethod
+    def update_topic_name(topic_id: int, new_name: str) -> tuple[bool, str]:
+        """Обновляет название топика."""
+        new_name = html.escape(new_name.strip())
+        if not new_name:
+            return False, "❌ Название не может быть пустым."
+        if len(new_name) > ManagementService.MAX_NAME_LENGTH:
+            return False, "❌ Название слишком длинное."
+            
+        db.update_topic_name(topic_id, new_name)
+        return True, "✅ Название топика обновлено."
+
+    @staticmethod
+    def add_topic_to_group(group_id: int, topic_id: int) -> tuple[bool, str]:
+        """Привязывает топик к группе."""
+        if db.add_topic_to_group(group_id, topic_id):
+            return True, "✅ Топик привязан к группе."
+        return False, "❌ Не удалось привязать топик (возможно, уже привязан)."
+
+    @staticmethod
+    def toggle_user_group(user_id: int, group_id: int) -> tuple[bool, str]:
+        """Переключает членство пользователя в группе."""
+        user_groups = set(g[0] for g in db.get_user_groups(user_id))
+        if group_id in user_groups:
+            db.revoke_group(user_id, group_id)
+            return True, "🔓 Группа отозвана."
+        else:
+            db.grant_group(user_id, group_id)
+            return True, "🔐 Группа выдана."
+
+    @staticmethod
+    def grant_role(user_id: int, role_id: int, topic_id: int = None) -> tuple[bool, str]:
+        """Выдает роль пользователю."""
+        if db.grant_role(user_id, role_id, topic_id):
+            return True, "✅ Роль назначена."
+        return False, "❌ Ошибка (возможно, роль уже назначена)."
+
+    @staticmethod
+    def find_users(query: str) -> list:
+        """Поиск пользователей (обертка над БД для хендлеров)."""
+        return db.find_users_by_query(query)
 
     @staticmethod
     def get_entity_name(entity_type: str, entity_id: int) -> str:

@@ -103,7 +103,7 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
         await UIService.show_temp_message(state, message, "❌ Название не может быть пустым.")
         return
 
-    db.update_topic_name(topic_id, new_name)
+    ManagementService.update_topic_name(topic_id, new_name)
     status = ""
     if topic_id != -1:
         try:
@@ -141,7 +141,7 @@ async def moderator_link_group(callback: types.CallbackQuery, state: FSMContext)
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    db.add_topic_to_group(group_id, topic_id)
+    ManagementService.add_topic_to_group(group_id, topic_id)
     await callback.answer("✅ Группа привязана.")
     
     await UIService.generic_navigator(state, callback, f"mod_topic_groups_{topic_id}")
@@ -187,11 +187,11 @@ async def moderator_toggle_direct_access(callback: types.CallbackQuery, state: F
         return
 
     if target_user_id in direct_users:
-        db.revoke_direct_access(target_user_id, topic_id)
-        await callback.answer("🚫 Прямой доступ отозван.")
+        success, msg = ManagementService.revoke_direct_access(target_user_id, topic_id)
+        await callback.answer(msg)
     else:
-        db.grant_direct_access(target_user_id, topic_id)
-        await callback.answer("✅ Прямой доступ выдан.")
+        success, msg = ManagementService.grant_direct_access(str(target_user_id), topic_id)
+        await callback.answer(msg)
 
     await UIService.generic_navigator(state, callback, f"mod_users_manage_{topic_id}")
 
@@ -229,7 +229,7 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
         return
 
     if result == "SEARCH_REQUIRED":
-        results = db.find_users_by_query(text)
+        results = ManagementService.find_users(text)
         if not results:
             await UIService.show_temp_message(state, message, "❌ Никого не найдено по этому запросу.")
             return
@@ -287,7 +287,7 @@ async def moderator_add_moderator_finish(message: types.Message, state: FSMConte
         return
 
     if result == "SEARCH_REQUIRED":
-        results = db.find_users_by_query(text)
+        results = ManagementService.find_users(text)
         if not results:
             await UIService.show_temp_message(state, message, "❌ Никого не найдено. Уточните запрос.")
             return

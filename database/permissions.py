@@ -18,7 +18,7 @@ def grant_direct_access(user_id: int, topic_id: int) -> bool:
     except sqlite3.IntegrityError:
         return False
     except sqlite3.Error as e:
-        logger.error(f"❌ Ошибка выдчи прямого доступа: {e}")
+        logger.error(f"❌ Ошибка выдачи прямого доступа: {e}")
         return False
 
 def revoke_direct_access(user_id: int, topic_id: int):

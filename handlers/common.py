@@ -238,6 +238,9 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
     if s_action == "admin_role_target":
         return await UIService.generic_navigator(state, event, f"user_roles_manage_{item_id}")
 
+    if s_action == "mod_select":
+        return await UIService.generic_navigator(state, event, f"mod_topic_select_{item_id}")
+
 
 @router.callback_query(F.data.startswith("confirm_exe_"))
 @safe_callback()

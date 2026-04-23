@@ -46,7 +46,7 @@ async def admin_dashboard(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     is_superadmin = PermissionService.is_superadmin(user_id)
     
-    return "🛠 <b>Панель управления</b>", kb.main_admin_kb(is_superadmin=is_superadmin)
+    return "🛠 <b>Панель управления</b>", kb.main_admin_kb()
 
 
 @router.callback_query(F.data == "admin_main")
@@ -152,9 +152,8 @@ async def add_topic_to_group_init(callback: types.CallbackQuery, state: FSMConte
 async def confirm_add_topic(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     topic_id, group_id = int(parts[3]), int(parts[4])
-    db.add_topic_to_group(group_id, topic_id)
-    group_name = db.get_group_name(group_id)
-    await callback.answer("✅ Топик добавлен!")
+    success, msg = ManagementService.add_topic_to_group(group_id, topic_id)
+    await callback.answer(msg)
     await UIService.generic_navigator(state, callback, f"group_topics_list_{group_id}")
 
 
@@ -178,7 +177,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
         await UIService.show_temp_message(state, message, "❌ Ошибка: данные топика потеряны.")
         return
 
-    db.update_topic_name(t_id, new_name)
+    ManagementService.update_topic_name(t_id, new_name)
 
     status = ""
     if t_id != -1:
@@ -252,7 +251,10 @@ async def process_user_rename(message: types.Message, state: FSMContext):
         return
 
     data = await state.get_data()
-    db.update_user_name(data['edit_user_id'], parts[0], parts[1])
+    success, msg = ManagementService.update_user_name(data['edit_user_id'], parts[0], parts[1])
+    if not success:
+        await UIService.show_temp_message(state, message, msg)
+        return
     await UIService.generic_navigator(state, message, "manage_users")
 
 
@@ -268,13 +270,8 @@ async def toggle_group(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     user_id, group_id = int(parts[3]), int(parts[4])
 
-    user_groups = set(g[0] for g in db.get_user_groups(user_id))
-    if group_id in user_groups:
-        db.revoke_group(user_id, group_id)
-    else:
-        db.grant_group(user_id, group_id)
-
-    u_name = db.get_user_name(user_id)
+    success, msg = ManagementService.toggle_user_group(user_id, group_id)
+    await callback.answer(msg)
     await UIService.generic_navigator(state, callback, f"user_groups_manage_{user_id}")
 
 
@@ -327,12 +324,8 @@ async def role_pick_handler(callback: types.CallbackQuery, state: FSMContext):
             reply_markup=kb.topic_selection_for_role_kb(user_id)
         )
     else:
-        success = db.grant_role(user_id, role_id, None)
-        if success:
-            await callback.answer("✅ Роль назначена.")
-        else:
-            await callback.answer("❌ Не удалось назначить роль (возможно, уже есть).")
-            
+        success, msg = ManagementService.grant_role(user_id, role_id, None)
+        await callback.answer(msg)
         await UIService.generic_navigator(state, callback, f"user_roles_manage_{user_id}")
 
 
@@ -349,7 +342,7 @@ async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMCon
         await callback.answer("❌ Системная ошибка: роль модератора не найдена.")
         return
         
-    success = db.grant_role(user_id, mod_role_id, topic_id)
+    success = ManagementService.grant_role(user_id, mod_role_id, topic_id)
     if success:
         await callback.answer("✅ Роль модератора назначена.")
     else:

@@ -91,14 +91,14 @@ def find_users_by_query(query: str) -> list:
         for user_id, fname, lname in all_users:
             f = fname.lower() if fname else ""
             l = lname.lower() if lname else ""
-            if f == w or l == w:
+            if w in f or w in l:
                 matched.append((user_id, fname, lname))
     else:
         w1, w2 = parts[0], parts[1]
         for user_id, fname, lname in all_users:
             f = fname.lower() if fname else ""
             l = lname.lower() if lname else ""
-            if (f == w1 and l == w2) or (f == w2 and l == w1):
+            if (w1 in f and w2 in l) or (w2 in f and w1 in l):
                 matched.append((user_id, fname, lname))
                 
     return matched
