@@ -197,20 +197,29 @@ class UIService:
             "roles_dashboard": ("🛡 <b>Центр ролей</b>", lambda: kb.roles_dashboard_kb(PermissionService.is_global_admin(user_id))),
             "roles_faq": ("🛡 <b>Описание ролей</b>\n\n👑 <b>Админ</b>: Полный доступ к управлению группами, топиками и пользователями.\n🛡 <b>Модератор</b>: Управление доступом и модераторами в рамках конкретного топика.\n💎 <b>Суперадмин</b>: Системный владелец с неограниченными правами.", kb.back_to_roles_dashboard_kb),
             "list_users_roles": ("📋 <b>Пользователи с ролями:</b>", kb.users_list_kb), # Можно заменить на спец. клавиатуру позже
-            "moderator": ("🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id)))
+            "moderator": ("🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
+            "templates_faq": (None, None), # Redirects to help_service logic
         }
         
         cmd = callback_data.split("_pg_")[0]
         page = int(callback_data.split("_pg_")[1]) if "_pg_" in callback_data else 1
-
         if cmd in simple:
             text, kb_func = simple[cmd]
             
+            if cmd == "templates_faq":
+                return await UIService.generic_navigator(state, event, f"help:templates:manage_groups")
+
             if cmd in UIService.PAGINATED_CMDS:
                 markup = kb_func(page=page)
             else:
                 markup = kb_func()
             return await UIService.show_menu(state, event, text, reply_markup=markup)
+
+        # 1.5 Специальная обработка HELP (help:{key}:{back_data})
+        if cmd.startswith("help:"):
+            from handlers.common import show_help_view
+            parts = cmd.split(":")
+            return await show_help_view(state, event, key=parts[1], back_data=parts[2] if len(parts) > 2 else "admin_main")
 
         # 2. Параметризованная навигация
         p = callback_data.split("_")

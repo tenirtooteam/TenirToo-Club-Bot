@@ -62,6 +62,35 @@ async def cmd_help(message: types.Message, state: FSMContext):
     return help_text, None
 
 
+async def show_help_view(state: FSMContext, event: types.Message | types.CallbackQuery, key: str, back_data: str = "admin_main"):
+    """
+    Отображает окно справки с текстом из HelpService.
+    [CC-1] Sterile UI: Включает кнопку возврата.
+    """
+    from services.help_service import HelpService
+    
+    help_text = HelpService.get_help(key)
+    
+    # Создаем клавиатуру с кнопкой возврата
+    markup = kb.simple_back_kb(back_data)
+    
+    await UIService.show_menu(state, event, help_text, reply_markup=markup)
+
+
+@router.callback_query(F.data.startswith("help:"))
+@safe_callback()
+async def universal_help_handler(callback: types.CallbackQuery, state: FSMContext):
+    """
+    Универсальный хендлер для всех кнопок помощи.
+    Принимает формат колбэка: help:{key}:{back_data}
+    """
+    parts = callback.data.split(":")
+    key = parts[1]
+    back_data = parts[2] if len(parts) > 2 else "admin_main"
+    
+    await show_help_view(state, callback, key, back_data)
+
+
 @router.callback_query(F.data == "close_menu")
 @safe_callback()
 async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):

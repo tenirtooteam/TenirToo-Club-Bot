@@ -102,6 +102,7 @@ def groups_list_kb(page: int = 1, limit: int = 7):
         
     static_buttons = [
         InlineKeyboardButton(text="➕ Создать шаблон", callback_data="add_group_start"),
+        InlineKeyboardButton(text="❓ О шаблонах", callback_data="help:templates:manage_groups"),
         InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
@@ -117,6 +118,7 @@ def group_edit_kb(group_id):
     builder.button(text="⚡ Применить шаблон к топику", callback_data=f"tmpl_act_start_apply_{group_id}")
     builder.button(text="🔄 Синхронизировать топик", callback_data=f"tmpl_act_start_sync_{group_id}")
     builder.button(text="🗑 Удалить шаблон", callback_data=f"del_group_{group_id}")
+    builder.button(text="❓ О шаблонах", callback_data=f"help:templates:group_info_{group_id}")
     builder.button(text="⬅️ Назад", callback_data="manage_groups")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
@@ -308,6 +310,15 @@ def confirmation_kb(action_type: str, target_id: int, back_callback: str, extra_
         
     builder.button(text="❌ Да, удалить", callback_data=callback_data)
     builder.button(text="🔙 Отмена", callback_data=back_callback)
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def simple_back_kb(back_data: str):
+    """Универсальная клавиатура с одной кнопкой 'Назад'."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Назад", callback_data=back_data)
+    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
     return builder.as_markup()
 

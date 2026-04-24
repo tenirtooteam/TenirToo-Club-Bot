@@ -47,3 +47,31 @@ async def test_close_menu_handler(mock_state):
         
         mock_delete.assert_called_once_with(callback.message)
         mock_state.update_data.assert_called_once_with(last_menu_id=None, last_menu_ids=[])
+
+
+@pytest.mark.asyncio
+async def test_universal_help_handler(mock_state):
+    from handlers.common import universal_help_handler
+    callback = AsyncMock()
+    callback.data = "help:templates:manage_groups"
+    
+    # Используем __wrapped__ для обхода декоратора safe_callback
+    with patch("handlers.common.show_help_view", AsyncMock()) as mock_show:
+        await universal_help_handler.__wrapped__(callback, mock_state)
+        mock_show.assert_called_once_with(mock_state, callback, "templates", "manage_groups")
+
+
+@pytest.mark.asyncio
+async def test_show_help_view(mock_state):
+    from handlers.common import show_help_view
+    event = AsyncMock()
+    
+    with patch("services.help_service.HelpService.get_help", return_value="Test Help") as mock_get:
+        with patch("services.ui_service.UIService.show_menu", AsyncMock()) as mock_ui:
+            await show_help_view(mock_state, event, "test_key", "back_point")
+            
+            mock_get.assert_called_once_with("test_key")
+            mock_ui.assert_called_once()
+            args, kwargs = mock_ui.call_args
+            assert args[2] == "Test Help"
+            assert kwargs["reply_markup"] is not None

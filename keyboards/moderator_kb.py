@@ -79,6 +79,7 @@ def moderator_group_list_kb(topic_id: int, page: int = 1, limit: int = 7):
             text="⬅️ Назад",
             callback_data=f"mod_topic_select_{topic_id}"
         ),
+        InlineKeyboardButton(text="❓ О шаблонах", callback_data=f"help:templates:mod_topic_groups_{topic_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_topic_groups_{topic_id}")
@@ -105,6 +106,7 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
             text="⬅️ Назад",
             callback_data=f"mod_topic_groups_{topic_id}"
         ),
+        InlineKeyboardButton(text="❓ О шаблонах", callback_data=f"help:templates:mod_gr_addlist_{topic_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_gr_addlist_{topic_id}")
