@@ -39,7 +39,7 @@ Complete file list with individual responsibilities and full function inventory:
 - **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
 - **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
 - **database/db.py** — Single facade re-exporting all database functions. **The only permitted import point for data operations.**
-- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input`, `send_redirected_menu`, `show_menu`, `generic_navigator` (Unified Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input`, `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router with callable checks), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
 - **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`.
 - **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`.
@@ -258,7 +258,10 @@ Comprehensive automated testing suite using `pytest`. Tests are an integral part
 
 ### 8.2. Test Categories
 - **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
-- **tests/test_services/**: Tests for `ManagementService` and `PermissionService`. Focus: Validation logic, Search-Or-Action protocol, and role resolution.
+- **tests/test_services/**: Tests for domain services.
+    - `test_ui_navigation.py` (UI stabilization and route validation).
+    - `test_management_service.py` (Search-Or-Action protocol).
+    - `test_permission_service.py` (Role resolution).
 - **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
 - **tests/test_integration/**: End-to-End flow tests using a real `Dispatcher` but mocked `Bot`. Focus: Full update processing chain from middleware to final handler response.
 

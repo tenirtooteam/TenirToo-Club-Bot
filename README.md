@@ -62,6 +62,8 @@
 │   ├── conftest.py
 │   ├── test_database/
 │   ├── test_services/
+│   │   ├── test_ui_navigation.py
+│   │   └── ...
 │   ├── test_handlers/
 │   ├── test_integration/
 │   └── test_keyboards/

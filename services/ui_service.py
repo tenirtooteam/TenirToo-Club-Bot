@@ -206,14 +206,19 @@ class UIService:
         if cmd in simple:
             text, kb_func = simple[cmd]
             
+            # 1.1 Специальные редиректы
             if cmd == "templates_faq":
                 return await UIService.generic_navigator(state, event, f"help:templates:manage_groups")
-
-            if cmd in UIService.PAGINATED_CMDS:
-                markup = kb_func(page=page)
-            else:
-                markup = kb_func()
-            return await UIService.show_menu(state, event, text, reply_markup=markup)
+            
+            if cmd == "user_profile_view":
+                # Переходим к блоку "Инфо-карточки" ниже
+                pass
+            elif kb_func is not None:
+                if cmd in UIService.PAGINATED_CMDS:
+                    markup = kb_func(page=page)
+                else:
+                    markup = kb_func()
+                return await UIService.show_menu(state, event, text, reply_markup=markup)
 
         # 1.5 Специальная обработка HELP (help:{key}:{back_data})
         if cmd.startswith("help:"):

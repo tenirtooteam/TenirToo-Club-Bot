@@ -92,8 +92,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 18. **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
     > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
 
-19. **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)` instead of direct calls to `UIService.show_menu` or manual keyboard creation. The navigator uses the `PAGINATED_CMDS` class constant to explicitly determine call signatures.
-    > Rationale: Centralizing routing logic in the service layer prevents "UI logic leak" into handlers and ensures that role-based visibility (e.g., superadmin buttons) and pagination are handled consistently in a single point.
+19. **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)`. The navigator MUST implement a **Defensive Routing** protocol: before calling any keyboard builder or transition, it must verify the route exists and is valid (e.g., via callable checks or explicit key matching).
+    > Rationale: Centralizing routing logic prevents "UI logic leak". Defensive checks prevent `TypeError` or `NoneType` crashes in the router if a route mapping is incomplete or misconfigured.
 
 20. **VERIFY BEFORE AND AFTER CHANGE**: BEFORE making any code changes, view the target file and signatures. AFTER any modification to a strategic file (`.md`, `db.py`, `UIService`), it is mandatory to `view_file` the entire modified section to ensure no structural truncation or logic drift occurred.
     > Rationale: Relying on memory leads to bugs. Post-edit verification is the only way to catch "greedy match" errors that silently delete surrounding structural logic.
