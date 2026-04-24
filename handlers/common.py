@@ -185,11 +185,11 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
         return await UIService.generic_navigator(state, event, f"{s_type}_info_{item_id}")
         
     if s_action == "mod_add":
-        success, result = ManagementService.assign_moderator_role(str(item_id), int(s_context))
+        success, result = ManagementService.assign_moderator_role_by_id(item_id, int(s_context))
         return await UIService.show_menu(state, event, result, reply_markup=kb.back_to_main_kb())
         
     if s_action == "dir_add":
-        success, result = ManagementService.grant_direct_access(str(item_id), int(s_context))
+        success, result = ManagementService.grant_direct_access_by_id(item_id, int(s_context))
         return await UIService.show_menu(state, event, result, reply_markup=kb.back_to_main_kb())
 
     if s_action == "admin_role_target":

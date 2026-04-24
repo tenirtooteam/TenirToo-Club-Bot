@@ -7,6 +7,7 @@ from database import db
 from services.management_service import ManagementService
 from services.permission_service import PermissionService
 
+from config import IMMUNITY_FOR_ADMINS
 logger = logging.getLogger(__name__)
 
 
@@ -62,7 +63,6 @@ class AccessGuardMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         user_id = event.from_user.id
-        from config import IMMUNITY_FOR_ADMINS
         if IMMUNITY_FOR_ADMINS and PermissionService.is_global_admin(user_id):
             return await handler(event, data)
 

@@ -103,7 +103,11 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
         await UIService.show_temp_message(state, message, "❌ Название не может быть пустым.")
         return
 
-    ManagementService.update_topic_name(topic_id, new_name)
+    success, msg = ManagementService.update_topic_name(topic_id, new_name)
+    if not success:
+        await UIService.show_temp_message(state, message, msg)
+        return
+
     status = ""
     if topic_id != -1:
         try:

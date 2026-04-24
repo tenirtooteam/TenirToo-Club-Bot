@@ -369,7 +369,7 @@ class UIService:
         await UIService.show_menu(state, event, text, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
 
     @staticmethod
-    async def show_moderator_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery, text: str = "🛠 <b>Панель модератора</b>\nВыберите топик для управления:"):
+    async def show_moderator_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery):
         """Отображает главную панель модератора."""
         return await UIService.generic_navigator(state, event, "moderator")
 

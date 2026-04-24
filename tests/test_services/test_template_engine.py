@@ -2,8 +2,7 @@ import pytest
 from database import db
 from services.management_service import ManagementService
 
-@pytest.mark.asyncio
-async def test_template_mass_apply_logic():
+def test_template_mass_apply_logic():
     # Создаем шаблон и топик
     g_id = db.create_group("MassTemplate")
     t_id = 101
@@ -26,8 +25,7 @@ async def test_template_mass_apply_logic():
     for u_id in user_ids:
         assert db.can_write(u_id, t_id) is True
 
-@pytest.mark.asyncio
-async def test_template_sync_logic():
+def test_template_sync_logic():
     g_id = db.create_group("SyncTemplate")
     t_id = 102
     db.register_topic_if_not_exists(t_id)
@@ -49,8 +47,7 @@ async def test_template_sync_logic():
     assert db.can_write(9999, t_id) is False
     assert db.can_write(8888, t_id) is True
 
-@pytest.mark.asyncio
-async def test_template_empty_sync():
+def test_template_empty_sync():
     g_id = db.create_group("EmptyTemplate")
     t_id = 103
     db.register_topic_if_not_exists(t_id)

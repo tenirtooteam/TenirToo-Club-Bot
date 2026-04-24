@@ -39,7 +39,7 @@ async def test_moderator_rename_topic_finish_success(mock_state):
     
     mock_state.get_data.return_value = {"moderator_edit_topic_id": 10}
     
-    with patch("services.management_service.ManagementService.update_topic_name", MagicMock()) as mock_update:
+    with patch("services.management_service.ManagementService.update_topic_name", return_value=(True, "✅")) as mock_update:
         with patch("services.ui_service.UIService.generic_navigator", AsyncMock()) as mock_nav:
             await moderator_rename_topic_finish(message, mock_state)
             

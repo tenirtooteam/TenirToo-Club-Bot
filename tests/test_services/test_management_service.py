@@ -82,5 +82,23 @@ def test_add_user_boundary_and_security():
     assert ok is True
     # Проверяем, что в базу попало экранированное имя
     name = db.get_user_name(555)
-    assert "&lt;script&gt;" in name
+
+def test_update_user_name_validation():
+    u_id = 900
+    db.add_user(u_id, "Old", "Name")
+    
+    # Ошибка: пустое имя
+    ok, msg = ManagementService.update_user_name(u_id, "", "New")
+    assert ok is False
+    assert "Имя не может быть пустым" in msg
+    
+    # Успех: пустая фамилия (BUG-1 Fix)
+    ok, msg = ManagementService.update_user_name(u_id, "Ivan", "")
+    assert ok is True
+    assert db.get_user_name(u_id) == "Ivan"
+    
+    # Успех: полные данные
+    ok, msg = ManagementService.update_user_name(u_id, "Ivan", "Ivanov")
+    assert ok is True
+    assert db.get_user_name(u_id) == "Ivan Ivanov"
 

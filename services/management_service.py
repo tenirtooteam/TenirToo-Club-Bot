@@ -105,15 +105,8 @@ class ManagementService:
         return False, "❌ Не удалось создать группу в базе данных."
 
     @staticmethod
-    def assign_moderator_role(user_input: str, topic_id: int) -> tuple[bool, str]:
-        """Логика назначения пользователя модератором топика."""
-        target_user_id, err = ManagementService._parse_and_validate_id(user_input)
-        if err:
-            return False, err
-
-        if not db.user_exists(target_user_id):
-            return False, "❌ Пользователь с таким ID не найден в системе."
-
+    def assign_moderator_role_by_id(target_user_id: int, topic_id: int) -> tuple[bool, str]:
+        """Прямое назначение модератора по ID."""
         if PermissionService.is_moderator_of_topic(target_user_id, topic_id):
             return False, "❌ Этот пользователь уже является модератором данного топика."
 
@@ -123,23 +116,32 @@ class ManagementService:
 
         if db.grant_role(target_user_id, role_id, topic_id):
             return True, "✅ Пользователь назначен модератором топика."
-
         return False, "❌ Не удалось назначить модератора."
 
     @staticmethod
-    def grant_direct_access(user_input: str, topic_id: int) -> tuple[bool, str]:
-        """Логика выдачи прямого доступа к топику."""
+    def assign_moderator_role(user_input: str, topic_id: int) -> tuple[bool, str]:
+        """Логика назначения пользователя модератором топика (через ввод)."""
         target_user_id, err = ManagementService._parse_and_validate_id(user_input)
-        if err:
-            return False, err
-
+        if err: return False, err
         if not db.user_exists(target_user_id):
-            return False, "❌ Пользователь не найден в системе."
+            return False, "❌ Пользователь с таким ID не найден в системе."
+        return ManagementService.assign_moderator_role_by_id(target_user_id, topic_id)
 
+    @staticmethod
+    def grant_direct_access_by_id(target_user_id: int, topic_id: int) -> tuple[bool, str]:
+        """Прямая выдача доступа по ID."""
         if db.grant_direct_access(target_user_id, topic_id):
             return True, "✅ Прямой доступ выдан."
-        
         return False, "❌ Ошибка: Доступ уже есть или сбой БД."
+
+    @staticmethod
+    def grant_direct_access(user_input: str, topic_id: int) -> tuple[bool, str]:
+        """Логика выдачи прямого доступа к топику (через ввод)."""
+        target_user_id, err = ManagementService._parse_and_validate_id(user_input)
+        if err: return False, err
+        if not db.user_exists(target_user_id):
+            return False, "❌ Пользователь не найден в системе."
+        return ManagementService.grant_direct_access_by_id(target_user_id, topic_id)
 
     @staticmethod
     def revoke_direct_access(user_id: int, topic_id: int) -> tuple[bool, str]:
@@ -152,8 +154,8 @@ class ManagementService:
     def update_user_name(user_id: int, first_name: str, last_name: str) -> tuple[bool, str]:
         """Обновляет имя пользователя с валидацией и экранированием."""
         first_name, last_name = html.escape(first_name.strip()), html.escape(last_name.strip())
-        if not first_name or not last_name:
-            return False, "❌ Имя и Фамилия не могут быть пустыми."
+        if not first_name:
+            return False, "❌ Имя не может быть пустым."
             
         if len(first_name) > ManagementService.MAX_NAME_LENGTH or len(last_name) > ManagementService.MAX_NAME_LENGTH:
             return False, f"❌ Максимум {ManagementService.MAX_NAME_LENGTH} символов."
