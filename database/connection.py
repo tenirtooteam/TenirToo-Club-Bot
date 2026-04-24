@@ -90,11 +90,41 @@ def init_db():
                     FOREIGN KEY (topic_id) REFERENCES topic_names(topic_id) ON DELETE CASCADE
                 )""")
 
+                # Таблицы Мероприятий (Expedition Protocol)
+                c.execute("""CREATE TABLE IF NOT EXISTS events (
+                    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    start_date TEXT NOT NULL,
+                    end_date TEXT,
+                    creator_id INTEGER,
+                    is_approved INTEGER DEFAULT 0,
+                    sheet_url TEXT,
+                    FOREIGN KEY (creator_id) REFERENCES users(user_id) ON DELETE SET NULL
+                )""")
+
+                c.execute("""CREATE TABLE IF NOT EXISTS event_leads (
+                    event_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    PRIMARY KEY (event_id, user_id),
+                    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )""")
+
+                c.execute("""CREATE TABLE IF NOT EXISTS event_participants (
+                    event_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    PRIMARY KEY (event_id, user_id),
+                    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )""")
+
                 # Индексы
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_topics_topic_id ON group_topics(topic_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_direct_topic_access_user_id ON direct_topic_access(user_id)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_event_participants_event_id ON event_participants(event_id)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_event_leads_event_id ON event_leads(event_id)")
 
                 # Предзаполнение ролей
                 c.execute("INSERT OR IGNORE INTO roles (name) VALUES ('superadmin')")

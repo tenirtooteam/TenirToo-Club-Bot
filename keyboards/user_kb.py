@@ -6,6 +6,7 @@ from database import db
 def user_main_kb():
     builder = InlineKeyboardBuilder()
     builder.button(text="📍 Мои топики", callback_data="user_topics")
+    builder.button(text="🏔 Мероприятия", callback_data="event_list")
     builder.button(text="👤 Мой профиль", callback_data="user_profile_view")
     builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)

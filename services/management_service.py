@@ -38,6 +38,7 @@ class ManagementService:
 
             db.add_user(user_id, f_name, l_name)
             logger.info(f"🆕 Авто-регистрация: {f_name} {l_name} (ID: {user_id})")
+            ManagementService._trigger_sheets_sync("users")
 
     @staticmethod
     def _parse_and_validate_id(user_input: str) -> tuple[int, str]:
@@ -84,6 +85,7 @@ class ManagementService:
             return False, f"❌ Ошибка: Имя/Фамилия не должны превышать {ManagementService.MAX_NAME_LENGTH} симв."
 
         if db.add_user(user_id, f_name, l_name):
+            ManagementService._trigger_sheets_sync("users")
             return True, f"✅ Пользователь {f_name} добавлен!"
 
         return False, f"❌ Ошибка: ID {user_id} уже занят или сбой БД."
@@ -100,6 +102,7 @@ class ManagementService:
 
         group_id = db.create_group(name)
         if group_id > 0:
+            ManagementService._trigger_sheets_sync("groups")
             return True, f"✅ Группа <b>{name}</b> создана!"
 
         return False, "❌ Не удалось создать группу в базе данных."
@@ -244,7 +247,81 @@ class ManagementService:
             db.revoke_role(target_id, role_id, extra_id)
             return True, "✅ Модератор удалён", f"mod_topic_moderators_{extra_id}"
 
+        if action in ["group_del", "topic_del", "mod_topic_del", "global_topic_del", "user_del"]:
+             # Любое системное удаление триггерит полный синк для чистоты
+             ManagementService._trigger_sheets_sync("all")
+
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
+    
+    @staticmethod
+    async def sync_from_sheets() -> tuple[bool, str]:
+        """Синхронизирует локальную БД данными из Google Sheets (Manual Import)."""
+        from services.google_sheets_service import GoogleSheetsService
+        
+        users_data = await GoogleSheetsService.import_users()
+        if not users_data:
+            return False, "❌ Ошибка: Данные пользователей не получены или лист пуст."
+            
+        # Оптимизация: получаем текущих юзеров для сравнения [PL-HI]
+        current_users = {u[0]: (u[1], u[2]) for u in db.get_all_users()}
+        
+        imported_count = 0
+        updated_count = 0
+        for row in users_data:
+            u_id = row.get("User ID")
+            f_name = str(row.get("First Name", ""))
+            l_name = str(row.get("Last Name", ""))
+            
+            if u_id and f_name:
+                try:
+                    u_id_int = int(u_id)
+                    if u_id_int not in current_users:
+                        # Новый пользователь
+                        db.add_user(u_id_int, f_name, l_name)
+                        imported_count += 1
+                    else:
+                        # Проверяем, изменилось ли имя
+                        old_f, old_l = current_users[u_id_int]
+                        if f_name != old_f or l_name != old_l:
+                            db.update_user_name(u_id_int, f_name, l_name)
+                            updated_count += 1
+                except Exception as e:
+                    logger.warning(f"Ошибка парсинга строки при импорте: {row} ({e})")
+        
+        status = f"✅ Синхронизировано. Новых: {imported_count}, Обновлено: {updated_count}"
+        return True, status
+
+    @staticmethod
+    def _trigger_sheets_sync(mode: str = "all"):
+        """Запускает синхронизацию с Google Sheets в фоновом режиме."""
+        import asyncio
+        from services.google_sheets_service import GoogleSheetsService
+        
+        async def _task():
+            try:
+                if mode in ["all", "users"]:
+                    users = db.get_all_users()
+                    users_with_roles = []
+                    for u in users:
+                        roles = db.get_user_roles(u[0])
+                        # Форматируем роли: 'admin' или 'moderator(123)'
+                        roles_str = ", ".join([f"{r[0]}({r[1]})" if r[1] else r[0] for r in roles])
+                        users_with_roles.append((u[0], u[1], u[2], roles_str))
+                    await GoogleSheetsService.export_users(users_with_roles)
+                
+                if mode in ["all", "groups"]:
+                    groups = db.get_all_groups()
+                    groups_data = []
+                    for g_id, g_name in groups:
+                        topics = db.get_topics_of_group(g_id)
+                        # Преобразуем ID топиков в строки для join
+                        topics_str_list = [str(t) for t in topics]
+                        groups_data.append({'id': g_id, 'name': g_name, 'topics': topics_str_list})
+                    await GoogleSheetsService.export_groups(groups_data)
+            except Exception as e:
+                logger.error(f"Фоновая синхронизация Google Sheets провалилась: {e}")
+
+        asyncio.create_task(_task())
 
     # --- НОВЫЕ ОПЕРАЦИИ ШАБЛОНОВ (ЭТАП 2) ---
 

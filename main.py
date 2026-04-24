@@ -5,7 +5,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from loader import bot, dp
 from database import db
-from handlers import admin, user, common, moderator
+from handlers import admin, user, common, moderator, events
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
 
 
@@ -51,6 +51,7 @@ async def main():
     dp.include_router(user.router)
     dp.include_router(admin.router)
     dp.include_router(moderator.router)
+    dp.include_router(events.router)
 
     logging.info("🚀 Бот запущен и готов к работе!")
 

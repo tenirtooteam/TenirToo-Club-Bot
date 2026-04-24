@@ -53,6 +53,24 @@ async def back_to_main(callback: types.CallbackQuery, state: FSMContext):
     await UIService.generic_navigator(state, callback, callback.data)
 
 
+@router.callback_query(F.data == "sheets_export_all")
+@safe_callback()
+async def sheets_export_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Триггер полной выгрузки данных в Google Sheets."""
+    await callback.answer("⏳ Запуск выгрузки...")
+    ManagementService._trigger_sheets_sync("all")
+    await callback.message.answer("🚀 Фоновая синхронизация запущена. Проверьте Google таблицы через несколько секунд.")
+
+
+@router.callback_query(F.data == "sheets_import_all")
+@safe_callback()
+async def sheets_import_callback(callback: types.CallbackQuery, state: FSMContext):
+    """Триггер импорта данных из Google Sheets."""
+    await callback.answer("⏳ Загрузка данных из Google...")
+    success, msg = await ManagementService.sync_from_sheets()
+    await callback.message.answer(msg)
+
+
 # --- УПРАВЛЕНИЕ ГРУППАМИ ---
 
 @router.callback_query(F.data.startswith("manage_groups"))

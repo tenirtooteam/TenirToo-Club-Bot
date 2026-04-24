@@ -1,0 +1,61 @@
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
+def get_events_list_kb(events: list, is_admin: bool = False) -> InlineKeyboardMarkup:
+    """Клавиатура списка мероприятий."""
+    builder = InlineKeyboardBuilder()
+    
+    for event in events:
+        builder.row(
+            InlineKeyboardButton(
+                text=f"🏔 {event['title']} ({event['start_date']})",
+                callback_data=f"event_view:{event['event_id']}"
+            )
+        )
+        
+    builder.row(
+        InlineKeyboardButton(text="➕ Создать мероприятие", callback_data="event_create")
+    )
+    if is_admin:
+        builder.row(
+            InlineKeyboardButton(text="⏳ На модерации", callback_data="event_pending_list")
+        )
+    
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="user_main"))
+    return builder.as_markup()
+
+def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> InlineKeyboardMarkup:
+    """Клавиатура карточки мероприятия."""
+    builder = InlineKeyboardBuilder()
+    
+    # Кнопки участия
+    if is_participant:
+        builder.row(InlineKeyboardButton(text="❌ Не иду", callback_data=f"event_leave:{event_id}"))
+    else:
+        builder.row(InlineKeyboardButton(text="✅ Иду", callback_data=f"event_join:{event_id}"))
+        
+    # Кнопки редактирования
+    if can_edit:
+        builder.row(
+            InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"event_edit:{event_id}"),
+            InlineKeyboardButton(text="🗑 Удалить", callback_data=f"event_delete:{event_id}")
+        )
+        
+    builder.row(InlineKeyboardButton(text="🔙 К списку", callback_data="event_list"))
+    return builder.as_markup()
+
+def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:
+    """Клавиатура для администраторов для одобрения мероприятия."""
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="✅ Одобрить", callback_data=f"event_approve:{event_id}"),
+        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"event_reject:{event_id}")
+    )
+    builder.row(InlineKeyboardButton(text="🔙 К списку", callback_data="event_pending_list"))
+    return builder.as_markup()
+
+def get_event_cancel_kb() -> InlineKeyboardMarkup:
+    """Кнопка отмены при создании мероприятия."""
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="event_list")]
+    ])

@@ -83,6 +83,10 @@ def get_moderators_of_topic(topic_id: int) -> list:
         return c.fetchall()
 
 def is_global_admin(user_id: int) -> bool:
+    import config
+    if user_id == config.ADMIN_ID:
+        return True
+        
     with get_conn() as conn:
         c = conn.cursor()
         c.execute("""
@@ -117,3 +121,15 @@ def get_role_name_by_id(role_id: int) -> str:
         c.execute("SELECT name FROM roles WHERE id = ?", (role_id,))
         row = c.fetchone()
         return row[0] if row else ""
+
+def get_global_admin_ids() -> list:
+    """Возвращает список ID всех глобальных администраторов (admin, superadmin)."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("""
+            SELECT DISTINCT ur.user_id 
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE r.name IN ('admin', 'superadmin')
+        """)
+        return [row[0] for row in c.fetchall()]

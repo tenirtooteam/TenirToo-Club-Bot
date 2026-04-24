@@ -4,6 +4,12 @@ from aiogram.types import User
 from services.management_service import ManagementService
 from database import db
 
+@pytest.fixture(autouse=True)
+def mock_sheets_sync():
+    from unittest.mock import patch
+    with patch.object(ManagementService, '_trigger_sheets_sync', return_value=None):
+        yield
+
 def test_parse_and_validate_id():
     # Валидный ID
     val, err = ManagementService._parse_and_validate_id("12345")

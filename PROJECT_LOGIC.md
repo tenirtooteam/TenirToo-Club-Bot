@@ -38,8 +38,11 @@ Complete file list with individual responsibilities and full function inventory:
 - **database/groups.py** — Global templates management: `create_group`, `delete_group`, `get_all_groups`, `get_group_name`, `add_topic_to_group`, `remove_topic_from_group`, `get_topics_of_group`, `get_group_ids_by_topic`.
 - **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
 - **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
+- **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
 - **database/db.py** — Single facade re-exporting all database functions. **The only permitted import point for data operations.**
-- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input`, `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router with callable checks), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input` (FSM protection support), `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`.
+- **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
 - **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
 - **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`.
 - **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`.
@@ -48,11 +51,13 @@ Complete file list with individual responsibilities and full function inventory:
 - **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`.
 - **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
 - **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
+- **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`.
 - **handlers/user.py** — User flows: `/start`, profile, topics.
 - **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
 - **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
-- **keyboards/moderator_kb.py** — Moderator keyboards: `moderator_topics_list_kb`, `moderator_topic_menu_kb`, `moderator_group_list_kb`, `moderator_available_groups_kb`, `moderator_users_list_kb`, `moderator_users_to_add_kb`, `moderator_topic_moderators_kb`.
+- **keyboards/moderator_kb.py** — Moderator keyboards.
 - **keyboards/pagination_util.py** — Pagination helper: `build_paginated_menu`.
+- **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`.
 - **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
 - **local_scripts/dev_run.py** — Developer-only hot-reload runner.
 - **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
@@ -136,6 +141,33 @@ CREATE TABLE IF NOT EXISTS topic_names (
 
 CREATE INDEX IF NOT EXISTS idx_group_topics_topic_id ON group_topics(topic_id);
 CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id);
+
+CREATE TABLE IF NOT EXISTS events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    creator_id INTEGER,
+    is_approved INTEGER DEFAULT 0,
+    sheet_url TEXT,
+    FOREIGN KEY (creator_id) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS event_leads (
+    event_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (event_id, user_id),
+    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS event_participants (
+    event_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (event_id, user_id),
+    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
 ~~~
 
 - **Transactional Integrity**: Native `ON DELETE CASCADE` is enforced at the database level via `PRAGMA foreign_keys = ON;` executed on every connection open. **Strict Enforcement**: `init_db()` performs a runtime check at startup; if `PRAGMA foreign_keys` returns `0`, the bot throws a `RuntimeError` and terminates immediately to prevent data corruption.
@@ -152,6 +184,12 @@ CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id);
 ### 3.4. Indexes
 - `idx_group_members_user_id ON group_members(user_id)` — hot path for template member lookups.
 - `idx_group_topics_topic_id ON group_topics(topic_id)` — hot path for topic template lookups.
+
+### 3.5. Background Sync Pattern
+To ensure the bot remains responsive during network I/O with Google Sheets, all synchronization tasks are executed in the background using `asyncio.create_task`.
+- **Trigger**: Any data mutation in `ManagementService`.
+- **Mechanism**: `_trigger_sheets_sync(mode)` calls `GoogleSheetsService` asynchronously.
+- **Error Handling**: Failures in background tasks are logged but do not interrupt the main execution flow.
 
 ---
 
@@ -185,9 +223,10 @@ All three stages follow a **fail-open** strategy: non-critical exceptions are ca
 - **last_menu_id**: FSM key tracking the message ID of the currently active inline keyboard or system message. Set via `state.update_data(last_menu_id=sent_message.message_id)` immediately after every menu deployment.
 - **last_menu_ids**: FSM key holding a list (stack) of message IDs for transient alerts, error messages, or multi-step menus that require bulk deletion.
 - **UIService.clear_last_menu**: Reads `last_menu_id` and `last_menu_ids` from FSM state, deletes all tracked messages, nullifies FSM data in a `finally` block (guaranteed even if deletion fails).
-- **UIService.finish_input**: Atomic sequence: (1) `clear_last_menu`, (2) `delete_msg` (user's trigger message), (3) `state.set_state(None)`.
+- **UIService.finish_input**: Atomic sequence: (1) `clear_last_menu`, (2) `delete_msg` (user's trigger message), (3) `state.set_state(None)` IF `reset_state=True`. **Systemic Guard**: To maintain FSM chains (like Title -> Dates), `finish_input` must be called with `reset_state=False` in intermediate steps.
 - **UIService.ask_input**: Clears previous menu, deletes trigger message if in group, sends prompt, tracks it as `last_menu_id`, sets FSM state. Used for all FSM text-input initiation flows.
 - **UIService.show_temp_message**: Clears previous menu, deletes trigger, sends self-cleaning status or error message tracked as `last_menu_id`. Used for all transient error/status notifications.
+- **UIService.show_menu**: The primary gateway for all UI transitions. Automatically handles `last_menu_id` tracking. When called with a `Message` (user input), it calls `finish_input(reset_state=False)` to maintain flow continuity while cleaning the UI.
 - **UIService.generic_navigator**: Unified entry point for all UI transitions. Maps callback data strings to specific `UIService` show methods or keyboard builders. Supports global panels (Admin, Moderator, User), profile views, topic details, and **Help Infrastructure** (prefix `help:`). Decoupled help text via `HelpService` using `help:{key}:{back_data}` format. Uses the `PAGINATED_CMDS` class constant to explicitly determine if a keyboard requires the `page` argument. Includes fallback logging for unknown commands. `[AI-1]` Standard: All standard UI returns and transitions MUST traverse this router.
 - **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
 - **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `send_redirected_menu`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
@@ -260,6 +299,7 @@ Comprehensive automated testing suite using `pytest`. Tests are an integral part
 - **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
 - **tests/test_services/**: Tests for domain services.
     - `test_ui_navigation.py` (UI stabilization and route validation).
+    - `test_google_sheets_service.py` (Mocked API validation).
     - `test_management_service.py` (Search-Or-Action protocol).
     - `test_permission_service.py` (Role resolution).
 - **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.

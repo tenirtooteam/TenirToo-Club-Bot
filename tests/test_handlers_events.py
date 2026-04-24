@@ -1,0 +1,186 @@
+import pytest
+from unittest.mock import AsyncMock, patch
+from aiogram import types
+from handlers.events import process_event_dates, approve_event_handler, reject_event_handler
+import config
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+@patch('handlers.events.EventService')
+@patch('handlers.events.show_events_list')
+async def test_process_event_dates_regular_user(mock_show_list, mock_event_service, mock_db):
+    """Обычный пользователь: мероприятие должно уйти на модерацию."""
+    mock_event_service.notify_admins_for_approval = AsyncMock()
+    message = AsyncMock()
+    message.text = "01.01 - 02.01"
+    message.from_user.id = 111
+    
+    state = AsyncMock()
+    state.get_data.return_value = {"title": "Поход"}
+    
+    # Мок БД
+    mock_db.is_global_admin.return_value = False
+    mock_db.create_event.return_value = 10
+    
+    await process_event_dates(message, state)
+    
+    # Проверяем, что is_approved = 0
+    mock_db.create_event.assert_called_once_with("Поход", "01.01 - 02.01", "", 111, 0)
+    
+    # Проверяем уведомление админам
+    mock_event_service.notify_admins_for_approval.assert_called_once_with(message.bot, 10)
+    
+    # Проверяем редирект с текстом модерации
+    mock_show_list.assert_called_once()
+    args, kwargs = mock_show_list.call_args
+    assert "модерацию" in kwargs["custom_text"]
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+@patch('handlers.events.EventService')
+@patch('handlers.events.show_events_list')
+async def test_process_event_dates_admin_audit_on(mock_show_list, mock_event_service, mock_db):
+    """[CC-2] Админ с включенным аудитом: мероприятие уходит на модерацию."""
+    mock_event_service.notify_admins_for_approval = AsyncMock()
+    message = AsyncMock()
+    message.from_user = AsyncMock()
+    message.text = "01.01 - 02.01"
+    message.from_user.id = 222
+    
+    state = AsyncMock()
+    state.get_data.return_value = {"title": "Поход Админа"}
+    
+    mock_db.is_global_admin.return_value = True
+    mock_db.create_event.return_value = 20
+    
+    original_audit = getattr(config, 'REQUIRE_ADMIN_EVENT_AUDIT', True)
+    config.REQUIRE_ADMIN_EVENT_AUDIT = True
+    
+    try:
+        await process_event_dates(message, state)
+        # Уходит на модерацию (is_approved=0)
+        mock_db.create_event.assert_called_once_with("Поход Админа", "01.01 - 02.01", "", 222, 0)
+        mock_event_service.notify_admins_for_approval.assert_called_once_with(message.bot, 20)
+        
+        # Проверяем редирект
+        mock_show_list.assert_called_once()
+        assert "модерацию" in mock_show_list.call_args[1]["custom_text"]
+    finally:
+        config.REQUIRE_ADMIN_EVENT_AUDIT = original_audit
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+@patch('handlers.events.EventService')
+@patch('handlers.events.show_events_list')
+async def test_process_event_dates_admin_audit_off(mock_show_list, mock_event_service, mock_db):
+    """[CC-2] Админ с выключенным аудитом: мгновенная публикация."""
+    message = AsyncMock()
+    message.from_user = AsyncMock()
+    message.text = "01.01 - 02.01"
+    message.from_user.id = 333
+    
+    state = AsyncMock()
+    state.get_data.return_value = {"title": "Супер Поход"}
+    
+    mock_db.is_global_admin.return_value = True
+    mock_db.create_event.return_value = 30
+    
+    original_audit = getattr(config, 'REQUIRE_ADMIN_EVENT_AUDIT', True)
+    config.REQUIRE_ADMIN_EVENT_AUDIT = False
+    
+    try:
+        await process_event_dates(message, state)
+        # Одобряется сразу (is_approved=1)
+        mock_db.create_event.assert_called_once_with("Супер Поход", "01.01 - 02.01", "", 333, 1)
+        # Уведомления не рассылаются
+        mock_event_service.notify_admins_for_approval.assert_not_called()
+        
+        # Проверяем редирект с текстом успеха
+        mock_show_list.assert_called_once()
+        assert "опубликовано" in mock_show_list.call_args[1]["custom_text"]
+    finally:
+        config.REQUIRE_ADMIN_EVENT_AUDIT = original_audit
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+async def test_approve_event_handler(mock_db):
+    callback = AsyncMock()
+    callback.from_user = AsyncMock()
+    callback.data = "event_approve:15"
+    callback.from_user.id = 999
+    
+    mock_db.is_global_admin.return_value = True
+    mock_db.approve_event.return_value = True
+    
+    await approve_event_handler(callback)
+    
+    mock_db.approve_event.assert_called_once_with(15)
+    callback.message.edit_text.assert_called_once()
+    callback.answer.assert_called_once_with("✅ Мероприятие опубликовано.")
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+async def test_reject_event_handler(mock_db):
+    callback = AsyncMock()
+    callback.from_user = AsyncMock()
+    callback.data = "event_reject:25"
+    callback.from_user.id = 999
+    
+    mock_db.is_global_admin.return_value = True
+    
+    await reject_event_handler(callback)
+    
+    mock_db.delete_event.assert_called_once_with(25)
+    callback.message.edit_text.assert_called_once()
+    callback.answer.assert_called_once_with("❌ Мероприятие отклонено и удалено.")
+
+@pytest.mark.asyncio
+@patch('handlers.events.db')
+async def test_show_pending_events(mock_db):
+    """Проверка отображения списка ожидания."""
+    callback = AsyncMock()
+    callback.from_user.id = 777
+    state = AsyncMock()
+    state.get_data.return_value = {}
+    
+    mock_db.is_global_admin.return_value = True
+    mock_db.get_pending_events.return_value = [{"event_id": 1, "title": "Test", "start_date": "01.01", "end_date": "02.01"}]
+    
+    from handlers.events import show_pending_events
+    await show_pending_events(callback, state)
+    
+    mock_db.get_pending_events.assert_called_once()
+    state.clear.assert_called_once()
+
+@pytest.mark.asyncio
+@patch('handlers.events.UIService.show_temp_message', new_callable=AsyncMock)
+async def test_process_event_title_non_text(mock_show_temp):
+    """[CC-2] Проверка: отправка фото вместо названия не должна ронять бота."""
+    message = AsyncMock()
+    message.text = None # Эмуляция фото/стикера
+    state = AsyncMock()
+    
+    from handlers.events import process_event_title
+    await process_event_title(message, state)
+    
+    # Должно быть показано временное сообщение об ошибке
+    mock_show_temp.assert_called_once()
+    assert "название" in mock_show_temp.call_args[0][2]
+    # Состояние не должно меняться
+    state.set_state.assert_not_called()
+
+@pytest.mark.asyncio
+@patch('handlers.events.UIService.show_temp_message', new_callable=AsyncMock)
+async def test_process_event_dates_non_text(mock_show_temp):
+    """[CC-2] Проверка: отправка фото вместо дат не должна ронять бота."""
+    message = AsyncMock()
+    message.text = None
+    state = AsyncMock()
+    
+    from handlers.events import process_event_dates
+    await process_event_dates(message, state)
+    
+    mock_show_temp.assert_called_once()
+    assert "даты" in mock_show_temp.call_args[0][2]
+    # БД не должна вызываться
+

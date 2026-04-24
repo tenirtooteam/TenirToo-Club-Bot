@@ -39,15 +39,16 @@ class UIService:
             pass
 
     @staticmethod
-    async def finish_input(state: FSMContext, message: types.Message):
+    async def finish_input(state: FSMContext, message: types.Message, reset_state: bool = True):
         """
         Единый метод завершения FSM-ввода:
         удаляет старое меню/промпт, удаляет сообщение пользователя,
-        сбрасывает состояние ввода.
+        опционально сбрасывает состояние ввода (по умолчанию Да).
         """
         await UIService.clear_last_menu(state, message.bot, message.chat.id)
         await UIService.delete_msg(message)
-        await state.set_state(None)
+        if reset_state:
+            await state.set_state(None)
 
     @staticmethod
     async def send_redirected_menu(
@@ -84,8 +85,9 @@ class UIService:
                 await UIService.delete_msg(message)
                 return sent_error
         else:
-            # Если уже в личке или редирект не требуется
-            await UIService.finish_input(state, message)
+            # Если уже в личке или редирект не требуется. 
+            # Не сбрасываем состояние, так как это может быть промежуточный шаг.
+            await UIService.finish_input(state, message, reset_state=False)
             sent_message = await message.answer(
                 text=text,
                 reply_markup=reply_markup,
@@ -145,7 +147,8 @@ class UIService:
             except Exception:
                 pass
         else:
-            await UIService.finish_input(state, event)
+            # Если это сообщение (текстовый ввод), чистим чат, но СОХРАНЯЕМ состояние
+            await UIService.finish_input(state, event, reset_state=False)
             new_msg = await event.bot.send_message(
                 event.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode
             )
