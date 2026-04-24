@@ -16,9 +16,12 @@ def user_topics_list_kb(user_id: int):
     builder = InlineKeyboardBuilder()
     all_topics = db.get_all_unique_topics()
     user_available = set(db.get_user_available_topics(user_id))
+    
+    # Оптимизация: пакетная выборка имён [PL-HI]
+    names_map = db.get_topic_names_by_ids(all_topics)
 
     for t_id in all_topics:
-        t_name = db.get_topic_name(t_id)
+        t_name = names_map.get(t_id, f"ID: {t_id}")
         if t_id in user_available:
             status = "✅"
             label = ""

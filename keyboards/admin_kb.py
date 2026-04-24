@@ -22,9 +22,13 @@ def back_to_main_kb():
 def all_topics_kb(page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     topic_ids = db.get_all_unique_topics()
+    
+    # Оптимизация: получаем имена всех топиков одним запросом [PL-HI]
+    names_map = db.get_topic_names_by_ids(topic_ids)
+    
     item_buttons = []
     for t_id in topic_ids:
-        t_name = db.get_topic_name(t_id)
+        t_name = names_map.get(t_id, f"ID: {t_id}")
         item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_global_view_{t_id}"))
     static_buttons = [
         InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
@@ -51,9 +55,13 @@ def topic_edit_kb(topic_id, group_id=0):
 def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     topics = db.get_topics_of_group(group_id)
+    
+    # Оптимизация: пакетная выборка имён [PL-HI]
+    names_map = db.get_topic_names_by_ids(topics)
+    
     item_buttons = []
     for t_id in topics:
-        t_name = db.get_topic_name(t_id)
+        t_name = names_map.get(t_id, f"ID: {t_id}")
         item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_in_group_{t_id}_{group_id}"))
         
     static_buttons = [
@@ -69,12 +77,15 @@ def available_topics_kb(group_id, page: int = 1, limit: int = 7):
     group_topics = set(db.get_topics_of_group(group_id))
     available = [t for t in all_topics if t not in group_topics]
     
+    # Оптимизация: пакетная выборка имён [PL-HI]
+    names_map = db.get_topic_names_by_ids(available)
+    
     item_buttons = []
     if not available:
         item_buttons.append(InlineKeyboardButton(text="🚫 Все топики уже в группе", callback_data="noop"))
     else:
         for t_id in available:
-            t_name = db.get_topic_name(t_id)
+            t_name = names_map.get(t_id, f"ID: {t_id}")
             item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name} (ID: {t_id})", callback_data=f"topic_add_confirm_{t_id}_{group_id}"))
             
     static_buttons = [
@@ -115,9 +126,13 @@ def template_action_topic_select_kb(group_id: int, action: str, page: int = 1, l
     """Клавиатура выбора топика для применения или синхронизации шаблона (с пагинацией)."""
     from keyboards.pagination_util import build_paginated_menu
     topics = db.get_all_unique_topics()
+    
+    # Оптимизация: пакетная выборка имён [PL-HI]
+    names_map = db.get_topic_names_by_ids(topics)
+    
     item_buttons = []
     for t_id in topics:
-        t_name = db.get_topic_name(t_id)
+        t_name = names_map.get(t_id, f"ID: {t_id}")
         item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"tmpl_act_exec_{action}_{group_id}_{t_id}"))
     
     static_buttons = [
@@ -215,12 +230,17 @@ def user_roles_manage_kb(user_id: int):
     """Клавиатура управления ролями конкретного пользователя."""
     builder = InlineKeyboardBuilder()
     user_roles = list(db.get_user_roles(user_id))
+    
+    # Оптимизация: собираем ID топиков для пакетной выборки имён [PL-HI]
+    topic_ids = [tid for _, tid in user_roles if tid is not None]
+    names_map = db.get_topic_names_by_ids(topic_ids)
+    
     for role_name, topic_id in user_roles:
         if topic_id is None:
             display = f"✅ {role_name} (глобально)"
             callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_None"
         else:
-            topic_name = db.get_topic_name(topic_id)
+            topic_name = names_map.get(topic_id, f"Топик {topic_id}")
             display = f"✅ {role_name} топика {topic_name}"
             callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_{topic_id}"
         builder.button(text=display, callback_data=callback)
@@ -235,9 +255,12 @@ def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     all_topics = db.get_all_unique_topics()
     
+    # Оптимизация: пакетная выборка имён [PL-HI]
+    names_map = db.get_topic_names_by_ids(all_topics)
+    
     item_buttons = []
     for t_id in all_topics:
-        t_name = db.get_topic_name(t_id)
+        t_name = names_map.get(t_id, f"ID: {t_id}")
         item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"role_assign_topic_{user_id}_{t_id}"))
         
     static_buttons = [

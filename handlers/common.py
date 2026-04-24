@@ -65,9 +65,10 @@ async def cmd_help(message: types.Message, state: FSMContext):
 @router.callback_query(F.data == "close_menu")
 @safe_callback()
 async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):
-    """Удаляет меню и очищает состояние трекинга."""
+    """Удаляет меню и очищает состояние трекинга (синхронизация со стеком [CC-3])."""
     await UIService.delete_msg(callback.message)
-    await state.update_data(last_menu_id=None)
+    # Очищаем оба поля для поддержки перехода на новую систему стеков
+    await state.update_data(last_menu_id=None, last_menu_ids=[])
 
 
 @router.callback_query(F.data == "roles_dashboard")

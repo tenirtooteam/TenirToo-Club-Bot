@@ -109,21 +109,24 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
     - **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
     - **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
- 
- 24. **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
+
+24. **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
      > Rationale: Standardizing the synchronization process prevents accidental data loss, ensures clear history, and maintains environment parity across distributed workspaces.
- 
- 25. **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
+
+25. **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
      > Rationale: Prevents architectural decay and ensures the codebase remains lean and aligned with project-specific constraints without introducing unnecessary churn.
 
- 26. **BATCH-FETCH RULE**: Keyboard builders iterating over entity lists (users, topics, groups) MUST use batch-fetching helpers (e.g., `db.get_topic_names_by_ids`) to avoid N+1 database queries. direct `db.*` calls inside loops are strictly prohibited. [PL-HI]
-     > Rationale: Minimizes I/O overhead and database lock contention, ensuring the UI remains responsive even as the number of entities grows.
+26. **BATCH-FETCH RULE**: Keyboard builders iterating over entity lists (users, topics, groups) MUST use batch-fetching helpers (e.g., `db.get_topic_names_by_ids`) to avoid N+1 database queries. direct `db.*` calls inside loops are strictly prohibited. [PL-HI]
+    > Rationale: Minimizes I/O overhead and database lock contention, ensuring the UI remains responsive even as the number of entities grows.
 
- 27. **STRATEGIC ANCHORING**: When modifying strategic files (`🔒 Private` or `🌐 Public` prompts and technical docs), `TargetContent` MUST include the section header and at least 2 lines of surrounding context. Simplification of match targets that sacrifices structural anchors is strictly prohibited.
+27. **STRATEGIC ANCHORING**: When modifying strategic files (`🔒 Private` or `🌐 Public` prompts and technical docs), `TargetContent` MUST include the section header and at least 2 lines of surrounding context. Simplification of match targets that sacrifices structural anchors is strictly prohibited.
      > Rationale: High-fidelity anchoring prevents accidental deletion of "structural" bullet points or constraints that reside near the modification area.
 
- 28. **BY-ID PREFERENCE**: When an entity ID (user_id, topic_id, group_id) is already known as an integer, handlers MUST use `*_by_id` service methods (e.g., `ManagementService.assign_moderator_role_by_id`) instead of string-parsing equivalents.
+28. **BY-ID PREFERENCE**: When an entity ID (user_id, topic_id, group_id) is already known as an integer, handlers MUST use `*_by_id` service methods (e.g., `ManagementService.assign_moderator_role_by_id`) instead of string-parsing equivalents.
      > Rationale: Eliminates redundant type conversions and string validation logic, reducing CPU cycles and improving code readability in high-frequency routing paths.
+
+29. **ZERO CREATIVITY**: Architectural or logic proposals regarding bot functionality MUST NEVER be answered conversationally. They MUST trigger Route B (**PA-1** / **APA-1**). Any technical advice outside verified patterns must be flagged as "Speculative" and require an explicit audit. Implementation planning (RNA-Blueprint) MUST start only after an explicit **RNA-1** command following an approved audit.
+     > Rationale: Prevents protocol drift and ensures all changes are vetted against the Optimality Standard and project constraints before a single line of plan or code is written.
 
 ---
 

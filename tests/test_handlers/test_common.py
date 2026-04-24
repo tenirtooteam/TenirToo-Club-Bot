@@ -46,4 +46,4 @@ async def test_close_menu_handler(mock_state):
         await close_menu_handler(callback, mock_state)
         
         mock_delete.assert_called_once_with(callback.message)
-        mock_state.update_data.assert_called_once_with(last_menu_id=None)
+        mock_state.update_data.assert_called_once_with(last_menu_id=None, last_menu_ids=[])
