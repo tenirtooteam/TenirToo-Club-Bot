@@ -31,8 +31,8 @@ async def test_ensure_user_registered():
     assert db.get_user_name(999) == "Test User"
 
 def test_add_user_validation():
-    # Ошибка формата
-    ok, msg = ManagementService.add_user("123 Ivan")
+    # Ошибка формата (только ID без имени)
+    ok, msg = ManagementService.add_user("123")
     assert ok is False
     assert "Формат" in msg
     
@@ -69,3 +69,18 @@ def test_execute_deletion():
     ok, msg, next_cb = ManagementService.execute_deletion("user_del", u_id)
     assert ok is True
     assert db.user_exists(u_id) is False
+
+def test_add_user_boundary_and_security():
+    # Слишком длинное имя (MAX_NAME_LENGTH = 64)
+    long_name = "A" * 70
+    ok, msg = ManagementService.add_user(f"12345 {long_name}")
+    assert ok is False
+    assert "превышать" in msg
+    
+    # HTML экранирование
+    ok, msg = ManagementService.add_user("555 <script>alert(1)</script>")
+    assert ok is True
+    # Проверяем, что в базу попало экранированное имя
+    name = db.get_user_name(555)
+    assert "&lt;script&gt;" in name
+

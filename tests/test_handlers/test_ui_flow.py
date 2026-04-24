@@ -22,8 +22,8 @@ async def test_ui_sterile_cleanup_logic(mock_state):
     message.chat.id = 123
     message.chat.type = "private"
     
-    # Записываем старый ID меню в стейт
-    await mock_state.update_data(last_menu_id=999)
+    # Записываем старый ID меню в стейт (новый формат списка)
+    await mock_state.update_data(last_menu_ids=[999])
     
     # Мокаем отправку сообщения
     bot.send_message = AsyncMock(return_value=AsyncMock(message_id=2002))
@@ -34,9 +34,9 @@ async def test_ui_sterile_cleanup_logic(mock_state):
     # Проверяем, что бот пытался удалить старое сообщение (999)
     bot.delete_message.assert_any_call(chat_id=123, message_id=999)
     
-    # Проверяем, что новый ID меню (2002) сохранен в стейт
+    # Проверяем, что новый ID меню (2002) сохранен в стейт (в списке)
     data = await mock_state.get_data()
-    assert data['last_menu_id'] == 2002
+    assert 2002 in data.get('last_menu_ids', [])
 
 @pytest.mark.asyncio
 async def test_ui_redirect_command_cleanup(mock_state):
@@ -48,7 +48,7 @@ async def test_ui_redirect_command_cleanup(mock_state):
     message.chat.type = "private"
     
     # Имитируем старое меню
-    await mock_state.update_data(last_menu_id=1500)
+    await mock_state.update_data(last_menu_ids=[1500])
     
     # Вызываем sterile_command декоратор (внутреннюю логику)
     # Здесь мы тестируем UIService.clear_last_menu напрямую
@@ -56,6 +56,7 @@ async def test_ui_redirect_command_cleanup(mock_state):
     
     bot.delete_message.assert_called_with(chat_id=123, message_id=1500)
     
-    # После очистки в стейте не должно быть ID
+    # После очистки список должен быть пустым
     data = await mock_state.get_data()
+    assert not data.get('last_menu_ids')
     assert data.get('last_menu_id') is None

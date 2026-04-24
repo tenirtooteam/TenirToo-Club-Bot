@@ -54,5 +54,14 @@ def test_find_users_by_query():
     assert len(results) == 1
     assert results[0][0] == 202
     
+    # Тест на регистронезависимость кириллицы (ВАЖНО)
+    results = members.find_users_by_query("ИВАН")
+    assert len(results) == 1
+    assert results[0][0] == 202
+
+    results = members.find_users_by_query("пЕТРОВ")
+    assert len(results) == 1
+    assert results[0][0] == 201
+
     # Пустой запрос
     assert members.find_users_by_query("") == []

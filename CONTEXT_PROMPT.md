@@ -102,9 +102,9 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
     > Rationale: Global package installations lead to version conflicts and unpredictable behavior. Mandatory `venv` ensures environment parity between development and production.
 
 23. **STRATEGIC PLANNING (RNA-BLUEPRINT)**: For any non-trivial logical change (features, refactoring, audit), an implementation plan using the **RNA-Blueprint** format must be established.
-    - **Header Logic**: The header must include both **Base DNA** (general project standards) and **Task RNA** (specific logic and risks for the current task). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
+    - **Header Logic**: The header must include **Base DNA** (standards), **Task RNA** (logic, risks), and **Contextual Constraints (CC)**. CC are critical principles and nuances extracted from `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` specifically for the current task, indexed (e.g., `[CC-1]`). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
     - **Incremental Principle**: Do not rewrite the entire plan for every correction; update only the affected parts.
-    - **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[PL-HI]`) referring to the header logic.
+    - **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[CC-x]`) referring to the header logic. Every task must be verified against the CC list for compliance.
     - **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
     - **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
