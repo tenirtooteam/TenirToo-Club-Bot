@@ -274,10 +274,14 @@ class UIService:
             return await UIService.show_menu(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
             
         if cmd.startswith("user_templates_manage"):
-            parts = cmd.split("_")
-            u_id = int(parts[3])
-            page = int(parts[4]) if len(parts) > 4 else 1
+            u_id = int(p[3])
             return await UIService.show_menu(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
+
+        if cmd.startswith("tmpl_act_start_"):
+            action = p[3]
+            g_id = int(p[4])
+            title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
+            return await UIService.show_menu(state, event, title, reply_markup=kb.template_action_topic_select_kb(g_id, action, page=page))
             
         if cmd.startswith("group_topics_list"):
             g_id = int(p[-1])

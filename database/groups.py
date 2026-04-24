@@ -147,3 +147,17 @@ def get_user_group_templates(user_id: int) -> list:
             WHERE gm.user_id = ?
         """, (user_id,))
         return c.fetchall()
+
+def get_user_group_membership_ids(user_id: int) -> list:
+    """Возвращает только список ID шаблонов групп, в которых состоит пользователь."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT group_id FROM group_members WHERE user_id = ?", (user_id,))
+        return [row[0] for row in c.fetchall()]
+
+def get_group_ids_by_topic(topic_id: int) -> list:
+    """Возвращает список ID групп, к которым привязан данный топик."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT group_id FROM group_topics WHERE topic_id = ?", (topic_id,))
+        return [row[0] for row in c.fetchall()]

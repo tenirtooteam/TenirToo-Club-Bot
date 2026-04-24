@@ -4,13 +4,16 @@ from database import db
 
 
 def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
-    """Список топиков, доступных модератору для управления."""
+    """Список топиков, доступных модератору для управления (оптимизировано)."""
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     
+    # Оптимизация: получаем имена всех топиков одним запросом [PL-HI]
+    names_map = db.get_topic_names_by_ids(topics)
+    
     item_buttons = []
     for topic_id in topics:
-        topic_name = db.get_topic_name(topic_id)
+        topic_name = names_map.get(topic_id, f"ID: {topic_id}")
         item_buttons.append(InlineKeyboardButton(
             text=f"📍 {topic_name} (ID: {topic_id})",
             callback_data=f"mod_topic_select_{topic_id}"
@@ -56,18 +59,16 @@ def moderator_group_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     all_groups = db.get_all_groups()
-    attached_groups = []
-    for g_id, g_name in all_groups:
-        topics = db.get_topics_of_group(g_id)
-        if topic_id in topics:
-            attached_groups.append((g_id, g_name))
-
+    # Оптимизация: получаем ID всех привязанных групп одним запросом [PL-HI]
+    attached_ids = set(db.get_group_ids_by_topic(topic_id))
+    
     item_buttons = []
-    for g_id, g_name in attached_groups:
-        item_buttons.append(InlineKeyboardButton(
-            text=f"🔹 {g_name} ❌ (Отвязать)",
-            callback_data=f"mod_group_remove_{g_id}_{topic_id}"
-        ))
+    for g_id, g_name in all_groups:
+        if g_id in attached_ids:
+            item_buttons.append(InlineKeyboardButton(
+                text=f"🔹 {g_name} ❌ (Отвязать)",
+                callback_data=f"mod_group_remove_{g_id}_{topic_id}"
+            ))
 
     static_buttons = [
         InlineKeyboardButton(
@@ -88,18 +89,16 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     all_groups = db.get_all_groups()
-    unattached_groups = []
-    for g_id, g_name in all_groups:
-        topics = db.get_topics_of_group(g_id)
-        if topic_id not in topics:
-            unattached_groups.append((g_id, g_name))
+    # Оптимизация: получаем ID всех привязанных групп одним запросом [PL-HI]
+    attached_ids = set(db.get_group_ids_by_topic(topic_id))
             
     item_buttons = []
-    for g_id, g_name in unattached_groups:
-        item_buttons.append(InlineKeyboardButton(
-            text=f"🔗 {g_name}",
-            callback_data=f"mod_gr_link_{g_id}_{topic_id}"
-        ))
+    for g_id, g_name in all_groups:
+        if g_id not in attached_ids:
+            item_buttons.append(InlineKeyboardButton(
+                text=f"🔗 {g_name}",
+                callback_data=f"mod_gr_link_{g_id}_{topic_id}"
+            ))
         
     static_buttons = [
         InlineKeyboardButton(
@@ -118,8 +117,9 @@ def moderator_users_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     from aiogram.types import InlineKeyboardButton
     users = db.get_all_users()
     
-    direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
-    all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
+    # Оптимизация: пакетная выборка прав [PL-HI]
+    direct_users = set(db.get_direct_access_user_ids(topic_id))
+    all_authorized = set(db.get_topic_authorized_user_ids(topic_id))
     group_users = all_authorized - direct_users
     
     item_buttons = []
@@ -155,9 +155,8 @@ def moderator_users_to_add_kb(topic_id: int, page: int = 1, limit: int = 7):
     from aiogram.types import InlineKeyboardButton
     users = db.get_all_users()
     
-    direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
-    all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
-    has_access = direct_users | all_authorized
+    # Оптимизация: пакетная выборка прав [PL-HI]
+    has_access = set(db.get_topic_authorized_user_ids(topic_id))
     
     item_buttons = []
     for u_id, f_name, l_name in users:

@@ -68,3 +68,13 @@ def find_topics_by_query(query: str) -> list:
         query = query.lower()
         # Возвращаем список (topic_id, name)
         return [(r[0], r[1]) for r in rows if query in r[1].lower()]
+
+def get_topic_names_by_ids(topic_ids: list) -> dict:
+    """Возвращает словарь {topic_id: name} для списка ID."""
+    if not topic_ids:
+        return {}
+    with get_conn() as conn:
+        c = conn.cursor()
+        placeholders = ', '.join('?' for _ in topic_ids)
+        c.execute(f"SELECT topic_id, name FROM topic_names WHERE topic_id IN ({placeholders})", topic_ids)
+        return {row[0]: row[1] for row in c.fetchall()}

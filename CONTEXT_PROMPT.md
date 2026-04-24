@@ -26,7 +26,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Native Notifications**: The `@all` mention triggers a silent push notification for all authorized topic members.
 - **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
 - **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
-- **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and `perform_search_pick` router in `handlers/common.py`, supporting User, Group, and Topic entity types.
+- **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and a unified router in `handlers/common.py`. Disambiguation is fully automated via the `"SEARCH_REQUIRED"` protocol.
+- **Performance Optimization**: Zero N+1 queries in the UI layer. All keyboard builders iterating over entity lists use batch-fetching helpers (`get_topic_names_by_ids`, etc.) to ensure high responsiveness. [PL-HI]
 - **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. Consolidation includes template-based operations and **flexible name parsing** for users (supporting spaces and patronymics).
 - **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
 - **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `group_topics`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
@@ -109,11 +110,14 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
     - **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
  
- 24. **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`.
+ 24. **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
      > Rationale: Standardizing the synchronization process prevents accidental data loss, ensures clear history, and maintains environment parity across distributed workspaces.
  
  25. **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
      > Rationale: Prevents architectural decay and ensures the codebase remains lean and aligned with project-specific constraints without introducing unnecessary churn.
+
+ 26. **BATCH-FETCH RULE**: Keyboard builders iterating over entity lists (users, topics, groups) MUST use batch-fetching helpers (e.g., `db.get_topic_names_by_ids`) to avoid N+1 database queries. direct `db.*` calls inside loops are strictly prohibited. [PL-HI]
+     > Rationale: Minimizes I/O overhead and database lock contention, ensuring the UI remains responsive even as the number of entities grows.
 
 ---
 

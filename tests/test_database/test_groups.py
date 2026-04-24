@@ -32,3 +32,20 @@ def test_group_template_membership():
     
     groups.remove_from_group_template(g_id, u_id)
     assert u_id not in groups.get_group_template_members(g_id)
+
+def test_batch_group_helpers():
+    u_id = 101
+    g_id = groups.create_group("Batch G")
+    t_id = 77
+    topics.update_topic_name(t_id, "T77") # Register topic to satisfy FK
+    members.add_user(u_id, "B", "1")
+    assert groups.add_to_group_template(g_id, u_id) is True
+    assert groups.add_topic_to_group(g_id, t_id) is True
+    
+    # Test get_user_group_membership_ids
+    m_ids = groups.get_user_group_membership_ids(u_id)
+    assert g_id in m_ids
+    
+    # Test get_group_ids_by_topic
+    gt_ids = groups.get_group_ids_by_topic(t_id)
+    assert g_id in gt_ids

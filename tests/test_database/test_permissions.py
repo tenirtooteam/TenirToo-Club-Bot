@@ -55,3 +55,21 @@ def test_get_topic_authorized_users():
     ids = [u[0] for u in auth_users]
     assert u2 in ids
     assert u1 not in ids
+
+def test_batch_permission_ids():
+    t_id = 70
+    u1, u2 = 701, 702
+    topics.update_topic_name(t_id, "T70") # Register topic to satisfy FK
+    members.add_user(u1, "Batch1", "Test")
+    members.add_user(u2, "Batch2", "Test")
+    assert permissions.grant_direct_access(u1, t_id) is True
+    
+    # Test get_direct_access_user_ids
+    d_ids = permissions.get_direct_access_user_ids(t_id)
+    assert u1 in d_ids
+    assert u2 not in d_ids
+    
+    # Test get_topic_authorized_user_ids
+    a_ids = permissions.get_topic_authorized_user_ids(t_id)
+    assert u1 in a_ids
+    assert len(a_ids) == 1 # Restricted to u1

@@ -70,49 +70,6 @@ async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(last_menu_id=None)
 
 
-@router.callback_query(F.data.startswith("usr_pg_"))
-@safe_callback()
-async def process_user_pagination(callback: types.CallbackQuery, state: FSMContext):
-    """Пагинация в списке выбора пользователей при поиске."""
-    page = int(callback.data.split("_")[2])
-    data = await state.get_data()
-    query = data.get("disambig_query", "")
-
-    if not query:
-        await callback.answer("Контекст поиска утерян.", show_alert=True)
-        return
-
-    results = db.find_users_by_query(query)
-    total_pages = math.ceil(len(results) / 7)
-    start_idx = (page - 1) * 7
-    markup = kb.user_disambiguation_kb(results[start_idx:start_idx + 7], page, total_pages)
-    await UIService.show_menu(state, callback, "🔍 Кто именно из пользователей?", reply_markup=markup)
-
-
-@router.callback_query(F.data.startswith("usr_pick_"))
-@safe_callback()
-async def process_user_pick(callback: types.CallbackQuery, state: FSMContext):
-    """Обработка выбора конкретного пользователя после поиска."""
-    target_user_id = int(callback.data.split("_")[2])
-    data = await state.get_data()
-    action = data.get("disambig_action")
-    context_id = data.get("disambig_context")
-
-    if action == "dir_add":
-        success, result = ManagementService.grant_direct_access(str(target_user_id), context_id)
-        await UIService.show_menu(state, callback, result)
-    elif action == "mod_add":
-        success, result = ManagementService.assign_moderator_role(str(target_user_id), context_id)
-        await UIService.show_menu(state, callback, result)
-    elif action == "admin_role_target":
-        # Переход к выбору роли для админа
-        await UIService.show_menu(
-            state, callback, 
-            f"Выберите роль для пользователя {db.get_user_name(target_user_id)}:",
-            reply_markup=kb.role_selection_kb(target_user_id)
-        )
-
-
 @router.callback_query(F.data == "roles_dashboard")
 @safe_callback()
 async def roles_dashboard_menu(callback: types.CallbackQuery, state: FSMContext):

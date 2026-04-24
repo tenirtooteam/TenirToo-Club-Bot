@@ -111,17 +111,20 @@ def group_edit_kb(group_id):
     builder.adjust(1)
     return builder.as_markup()
 
-def template_action_topic_select_kb(group_id: int, action: str):
-    """Клавиатура выбора топика для применения или синхронизации шаблона."""
-    builder = InlineKeyboardBuilder()
+def template_action_topic_select_kb(group_id: int, action: str, page: int = 1, limit: int = 7):
+    """Клавиатура выбора топика для применения или синхронизации шаблона (с пагинацией)."""
+    from keyboards.pagination_util import build_paginated_menu
     topics = db.get_all_unique_topics()
+    item_buttons = []
     for t_id in topics:
         t_name = db.get_topic_name(t_id)
-        builder.button(text=f"📍 {t_name}", callback_data=f"tmpl_act_exec_{action}_{group_id}_{t_id}")
+        item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"tmpl_act_exec_{action}_{group_id}_{t_id}"))
     
-    builder.button(text="⬅️ Назад", callback_data=f"group_info_{group_id}")
-    builder.adjust(1)
-    return builder.as_markup()
+    static_buttons = [
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
+        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+    ]
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"tmpl_act_start_{action}_{group_id}")
 
 def users_list_kb(page: int = 1, limit: int = 7):
     users = db.get_all_users()
@@ -157,13 +160,8 @@ def user_edit_kb(user_id, is_superadmin: bool = False):
 def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     all_groups = db.get_all_groups()
-    # Теперь проверяем членство в шаблоне (group_members)
-    user_in_templates = set(db.get_group_template_members(g[0]) for g in all_groups if user_id in db.get_group_template_members(g[0]))
-    # Оптимизируем: получим список всех ID групп, где есть юзер
-    user_template_ids = set()
-    for g_id, _ in all_groups:
-        if user_id in db.get_group_template_members(g_id):
-            user_template_ids.add(g_id)
+    # Оптимизация: получаем все ID групп пользователя одним запросом [PL-HI]
+    user_template_ids = set(db.get_user_group_membership_ids(user_id))
     
     item_buttons = []
     for g_id, g_name in all_groups:
@@ -255,23 +253,7 @@ def back_to_roles_dashboard_kb():
     builder.adjust(1)
     return builder.as_markup()
 
-def user_disambiguation_kb(users_page: list, page: int, total_pages: int):
-    builder = InlineKeyboardBuilder()
-    for u_id, f_name, l_name in users_page:
-        builder.button(text=f"👤 {f_name} {l_name}", callback_data=f"usr_pick_{u_id}")
-    
-    nav_buttons = []
-    if page > 1:
-        nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=f"usr_pg_{page - 1}"))
-    if page < total_pages:
-        nav_buttons.append(InlineKeyboardButton(text="Вперёд ➡️", callback_data=f"usr_pg_{page + 1}"))
-    
-    builder.adjust(1)
-    if nav_buttons:
-        builder.row(*nav_buttons)
-        
-    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="close_menu"))
-    return builder.as_markup()
+
 
 
 def search_results_kb(results, search_type, search_action, search_context=None, page: int = 1, limit: int = 7):

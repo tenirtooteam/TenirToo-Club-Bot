@@ -134,3 +134,24 @@ def get_user_available_topics(user_id: int) -> list:
             WHERE dta.user_id = ?
         """, (user_id,))
         return c.fetchall()
+
+def get_direct_access_user_ids(topic_id: int) -> list:
+    """Возвращает только список ID пользователей с прямым доступом к топику."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT user_id FROM direct_topic_access WHERE topic_id = ?", (topic_id,))
+        return [row[0] for row in c.fetchall()]
+
+def get_topic_authorized_user_ids(topic_id: int) -> list:
+    """Возвращает только список ID пользователей, имеющих доступ к топику."""
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("SELECT 1 FROM direct_topic_access WHERE topic_id = ? LIMIT 1", (topic_id,))
+        is_restricted = c.fetchone() is not None
+
+        if is_restricted:
+            c.execute("SELECT user_id FROM direct_topic_access WHERE topic_id = ?", (topic_id,))
+            return [row[0] for row in c.fetchall()]
+        else:
+            c.execute("SELECT user_id FROM users")
+            return [row[0] for row in c.fetchall()]

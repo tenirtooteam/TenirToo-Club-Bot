@@ -42,3 +42,12 @@ def test_find_topics_by_query():
     
     res = topics.find_topics_by_query("ка")
     assert len(res) == 3 # КурилКА, РазработКА, АдминКА
+
+def test_get_topic_names_by_ids():
+    topics.update_topic_name(88, "Topic88")
+    topics.update_topic_name(99, "Topic99")
+    
+    names_map = topics.get_topic_names_by_ids([88, 99])
+    assert names_map[88] == "Topic88"
+    assert names_map[99] == "Topic99"
+    assert len(names_map) == 2
