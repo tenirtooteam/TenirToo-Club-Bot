@@ -188,6 +188,9 @@ class UIService:
         # 1. Глобальная навигация (Simple)
         simple = {
             "admin_main": ("🛠 <b>Панель управления</b>", kb.main_admin_kb),
+            "user_main": ("Главное меню участника:", kb.user_main_kb),
+            "user_profile_view": (None, None), # Специальная обработка ниже
+            "user_topics": ("📍 <b>Топики, в которых ты можешь писать:</b>", lambda: kb.user_topics_list_kb(user_id)),
             "manage_groups": ("📂 <b>Группы доступа:</b>", kb.groups_list_kb),
             "manage_users": ("👥 <b>Список пользователей:</b>", kb.users_list_kb),
             "all_topics_list": ("📍 <b>Все топики:</b>", kb.all_topics_kb),
@@ -213,10 +216,36 @@ class UIService:
         p = callback_data.split("_")
         
         # Инфо-карточки
+        if cmd == "user_profile_view":
+            user_name = db.get_user_name(user_id)
+            user_templates = db.get_user_group_templates(user_id)
+            groups_str = ", ".join(g[1] for g in user_templates) if user_templates else "нет назначенных шаблонов"
+            roles = list(db.get_user_roles(user_id))
+            available_topics = db.get_user_available_topics(user_id)
+            text = UIService.format_user_card(user_id, user_name, groups_str, roles, available_topics)
+            return await UIService.show_menu(state, event, text, reply_markup=kb.user_profile_kb())
+
         if "user_info" in cmd: return await UIService.show_user_detail(state, event, int(p[-1]))
         if "group_info" in cmd: return await UIService.show_group_detail(state, event, int(p[-1]))
         if "topic_" in cmd and ("global" in cmd or "in_group" in cmd):
             return await UIService.show_topic_detail(state, event, int(p[-1]), int(p[-2]) if "in_group" in cmd else 0)
+
+        if cmd.startswith("u_topic_info"):
+            t_id = int(p[-1])
+            t_name = db.get_topic_name(t_id)
+            access_groups = db.get_groups_by_topic(t_id)
+            groups_str = "\n".join(f"— {g}" for g in access_groups) if access_groups else "Доступ не настроен"
+            has_access = db.can_write(user_id, t_id)
+            access_status = "✅ У тебя есть доступ." if has_access else "❌ У тебя нет доступа."
+            text = (
+                f"📍 <b>Информация о топике</b>\n\n"
+                f"<b>Название:</b> {t_name}\n"
+                f"<b>ID:</b> <code>{t_id}</code>\n\n"
+                f"👥 <b>Связанные шаблоны:</b>\n{groups_str}\n\n"
+                f"🔐 <b>Твой статус:</b> {access_status}\n\n"
+                f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
+            )
+            return await UIService.show_menu(state, event, text, reply_markup=kb.user_topic_detail_kb())
 
         # Модерация топиков
         if cmd.startswith("mod_topic_select") or cmd.startswith("mod_back_to_topic"):

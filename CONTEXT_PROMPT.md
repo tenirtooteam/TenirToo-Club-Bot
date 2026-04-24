@@ -108,6 +108,12 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
     - **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
     - **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
+ 
+ 24. **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`.
+     > Rationale: Standardizing the synchronization process prevents accidental data loss, ensures clear history, and maintains environment parity across distributed workspaces.
+ 
+ 25. **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
+     > Rationale: Prevents architectural decay and ensures the codebase remains lean and aligned with project-specific constraints without introducing unnecessary churn.
 
 ---
 

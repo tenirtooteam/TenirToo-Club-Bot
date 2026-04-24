@@ -277,11 +277,14 @@ async def user_rename_init(callback: types.CallbackQuery, state: FSMContext):
 async def process_user_rename(message: types.Message, state: FSMContext):
     parts = message.text.split()
     if len(parts) < 2:
-        await UIService.show_temp_message(state, message, "❌ Введи Имя и Фамилию!")
+        await UIService.show_temp_message(state, message, "❌ Введи как минимум Имя и Фамилию!")
         return
 
+    first_name = parts[0]
+    last_name = " ".join(parts[1:])
+
     data = await state.get_data()
-    success, msg = ManagementService.update_user_name(data['edit_user_id'], parts[0], parts[1])
+    success, msg = ManagementService.update_user_name(data['edit_user_id'], first_name, last_name)
     if not success:
         await UIService.show_temp_message(state, message, msg)
         return

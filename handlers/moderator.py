@@ -225,23 +225,17 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
 
     success, result = ManagementService.grant_direct_access(text, topic_id)
     if success:
-        await UIService.show_menu(state, message, result, reply_markup=kb.moderator_users_list_kb(topic_id))
+        await UIService.generic_navigator(state, message, f"mod_users_manage_{topic_id}")
         return
 
     if result == "SEARCH_REQUIRED":
-        results = ManagementService.find_users(text)
-        if not results:
-            await UIService.show_temp_message(state, message, "❌ Никого не найдено по этому запросу.")
-            return
-        elif len(results) == 1:
-            # Снова вызываем сервис, но уже с ID
-            success, result = ManagementService.grant_direct_access(str(results[0][0]), topic_id)
-            await UIService.generic_navigator(state, message, f"mod_users_manage_{topic_id}")
-        else:
-            await state.update_data(disambig_query=text, disambig_action="dir_add", disambig_context=topic_id)
-            total_pages = math.ceil(len(results)/7)
-            markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
-            await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
+        # Делегируем в глобальный поиск из common.py
+        from handlers.common import SearchStates
+        await state.update_data(search_type="user", search_action="dir_add", search_context=topic_id)
+        await state.set_state(SearchStates.waiting_for_query)
+        # "Пробрасываем" сообщение в глобальный хендлер
+        from handlers.common import search_query_handler
+        return await search_query_handler(message, state)
     else:
         await UIService.show_temp_message(state, message, result)
 
@@ -263,6 +257,7 @@ async def moderator_show_moderators(callback: types.CallbackQuery, state: FSMCon
 @safe_callback()
 async def moderator_add_moderator_start(callback: types.CallbackQuery, state: FSMContext):
     """Запрос ID пользователя для назначения модератором."""
+    from handlers.common import SearchStates
     topic_id = extract_topic_id_from_callback(callback)
     user_id = callback.from_user.id
 
@@ -270,37 +265,8 @@ async def moderator_add_moderator_start(callback: types.CallbackQuery, state: FS
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    await state.update_data(moderator_add_target_topic=topic_id)
-    await UIService.ask_input(state, callback, "✍️ Введите ID пользователя, которого хотите сделать модератором этого топика:", ModeratorStates.waiting_for_user_data)
-
-
-@router.message(ModeratorStates.waiting_for_user_data)
-async def moderator_add_moderator_finish(message: types.Message, state: FSMContext):
-    """Назначение пользователя модератором топика."""
-    text = message.text.strip()
-    data = await state.get_data()
-    topic_id = data.get("moderator_add_target_topic")
-
-    success, result = ManagementService.assign_moderator_role(text, topic_id)
-    if success:
-        await UIService.generic_navigator(state, message, f"mod_topic_moderators_{topic_id}")
-        return
-
-    if result == "SEARCH_REQUIRED":
-        results = ManagementService.find_users(text)
-        if not results:
-            await UIService.show_temp_message(state, message, "❌ Никого не найдено. Уточните запрос.")
-            return
-        elif len(results) == 1:
-            success, result = ManagementService.assign_moderator_role(str(results[0][0]), topic_id)
-            await UIService.generic_navigator(state, message, f"mod_topic_moderators_{topic_id}")
-        else:
-            await state.update_data(disambig_query=text, disambig_action="mod_add", disambig_context=topic_id)
-            total_pages = math.ceil(len(results)/7)
-            markup = kb.user_disambiguation_kb(results[:7], 1, total_pages)
-            await UIService.show_menu(state, message, "👥 Найдено несколько человек. Кого вы имели в виду?", reply_markup=markup)
-    else:
-        await UIService.show_temp_message(state, message, result)
+    await state.update_data(search_type="user", search_action="mod_add", search_context=topic_id)
+    await UIService.ask_input(state, callback, "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:", SearchStates.waiting_for_query)
 
 
 @router.callback_query(F.data.startswith("mod_moderator_remove_"))
