@@ -36,29 +36,18 @@ class SearchStates(StatesGroup):
 async def cmd_help(message: types.Message, state: FSMContext):
     """Выводит справку по боту."""
     user_id = message.from_user.id
+    from services.help_service import HelpService
     
-    help_text = (
-        "🤖 <b>Информационный гид Tenir-Too Bot</b>\n\n"
-        "<b>Команды:</b>\n"
-        "🔹 /start : Главное меню\n"
-        "🔹 /help  : Вызов этой справки\n"
-    )
+    help_text = HelpService.get_help("help_general")
 
     manageable_topics = PermissionService.get_manageable_topics(user_id)
     if manageable_topics:
-        help_text += (
-            "\n<b>Модерация:</b>\n"
-            "🔹 /mod   : Панель модератора топиков\n"
-        )
+        # Инъекция динамических блоков разрешена, но основная структура в сервисе
+        help_text = help_text.replace("\n\n<i>Бот работает", "\n<b>Модерация:</b>\n🔹 /mod   : Панель модератора топиков\n\n<i>Бот работает")
 
     if PermissionService.is_global_admin(user_id):
-        help_text += (
-            "\n<b>Администрирование:</b>\n"
-            "🔹 /admin : Полный доступ к настройкам\n"
-        )
+        help_text = help_text.replace("\n\n<i>Бот работает", "\n<b>Администрирование:</b>\n🔹 /admin : Полный доступ к настройкам\n\n<i>Бот работает")
     
-    help_text += "\n<i>Бот работает в скрытом режиме: сообщения от неавторизованных пользователей удаляются автоматически.</i>"
-
     return help_text, None
 
 

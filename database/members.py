@@ -102,3 +102,16 @@ def find_users_by_query(query: str) -> list:
                 matched.append((user_id, fname, lname))
                 
     return matched
+
+
+def get_user_names_by_ids(user_ids: list) -> dict:
+    """Пакетное получение имен пользователей для оптимизации (N+1 fix)."""
+    if not user_ids:
+        return {}
+    # SQLite лимит параметров обычно 999, для бота этого достаточно.
+    placeholders = ",".join("?" for _ in user_ids)
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute(f"SELECT user_id, first_name, last_name FROM users WHERE user_id IN ({placeholders})", user_ids)
+        rows = c.fetchall()
+    return {row[0]: f"{row[1]} {row[2]}".strip() for row in rows}

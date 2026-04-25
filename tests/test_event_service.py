@@ -41,12 +41,12 @@ def test_format_event_card(mock_db):
         "leads": [1]
     }
     
-    # Имитируем получение имён пользователей
-    def mock_get_user_name(uid):
+    # Имитируем пакетное получение имён пользователей
+    def mock_get_user_names_by_ids(uids):
         names = {1: "Создатель", 2: "Участник 1", 3: "Участник 2"}
-        return names.get(uid, "Неизвестно")
+        return {uid: names.get(uid, f"ID:{uid}") for uid in uids}
         
-    mock_db.get_user_name.side_effect = mock_get_user_name
+    mock_db.get_user_names_by_ids.side_effect = mock_get_user_names_by_ids
     
     card = EventService.format_event_card(1)
     
@@ -69,7 +69,7 @@ async def test_notify_admins_for_approval(mock_db):
         "title": "Модерация", "start_date": "01", "end_date": "02",
         "creator_id": 1, "is_approved": False, "participants": [], "leads": []
     }
-    mock_db.get_user_name.return_value = "Автор"
+    mock_db.get_user_names_by_ids.return_value = {1: "Автор"}
     
     # Мокаем config.ADMIN_ID (пусть он будет 30)
     original_admin_id = config.ADMIN_ID

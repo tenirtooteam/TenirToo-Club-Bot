@@ -62,8 +62,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 6. **DATABASE FACADE**: Never import directly from internal DB files (`database/topics.py`, etc.). All data calls must go through the `database.db` facade (`from database import db`).
    > Rationale: Direct imports bypass the single architectural control point.
 
-7. **KEYBOARD FACADE**: Never import directly from `keyboards/admin_kb.py`, etc. All keyboard builders must be accessed via `import keyboards as kb`.
-   > Rationale: `keyboards/__init__.py` is the wildcard re-export facade for the entire keyboard layer.
+7. **KEYBOARD FACADE**: Never import directly from internal modules like `keyboards/admin_kb.py`, etc. All keyboard builders must be accessed via `import keyboards as kb`. This prohibition covers **all project layers** — handlers, services, and even keyboard modules themselves (to avoid circular dependencies and bypass logic).
+   > Rationale: `keyboards/__init__.py` is the single authoritative wildcard re-export facade. Bypassing it in any layer breaks architectural consistency.
 
 8. **DESTRUCTIVE CONFIRMATION PROTOCOL**: Any admin action that permanently deletes data (users, groups, roles) MUST include a confirmation step via `UIService.get_confirmation_ui` and be executed through `ManagementService.execute_deletion`.
    > Rationale: Telegram bots have no undo. Forcing a confirmation step prevents accidental data loss from misclicks or rapid navigation.
@@ -85,8 +85,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 14. **STRICT DATABASE FUSE**: Do not attempt to bypass or weaken the Foreign Key check in `init_db()`.
     > Rationale: Native `ON DELETE CASCADE` is critical for data integrity. Running on a system without FK support will result in orphaned records and silent database corruption.
 
-15. **UIService.show_menu AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` are prohibited in handlers.
-    > Rationale: `UIService.show_menu` is the single source of truth for menu rendering. It handles `last_menu_id` tracking, sterile cleanup, and fallback logic automatically. Bypassing it breaks the Sterile UI Protocol and introduces untraceable side effects.
+15. **UIService.show_menu AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `bot.edit_message_reply_markup(...)` are prohibited in handlers. When initiating FSM text input that requires a cancel button or other controls, pass `reply_markup` directly to `UIService.ask_input(..., reply_markup=...)`.
+    > Rationale: `UIService` methods are the single source of truth for UI lifecycle management. They handle `last_menu_id` tracking, cleanup, and state protection automatically. Manual Bot API calls bypass this infrastructure, leading to "dirty chat" and UI inconsistency.
 
 16. **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
     > Rationale: aiogram's DI injects `state` only if explicitly declared. Silent failure without it crashes the handler at the first `UIService` call.

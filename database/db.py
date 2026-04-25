@@ -3,7 +3,7 @@
 from .connection import init_db, get_conn
 from .members import (
     add_user, get_all_users, delete_user, update_user_name,
-    get_user_name, user_exists, find_users_by_query
+    get_user_name, user_exists, find_users_by_query, get_user_names_by_ids
 )
 from .groups import (
     create_group, get_all_groups, delete_group,

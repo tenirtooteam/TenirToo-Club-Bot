@@ -206,6 +206,9 @@ class ManagementService:
             return db.get_topic_name(entity_id) or f"Топик {entity_id}"
         elif entity_type == "user":
             return db.get_user_name(entity_id) or f"Пользователь {entity_id}"
+        elif entity_type == "event":
+            event = db.get_event_details(entity_id)
+            return event["title"] if event else f"Мероприятие {entity_id}"
         return "Неизвестная сущность"
 
     @staticmethod
@@ -216,11 +219,13 @@ class ManagementService:
         """
         if action == "group_del":
             db.delete_group(target_id)
+            ManagementService._trigger_sheets_sync("all")
             return True, "✅ Группа удалена", "manage_groups"
             
         elif action in ["topic_del", "mod_topic_del"]:
             # target_id — топик, extra_id — группа
             db.remove_topic_from_group(extra_id, target_id)
+            ManagementService._trigger_sheets_sync("all")
             
             if action == "mod_topic_del":
                  return True, "✅ Топик убран из группы", f"mod_topic_groups_{target_id}"
@@ -228,10 +233,12 @@ class ManagementService:
             
         elif action == "global_topic_del":
             db.delete_topic(target_id)
+            ManagementService._trigger_sheets_sync("all")
             return True, "✅ Топик полностью удален", "all_topics_list"
             
         elif action == "user_del":
             db.delete_user(target_id)
+            ManagementService._trigger_sheets_sync("all")
             return True, "✅ Пользователь удален", "manage_users"
 
         elif action.startswith("role_rev"):
@@ -247,9 +254,10 @@ class ManagementService:
             db.revoke_role(target_id, role_id, extra_id)
             return True, "✅ Модератор удалён", f"mod_topic_moderators_{extra_id}"
 
-        if action in ["group_del", "topic_del", "mod_topic_del", "global_topic_del", "user_del"]:
-             # Любое системное удаление триггерит полный синк для чистоты
-             ManagementService._trigger_sheets_sync("all")
+        elif action == "event_del":
+            db.delete_event(target_id)
+            ManagementService._trigger_sheets_sync("all")
+            return True, "✅ Мероприятие удалено", "event_list"
 
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
     
@@ -372,3 +380,29 @@ class ManagementService:
         if db.grant_direct_access_bulk(user_ids, target_topic_id):
             return True, f"✅ Права скопированы ({len(user_ids)} чел.)."
         return False, "❌ Ошибка при копировании прав."
+
+    # --- МЕРОПРИЯТИЯ (EXPEDITION PROTOCOL) ---
+
+    @staticmethod
+    def create_event_action(title: str, start_date: str, creator_id: int, is_approved: int = 0) -> int:
+        """Бизнес-логика создания мероприятия: регистрация автора как лидера и участника."""
+        event_id = db.create_event(title, start_date, "", creator_id, is_approved)
+        if event_id > 0:
+            db.add_event_participant(event_id, creator_id)
+            db.add_event_lead(event_id, creator_id)
+        return event_id
+
+    @staticmethod
+    def toggle_event_participation(event_id: int, user_id: int) -> tuple[bool, str]:
+        """Логика записи/отписки от мероприятия."""
+        if db.is_event_participant(event_id, user_id):
+            db.remove_event_participant(event_id, user_id)
+            return True, "❌ Вы больше не участвуете."
+        else:
+            db.add_event_participant(event_id, user_id)
+            return True, "✅ Вы записаны!"
+
+    @staticmethod
+    def approve_event_action(event_id: int) -> bool:
+        """Одобрение мероприятия администратором."""
+        return db.approve_event(event_id)

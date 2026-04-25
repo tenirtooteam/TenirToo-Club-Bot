@@ -64,10 +64,14 @@
 │   └── Gemini_maker.py
 ├── tests/
 │   ├── conftest.py
+│   ├── test_database_events.py
+│   ├── test_database_roles.py
+│   ├── test_event_kb.py
+│   ├── test_event_service.py
+│   ├── test_handlers_events.py
+│   ├── test_ui_service.py
 │   ├── test_database/
 │   ├── test_services/
-│   │   ├── test_ui_navigation.py
-│   │   └── ...
 │   ├── test_handlers/
 │   ├── test_integration/
 │   └── test_keyboards/
@@ -124,6 +128,7 @@
 | **OperationalError: no such table: topics** | Устаревшие запросы к БД | Таблица была переименована в `topic_names`. Убедитесь, что код обращается к актуальной схеме |
 | **TypeError в клавиатурах** | Несоответствие аргументов | После рефакторинга многие клавиатуры (например, `main_admin_kb`) вызываются без аргументов. Проверьте сигнатуры в `UIService` |
 | **Бот молчит при вводе данных** | Сброс состояния FSM в промежуточном шаге | Убедитесь, что `UIService.finish_input` вызывается с `reset_state=False` в середине цепочки ввода |
+| **Синхронизация с Sheets не срабатывает** | Вызов синка находился после `return` (мертвый код) | Проблема исправлена: вызов `_trigger_sheets_sync` перенесен внутрь каждой ветки удаления перед `return` |
 | **Ошибка NOT NULL в events** | Попытка сохранить пустое название или дату | Введена валидация `message.text`. Проверьте, что пользователь вводит именно текст, а не медиа |
 
 ---

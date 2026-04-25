@@ -159,7 +159,8 @@ class UIService:
         state: FSMContext,
         event: types.Message | types.CallbackQuery,
         text: str,
-        state_to_set=None
+        state_to_set=None,
+        reply_markup=None
     ):
         """
         Удаляет текущее меню, отправляет промпт и ставит его на слежение (last_menu_id).
@@ -173,7 +174,7 @@ class UIService:
             await UIService.delete_msg(event)
 
         msg_source = event if isinstance(event, types.Message) else event.message
-        sent = await msg_source.answer(text, parse_mode="HTML")
+        sent = await msg_source.answer(text, reply_markup=reply_markup, parse_mode="HTML")
 
         await state.update_data(last_menu_ids=[sent.message_id])
         if state_to_set:
@@ -432,6 +433,12 @@ class UIService:
             return (
                 f"❓ Отозвать роль <b>{role_name}</b> у пользователя <b>{name}</b> ({context})?",
                 f"user_roles_manage_{target_id}"
+            )
+        elif action == "event_del":
+            name = ManagementService.get_entity_name("event", target_id)
+            return (
+                f"⚠️ <b>ВНИМАНИЕ!</b>\n\nВы действительно хотите удалить мероприятие <b>{name}</b>?\n<i>Это действие нельзя отменить!</i>",
+                f"event_view:{target_id}"
             )
         elif action == "mod_rem":
             name = ManagementService.get_entity_name("user", target_id)

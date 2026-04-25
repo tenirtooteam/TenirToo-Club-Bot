@@ -1,6 +1,7 @@
 import logging
 from aiogram import Bot
 from database import db
+import keyboards as kb
 
 logger = logging.getLogger(__name__)
 
@@ -18,22 +19,16 @@ class EventService:
             return "❌ Мероприятие не найдено."
 
         status = "✅ Одобрено" if event["is_approved"] else "⏳ На модерации"
-        creator_name = db.get_user_name(event["creator_id"]) if event["creator_id"] else "Удален"
-        
-        # Batch Fetch для имен участников и лидеров
+        # Batch Fetch для имен участников и лидеров [CC-7]
         participant_ids = event["participants"]
         lead_ids = event["leads"]
+        all_relevant_ids = list(set(participant_ids + lead_ids + ([event["creator_id"]] if event["creator_id"] else [])))
+        user_names = db.get_user_names_by_ids(all_relevant_ids)
         
-        participant_names = []
-        if participant_ids:
-            # Тут нужен метод db.get_user_names_by_ids, но пока достанем по одному, 
-            # либо если есть пакетный - нужно добавить. 
-            # Для простоты используем get_user_name (Оптимизировать позже)
-            participant_names = [f"• {db.get_user_name(uid)}" for uid in participant_ids]
-            
-        lead_names = []
-        if lead_ids:
-            lead_names = [db.get_user_name(uid) for uid in lead_ids]
+        creator_name = user_names.get(event["creator_id"], "Удален")
+        
+        participant_names = [f"• {user_names.get(uid, f'ID:{uid}')}" for uid in participant_ids]
+        lead_names = [user_names.get(uid, f"ID:{uid}") for uid in lead_ids]
 
         leads_str = ", ".join(lead_names) if lead_names else "Не назначен"
         participants_str = "\n".join(participant_names) if participant_names else "Пока никого нет"
@@ -52,7 +47,6 @@ class EventService:
     async def notify_admins_for_approval(bot: Bot, event_id: int):
         """Отправляет карточку на модерацию всем администраторам."""
         import config
-        from keyboards.event_kb import get_event_moderation_kb
         
         # Получаем всех глобальных админов из БД
         admin_ids = set(db.get_global_admin_ids())
@@ -60,11 +54,11 @@ class EventService:
         admin_ids.add(config.ADMIN_ID)
         
         card_text = f"🚨 <b>Новое Мероприятие на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
-        kb = get_event_moderation_kb(event_id)
+        kb_markup = kb.get_event_moderation_kb(event_id)
         
         for adm_id in admin_ids:
             try:
-                await bot.send_message(adm_id, card_text, reply_markup=kb, parse_mode="HTML")
+                await bot.send_message(adm_id, card_text, reply_markup=kb_markup, parse_mode="HTML")
             except Exception as e:
                 logger.warning(f"Не удалось отправить уведомление админу {adm_id}: {e}")
 

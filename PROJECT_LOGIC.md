@@ -26,25 +26,23 @@ Decoupled concerns across five layers:
 Complete file list with individual responsibilities and full function inventory:
 
 - **main.py** — Entry point: `setup_logging` (RotatingFileHandler, 5MB limit, 5 backup files, dual console+file output to `logs/bot.log`), DB initialization via `db.init_db()`, router registration (common → user → admin → moderator), outer middleware chaining (UserManager → ForumUtility → AccessGuard), bot polling with `drop_pending_updates=True`.
-## § 2 MODULE REGISTRY & RESPONSIBILITIES
 
-- **main.py** — Entry point: Logger setup, DB initialization, router registration, middleware chaining, and bot polling.
 - **loader.py** — Initializes `Bot` and `Dispatcher` with `MemoryStorage`.
 - **config.py** — Environment variable loader and global constants definition.
 - **database/__init__.py** — Package initializer for DB facade pattern.
 - **database/connection.py** — Connection context manager, WAL activation, and Foreign Key enforcement.
-- **database/members.py** — User entity management: `register_user`, `get_user_by_id`, `get_all_users`, `update_user_name`, `delete_user`.
+- **database/members.py** — User entity management: `add_user`, `user_exists`, `get_all_users`, `get_user_name`, `get_user_names_by_ids` (Batch-Fetch, N+1 fix), `update_user_name`, `delete_user`, `find_users_by_query`.
 - **database/topics.py** — Forum topic management: `add_topic`, `rename_topic`, `get_topic_name`, `get_all_unique_topics`, `get_topic_names_by_ids` (Batch-Fetch), `delete_topic`.
-- **database/groups.py** — Global templates management: `create_group`, `delete_group`, `get_all_groups`, `get_group_name`, `add_topic_to_group`, `remove_topic_from_group`, `get_topics_of_group`, `get_group_ids_by_topic`.
+- **database/groups.py** — Global templates management: `create_group`, `delete_group`, `get_all_groups`, `get_group_name`, `add_topic_to_group`, `remove_topic_from_group`, `get_topics_of_group`, `get_group_ids_by_topic`, `get_group_template_members`, `add_to_group_template`, `remove_from_group_template`.
 - **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
 - **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
 - **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
 - **database/db.py** — Single facade re-exporting all database functions. **The only permitted import point for data operations.**
-- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input` (FSM protection support), `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input` (FSM protection support), `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input` (supports optional `reply_markup`), `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`.
 - **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
 - **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
-- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`.
+- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action`, `toggle_event_participation`, `approve_event_action`.
 - **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`.
 - **services/notification_service.py** — Notification logic: `send_native_all`.
 - **services/callback_guard.py** — `safe_callback()` decorator factory.
@@ -187,7 +185,7 @@ CREATE TABLE IF NOT EXISTS event_participants (
 
 ### 3.5. Background Sync Pattern
 To ensure the bot remains responsive during network I/O with Google Sheets, all synchronization tasks are executed in the background using `asyncio.create_task`.
-- **Trigger**: Any data mutation in `ManagementService`.
+- **Trigger**: Any data mutation in `ManagementService`. Specifically, the call is placed inside each relevant deletion branch of `execute_deletion`, before its `return` statement, and within mutation methods like `create_event_action`.
 - **Mechanism**: `_trigger_sheets_sync(mode)` calls `GoogleSheetsService` asynchronously.
 - **Error Handling**: Failures in background tasks are logged but do not interrupt the main execution flow.
 
