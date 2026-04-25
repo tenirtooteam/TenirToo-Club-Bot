@@ -5,7 +5,7 @@ from aiogram import Router, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from database import db
+
 import keyboards as kb
 from services.callback_guard import safe_callback
 from services.permission_service import PermissionService
@@ -16,15 +16,6 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 
-def _fetch_search_results(s_type: str, query: str) -> list:
-    """Централизованный диспетчер поиска по типам сущностей."""
-    if s_type == "user":
-        return [(u[0], f"{u[1]} {u[2]}") for u in db.find_users_by_query(query)]
-    elif s_type == "group":
-        return db.find_groups_by_query(query)
-    elif s_type == "topic":
-        return db.find_topics_by_query(query)
-    return []
 
 
 class SearchStates(StatesGroup):
@@ -140,7 +131,7 @@ async def search_query_handler(message: types.Message, state: FSMContext):
     s_action = data.get("search_action")
     s_context = data.get("search_context")
 
-    results = _fetch_search_results(s_type, query)
+    results = ManagementService.search_entities(s_type, query)
     await state.update_data(search_query=query)
 
     if not results:
@@ -175,7 +166,7 @@ async def search_results_pagination(callback: types.CallbackQuery, state: FSMCon
         await callback.answer("Поиск истек.", show_alert=True)
         return
 
-    results = _fetch_search_results(s_type, query)
+    results = ManagementService.search_entities(s_type, query)
     markup = kb.search_results_kb(results, s_type, s_action, s_context, page=page)
     await UIService.show_menu(
         state, callback,

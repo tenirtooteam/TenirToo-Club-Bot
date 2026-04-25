@@ -32,6 +32,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Performance Optimization**: Zero N+1 queries in the UI layer. All keyboard builders iterating over entity lists use batch-fetching helpers (`get_topic_names_by_ids`, etc.) to ensure high responsiveness. [PL-HI]
 - **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. Consolidation includes template-based operations and **flexible name parsing** for users (supporting spaces and patronymics).
 - **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
+- **Sterile Handler Architecture**: Handlers are 100% decoupled from the database facade. All data interaction (both reads and mutations) is mediated by the appropriate service layer (`PermissionService`, `ManagementService`, `EventService`).
 - **Expedition Protocol (Events)**: A complete lifecycle for club events (hikes, meetups). Includes multi-step creation (Title -> Dates), admin moderation queue (`is_approved` flag), participant tracking, and lead assignment. Standardized UI via `event_kb` and business logic via `EventService`. Includes robust input validation for non-text content.
 - **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `group_topics` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
 
@@ -59,8 +60,11 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 5. **GROUP FILTER**: `ForumUtilityMiddleware` and `AccessGuardMiddleware` must begin with the guard: `if event.chat.type == "private": return await handler(event, data)`. `UserManagerMiddleware` is explicitly exempt from this guard — it operates on all chat types by design (registration is valid regardless of chat context). The `GROUP_ID` constant must NOT be used as a middleware guard — it is reserved exclusively for Telegram API calls. Do not add inline admin-ID checks inside handlers — use `PermissionService.is_global_admin(user_id)` or router-level filters like `IsGlobalAdmin` instead.
    > Rationale: The `chat.type == "private"` guard ensures middleware logic executes correctly in the two middlewares that contain group-specific branching. `UserManagerMiddleware` has no group-specific logic and intentionally omits the guard. Using `GROUP_ID` as a guard would incorrectly restrict the bot. Hardcoding admin IDs into presentation layers violates MVC encapsulation.
 
-6. **DATABASE FACADE**: Never import directly from internal DB files (`database/topics.py`, etc.). All data calls must go through the `database.db` facade (`from database import db`).
-   > Rationale: Direct imports bypass the single architectural control point.
+6. **DATABASE FACADE & ISOLATION**:
+   - **DB Facade**: All data operations MUST pass through the `database.db` facade (`from database import db`).
+   - **Handler Isolation**: Handlers (`handlers/*.py`) are **strictly prohibited** from importing the database facade. They must interact with data exclusively through service layers (`services/*.py`).
+   - **Keyboard Exception**: Keyboard modules (`keyboards/*.py`) are permitted to import the database facade directly for dynamic rendering.
+   > Rationale: Handlers should only manage UI and routing. Moving data logic to services ensures testability, reusability, and architectural cleanliness.
 
 7. **KEYBOARD FACADE**: Never import directly from internal modules like `keyboards/admin_kb.py`, etc. All keyboard builders must be accessed via `import keyboards as kb`. This prohibition covers **all project layers** — handlers, services, and even keyboard modules themselves (to avoid circular dependencies and bypass logic).
    > Rationale: `keyboards/__init__.py` is the single authoritative wildcard re-export facade. Bypassing it in any layer breaks architectural consistency.
@@ -91,8 +95,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 16. **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
     > Rationale: aiogram's DI injects `state` only if explicitly declared. Silent failure without it crashes the handler at the first `UIService` call.
 
-17. **MANAGEMENT SERVICE MUTATION PROTOCOL**: All entity mutations (adding users, creating groups, granting/revoking access or roles) MUST traverse `ManagementService`. Handlers are strictly prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` mutation calls.
-    > Rationale: The service layer sanitizes intent and returns user-ready messages. Centralizing this logic prevents code duplication and ensures that business rules (like duplicate ID handling) are applied consistently.
+17. **MANAGEMENT SERVICE MUTATION & QUERY PROTOCOL**: All entity mutations and data queries in handlers MUST traverse a service layer. Handlers are strictly prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` calls of any kind.
+    > Rationale: The service layer (ManagementService, PermissionService, EventService) sanitizes intent and provides proxy methods for reads. Centralizing this logic prevents code duplication and ensures that business rules are applied consistently across all UI flows.
 18. **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
     > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
 

@@ -193,9 +193,15 @@ class ManagementService:
         return False, "❌ Ошибка (возможно, роль уже назначена)."
 
     @staticmethod
-    def find_users(query: str) -> list:
-        """Поиск пользователей (обертка над БД для хендлеров)."""
-        return db.find_users_by_query(query)
+    def search_entities(s_type: str, query: str) -> list:
+        """Централизованный диспетчер поиска по типам сущностей (обертка для UI)."""
+        if s_type == "user":
+            return [(u[0], f"{u[1]} {u[2]}") for u in db.find_users_by_query(query)]
+        elif s_type == "group":
+            return db.find_groups_by_query(query)
+        elif s_type == "topic":
+            return db.find_topics_by_query(query)
+        return []
 
     @staticmethod
     def get_entity_name(entity_type: str, entity_id: int) -> str:

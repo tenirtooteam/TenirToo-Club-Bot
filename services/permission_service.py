@@ -92,3 +92,26 @@ class PermissionService:
             return True
         # Если ограничен — проверяем права
         return db.can_write(user_id, topic_id)
+
+    @staticmethod
+    def get_user_display_name(user_id: int) -> str:
+        """Обёртка для получения имени пользователя."""
+        return db.get_user_name(user_id)
+
+    @staticmethod
+    def get_role_name(role_id: int) -> str:
+        """Обёртка для получения названия роли по ID."""
+        return db.get_role_name_by_id(role_id)
+
+    @staticmethod
+    def get_role_id(role_name: str) -> int:
+        """Обёртка для получения ID роли по названию."""
+        return db.get_role_id(role_name)
+
+    @staticmethod
+    def get_access_sets(topic_id: int) -> tuple[set, set]:
+        """Возвращает кортеж из (прямые_доступы: set, групповые_доступы: set)."""
+        direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
+        all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
+        group_users = all_authorized - direct_users
+        return direct_users, group_users

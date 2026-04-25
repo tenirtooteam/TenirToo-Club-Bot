@@ -6,7 +6,6 @@ from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import keyboards as kb
-from database import db
 from config import GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
@@ -182,9 +181,7 @@ async def moderator_toggle_direct_access(callback: types.CallbackQuery, state: F
         await callback.answer("❌ Доступ запрещён.", show_alert=True)
         return
 
-    direct_users = set(u[0] for u in db.get_direct_access_users(topic_id))
-    all_authorized = set(u[0] for u in db.get_topic_authorized_users(topic_id))
-    group_users = all_authorized - direct_users
+    direct_users, group_users = PermissionService.get_access_sets(topic_id)
 
     if target_user_id in group_users and target_user_id not in direct_users:
         await callback.answer("🌐 Пользователь имеет доступ через общую группу. Изменяется только глобальным администратором.", show_alert=True)

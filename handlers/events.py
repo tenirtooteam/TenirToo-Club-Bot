@@ -24,8 +24,7 @@ async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMCont
     user_id = event_or_msg.from_user.id
     
     # [CC-3] Данные получаем через EventService или db (GET разрешен)
-    from database import db
-    events = db.get_active_events()
+    events = EventService.get_active_events()
     is_admin = PermissionService.is_global_admin(user_id)
     
     text = custom_text or "🏔 <b>Мероприятия Клуба</b>\nЗдесь вы можете записаться на походы и тренировки."
@@ -44,8 +43,7 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
         return await callback.answer("❌ У вас нет прав.", show_alert=True)
         
     await state.set_state(None)
-    from database import db
-    events = db.get_pending_events()
+    events = EventService.get_pending_events()
     reply_markup = kb.get_events_list_kb(events, is_admin=True)
     
     await UIService.show_menu(
@@ -121,13 +119,12 @@ async def view_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
     
-    from database import db
-    event = db.get_event_details(event_id)
+    event = EventService.get_event_details(event_id)
     if not event:
         return await callback.answer("❌ Мероприятие не найдено.", show_alert=True)
         
     card_text = EventService.format_event_card(event_id)
-    is_participant = db.is_event_participant(event_id, user_id)
+    is_participant = EventService.is_event_participant(event_id, user_id)
     can_edit = EventService.can_edit_event(user_id, event_id)
     is_admin = PermissionService.is_global_admin(user_id)
     

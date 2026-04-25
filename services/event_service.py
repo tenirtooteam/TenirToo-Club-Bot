@@ -79,3 +79,23 @@ class EventService:
             return False
             
         return event["creator_id"] == user_id
+
+    @staticmethod
+    def get_active_events() -> list:
+        """Возвращает список активных мероприятий."""
+        return db.get_active_events()
+
+    @staticmethod
+    def get_pending_events() -> list:
+        """Возвращает список мероприятий на модерации."""
+        return db.get_pending_events()
+
+    @staticmethod
+    def get_event_details(event_id: int) -> dict:
+        """Возвращает полную информацию о мероприятии."""
+        return db.get_event_details(event_id)
+
+    @staticmethod
+    def is_event_participant(event_id: int, user_id: int) -> bool:
+        """Проверяет, участвует ли пользователь в мероприятии."""
+        return db.is_event_participant(event_id, user_id)

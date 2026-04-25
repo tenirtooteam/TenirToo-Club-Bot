@@ -5,7 +5,7 @@ from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import keyboards as kb
-from database import db
+
 from config import ADMIN_ID, GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
@@ -348,7 +348,7 @@ async def role_assign_choose_user(callback: types.CallbackQuery, state: FSMConte
     user_id = int(callback.data.split("_")[-1])
     await UIService.show_menu(
         state, callback, 
-        f"Выберите роль для пользователя {db.get_user_name(user_id)}:",
+        f"Выберите роль для пользователя {PermissionService.get_user_display_name(user_id)}:",
         reply_markup=kb.role_selection_kb(user_id)
     )
 
@@ -366,7 +366,7 @@ async def role_pick_handler(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     user_id = int(parts[2])
     role_id = int(parts[3])
-    role_name = db.get_role_name_by_id(role_id)
+    role_name = PermissionService.get_role_name(role_id)
     
     if role_name == 'moderator':
         await UIService.show_menu(
@@ -387,7 +387,7 @@ async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMCon
     parts = callback.data.split("_")
     user_id = int(parts[3])
     topic_id = int(parts[4])
-    mod_role_id = db.get_role_id("moderator")
+    mod_role_id = PermissionService.get_role_id("moderator")
     
     if mod_role_id == 0:
         await callback.answer("❌ Системная ошибка: роль модератора не найдена.")

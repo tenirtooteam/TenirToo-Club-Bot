@@ -15,9 +15,9 @@
 
 ### 2.1. Layered Architecture
 Decoupled concerns across five layers:
-- **Handlers** — UI and command routing.
+- **Handlers** — UI and command routing. **Sterile Isolation**: prohibited from importing `database.db`.
 - **Middlewares** — Logic interception pipeline.
-- **Services** — Business logic.
+- **Services** — Business logic. Gateway for all handler-to-DB interactions.
 - **Keyboards** — Inline keyboard builders. Import from `database.db` directly to render data-driven menus. Exposed via wildcard re-export facade (`keyboards/__init__.py`).
 - **Database** — Persistence via Facade pattern.
 - **Tests** — Automated test suite using in-memory database and mocks.
@@ -39,14 +39,14 @@ Complete file list with individual responsibilities and full function inventory:
 - **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
 - **database/db.py** — Single facade re-exporting all database functions. **The only permitted import point for data operations.**
 - **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input` (FSM protection support), `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input` (supports optional `reply_markup`), `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
-- **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`.
+- **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
 - **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
-- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action`, `toggle_event_participation`, `approve_event_action`.
-- **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`.
+- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action`, `toggle_event_participation`, `approve_event_action`, `search_entities`.
+- **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`, `get_user_display_name`, `get_role_name`, `get_role_id`, `get_access_sets`.
 - **services/notification_service.py** — Notification logic: `send_native_all`.
 - **services/callback_guard.py** — `safe_callback()` decorator factory.
-- **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`.
+- **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`. **Decoupled**: Uses `ManagementService.search_entities`.
 - **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
 - **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
 - **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`.
@@ -66,7 +66,7 @@ Permitted import direction — top consumers to bottom providers. Any arrow reve
 ~~~
 handlers/*              →  services/*                    →  database/db.py  →  database/(members|topics|groups|roles|permissions).py
 keyboards/__init__.py   →  keyboards/*_kb.py             →  database/db.py  →  database/(members|topics|groups|roles|permissions).py
-middlewares/*           →  services/access_service.py    →  database/db.py
+middlewares/*           →  services/permission_service.py →  database/db.py
 main.py                 →  handlers/*, middlewares/*, database/db.py (init_db only)
 database/__init__.py    →  database/db.py
 database/db.py          →  database/connection.py (init_db, get_conn re-export)
@@ -253,6 +253,7 @@ All keys stored in FSM state across the application:
 
 ## 6. OPERATIONAL CONSTRAINTS FOR AI AGENTS
 - **Facade Integrity**: Never import internal routing segments bypassing the Facade logic (Db or Keyboards). All calls must traverse the main `__init__.py` boundaries respectively.
+- **Handlers Sterile Isolation**: Handlers (`handlers/*.py`) are strictly prohibited from importing `from database import db`. All data interaction must be mediated by the appropriate service layer.
 - **FSM Maintenance**: Every handler that sends a new menu must immediately update `last_menu_id` in FSM state with the sent message ID. Use `UIService.show_menu` — it handles `last_menu_id` tracking automatically. Manual `state.update_data(last_menu_id=...)` is only required in edge cases not covered by `UIService`.
 - **UIService.show_menu as Single UI Gateway**: All menu transitions MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` from handlers are prohibited.
 - **Unified Navigation Protocol**: All standard UI returns and transitions from handlers SHOULD use `UIService.generic_navigator` instead of direct `UIService.show_menu` calls where possible, to centralize routing logic.
