@@ -80,6 +80,13 @@ async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     await state.update_data(last_menu_id=None, last_menu_ids=[])
 
 
+@router.callback_query(F.data == "landing")
+@safe_callback()
+async def landing_callback_handler(callback: types.CallbackQuery, state: FSMContext):
+    """Системная точка входа в главное меню через навигатор."""
+    await UIService.generic_navigator(state, callback, "landing")
+
+
 @router.callback_query(F.data == "roles_dashboard")
 @safe_callback()
 async def roles_dashboard_menu(callback: types.CallbackQuery, state: FSMContext):

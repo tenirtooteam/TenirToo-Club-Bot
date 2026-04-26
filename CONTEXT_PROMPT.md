@@ -76,13 +76,19 @@
 10. [CP-3.11] **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.terminate_input(state, message)`. For command-level handlers (`@router.message(Command(...))`), use the `@UIService.sterile_command(redirect=True/False, error_prefix="...")` decorator instead of calling `UIService.sterile_redirect` directly. The decorated handler must return a `(text, reply_markup)` tuple or just `text`.
     > Rationale: The decorator centralizes redirect logic, PM error fallback, trigger cleanup, and `last_menu_id` tracking into a single declarative line. Bypassing the decorator and calling `sterile_redirect` manually is redundant and error-prone.
 
-11. [CP-3.12] **Standardized UI Footer**: All menus MUST use `add_nav_footer` for navigation. Bottom row buttons ("Back", "Close", "Help") MUST be split in one row (1:1 or 1:1:1).
+11. [CP-3.12] **Standardized UI Footer**: Every menu must have a navigation row created via `add_nav_footer` or `build_paginated_menu`.
+    - Format: `[ ⬅️ Назад ] [ ❌ Закрыть ] [ ❓ ]`.
+    - Help Button: Must provide a unique key from `HelpService` and an explicit `help_back_data` for complex screens.
     > Rationale: Separating navigation from functional buttons improves ergonomics and ensures a consistent UI across the entire bot.
 
-12. [CP-3.13] **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
+12. [CP-3.13] **UI Integrity Testing**: All new keyboards must be added to `tests/test_services/test_ui_integrity.py` to verify callback reachability and prevent navigation "hangs".
+
+13. [CP-3.14] **Heartfelt UI**: User-facing text must be community-oriented. Avoid technical jargon like "management system", "entities", "permissions" in the interface. Use "Assistant", "Gid", "Rights".
+
+14. [CP-3.15] **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
     > Rationale: Duplicated handlers cause router dispatch conflicts, leading to unpredictable double-executions or arbitrary routing based on aiogram load order.
 
-13. [CP-3.14] **ROLE ENCAPSULATION**: Never manually inject system privileges (e.g., `superadmin` checks against `config.ADMIN_ID`) within UI handlers or keyboard builders. Use the database facade (e.g. `db.get_user_roles(user_id)`) which is designed to internally resolve and append virtual roles.
+15. [CP-3.16] **ROLE ENCAPSULATION**: Never manually inject system privileges (e.g., `superadmin` checks against `config.ADMIN_ID`) within UI handlers or keyboard builders. Use the database facade (e.g. `db.get_user_roles(user_id)`) which is designed to internally resolve and append virtual roles.
     > Rationale: Hardcoding admin IDs into the UI/presentation layer violates encapsulation. If the rules for admin detection change, all UI files would require auditing, leading to hard-to-trace bugs.
 
 14. [CP-3.15] **USER CARD CONSISTENCY**: All handlers displaying user profile details (Admin view, User view, Search results) MUST use `UIService.format_user_card` to ensure consistent visual styling and information architecture.

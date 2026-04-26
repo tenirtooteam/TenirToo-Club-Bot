@@ -15,7 +15,11 @@ def add_nav_footer(builder: InlineKeyboardBuilder, back_data: str = None, includ
         nav_buttons.append(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu"))
     
     if help_key:
-        back_link = help_back_data or back_data or "close_menu"
+        # Логика возврата из справки:
+        # 1. Явный путь (help_back_data) - приоритет
+        # 2. Путь назад (back_data) - если мы в дочернем меню
+        # 3. 'landing' - системный корень как последний рубеж
+        back_link = help_back_data or back_data or "landing"
         nav_buttons.append(InlineKeyboardButton(text="❓", callback_data=f"help:{help_key}:{back_link}"))
     
     if nav_buttons:
@@ -32,7 +36,8 @@ def build_paginated_menu(
     search_type: str = None, # 'user', 'group', 'topic'
     search_action: str = None, # 'info', 'select', etc.
     search_context: str = None, # Additional data (e.g. topic_id)
-    help_key: str = None
+    help_key: str = None,
+    help_back_data: str = None
 ):
     builder = InlineKeyboardBuilder()
     start = (page - 1) * limit
@@ -88,6 +93,6 @@ def build_paginated_menu(
         builder.row(s_btn)
         
     # 5. Универсальный футер [PL-5.1.14]
-    add_nav_footer(builder, back_data=footer_back_data, help_key=footer_help_key)
+    add_nav_footer(builder, back_data=footer_back_data, help_key=footer_help_key, help_back_data=help_back_data)
         
     return builder.as_markup()

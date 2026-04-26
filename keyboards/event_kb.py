@@ -22,7 +22,7 @@ def get_events_list_kb(events: list, is_admin: bool = False) -> InlineKeyboardMa
             InlineKeyboardButton(text="⏳ На модерации", callback_data="event_pending_list")
         )
     
-    add_nav_footer(builder, back_data="user_main")
+    add_nav_footer(builder, back_data="user_main", help_key="events", help_back_data="event_list")
     return builder.as_markup()
 
 def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> InlineKeyboardMarkup:
@@ -42,7 +42,7 @@ def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> In
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"event_delete:{event_id}")
         )
         
-    add_nav_footer(builder, back_data="event_list")
+    add_nav_footer(builder, back_data="event_list", help_key="events")
     return builder.as_markup()
 
 def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:

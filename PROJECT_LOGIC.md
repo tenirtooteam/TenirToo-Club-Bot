@@ -246,7 +246,12 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.11] **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
 - [PL-5.1.12] **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `sterile_redirect`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
 - [PL-5.1.13] **Orphan Notification Protocol**: Any message sent via direct `bot.send_message` (e.g., from `EventService.notify_admins_for_approval`) is considered an "Orphan Notification". These messages MUST be terminated via `UIService.delete_msg(callback.message)` upon user interaction (CallbackQuery) to ensure buttons are removed and the UI remains sterile.
-- [PL-5.1.14] **Split Navigation Footer**: Standardized "footer" for all menus. "Back" and "Close" buttons MUST reside in the same bottom row (split 1:1) to separate navigation from content. Implemented via `pagination_util.add_nav_footer`.
+- [PL-5.1.14] **Split Navigation Footer**: Every keyboard must use `add_nav_footer` or `build_paginated_menu` to ensure consistent navigation.
+    - **Buttons**: `[ ⬅️ Назад ] [ ❌ Закрыть ] [ ❓ ]`
+    - **Help Logic**: The `❓` button uses format `help:{key}:{back_data}`.
+    - **Navigation Safety**: `back_data` (for the help button) must point to the CURRENT screen to ensure the user returns to where they were. If not provided, defaults to `landing`.
+- [PL-5.1.15] **Systemic Landing Entry**: The `landing` callback is a mandatory system-wide entry point that triggers the `UIService.get_landing_data` controller. It serves as the ultimate fallback for navigation returns.
+- [PL-5.1.16] **Heartfelt UI Principle**: All user-facing strings must use welcoming, community-oriented language. Avoid technical jargon ("Management System", "Entities") in the interface. Use "Assistant", "Gid", "Rights". [RA-1]
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:

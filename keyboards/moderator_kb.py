@@ -26,7 +26,8 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
     ]
     return build_paginated_menu(
         item_buttons, static_buttons, page, limit, "moderator",
-        search_type="topic", search_action="mod_select"
+        search_type="topic", search_action="mod_select",
+        help_key="moderator_tools", help_back_data="moderator"
     )
 
 
@@ -50,7 +51,7 @@ def moderator_topic_menu_kb(topic_id: int):
         callback_data=f"mod_topic_moderators_{topic_id}"
     )
     builder.adjust(1)
-    add_nav_footer(builder, back_data="moderator")
+    add_nav_footer(builder, back_data=f"mod_topic_select_{topic_id}", help_key="moderator_tools", help_back_data=f"mod_topic_select_{topic_id}")
     return builder.as_markup()
 
 

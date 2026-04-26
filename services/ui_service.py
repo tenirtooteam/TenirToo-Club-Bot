@@ -215,8 +215,9 @@ class UIService:
         # 2.3 Обычный участник
         return (
             f"Привет! 👋\n\n"
-            f"Добро пожаловать в систему управления клуба <b>«Теңир-Too»</b>.\n\n"
-            f"Используй кнопки ниже для навигации:",
+            f"Добро пожаловать в круг друзей клуба <b>«Теңир-Too»</b>.\n\n"
+            f"Я твой походный гид. Помогу записаться в горы, найти нужные обсуждения или проверить свой профиль.\n\n"
+            f"Выбирай, с чего начнем:",
             kb.user_main_kb
         )
 
@@ -231,20 +232,20 @@ class UIService:
         
         # 1. Глобальная навигация (Simple)
         simple = {
-            "admin_main": ("🛠 <b>Панель управления</b>", kb.main_admin_kb),
-            "user_main": ("Главное меню участника:", kb.user_main_kb),
+            "admin_main": ("🛠 <b>Штаб управления</b>\nЗдесь настраивается жизнь всего клуба.", kb.main_admin_kb),
+            "user_main": ("🏠 <b>Главное меню</b>\nТвой личный пульт управления приключениями:", kb.user_main_kb),
             "user_profile_view": (None, None), # Специальная обработка ниже
-            "user_topics": ("📍 <b>Топики, в которых ты можешь писать:</b>", lambda: kb.user_topics_list_kb(user_id)),
-            "manage_groups": ("📂 <b>Группы доступа:</b>", kb.groups_list_kb),
-            "manage_users": ("👥 <b>Список пользователей:</b>", kb.users_list_kb),
-            "all_topics_list": ("📍 <b>Все топики:</b>", kb.all_topics_kb),
-            "roles_dashboard": ("🛡 <b>Центр ролей</b>", lambda: kb.roles_dashboard_kb(PermissionService.is_global_admin(user_id))),
-            "roles_faq": ("🛡 <b>Описание ролей</b>\n\n👑 <b>Админ</b>: Полный доступ к управлению группами, топиками и пользователями.\n🛡 <b>Модератор</b>: Управление доступом и модераторами в рамках конкретного топика.\n💎 <b>Суперадмин</b>: Системный владелец с неограниченными правами.", kb.back_to_roles_dashboard_kb),
-            "list_users_roles": ("📋 <b>Пользователи с ролями:</b>", kb.users_list_kb), # Можно заменить на спец. клавиатуру позже
-            "moderator": ("🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
+            "user_topics": ("📍 <b>Твои маршруты</b>\nСписок топиков, где ты можешь общаться:", lambda: kb.user_topics_list_kb(user_id)),
+            "manage_groups": ("📂 <b>Шаблоны доступа</b>\nГрупповые правила для выдачи прав:", kb.groups_list_kb),
+            "manage_users": ("👥 <b>Клубный реестр</b>\nСписок всех участников:", kb.users_list_kb),
+            "all_topics_list": ("📍 <b>Все локации</b>\nПолный список топиков форума:", kb.all_topics_kb),
+            "roles_dashboard": ("🛡 <b>Центр ответственности</b>\nКто за что отвечает в клубе:", lambda: kb.roles_dashboard_kb(PermissionService.is_global_admin(user_id))),
+            "roles_faq": ("🛡 <b>Описание ролей</b>\n\n👑 <b>Админ</b>: Видит всё, управляет всеми процессами.\n🛡 <b>Модератор</b>: Хранитель порядка в конкретном топике.\n👤 <b>Участник</b>: Тот, ради кого мы всё это затеяли.", kb.back_to_roles_dashboard_kb),
+            "list_users_roles": ("📋 <b>Ответственные лица</b>\nСписок всех пользователей с особыми правами:", kb.users_list_kb),
+            "moderator": ("🛠 <b>Инструменты хранителя</b>\nВыбери топик для управления:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
             "templates_faq": (None, None), # Redirects to help_service logic
-            "event_list": ("📅 <b>Список мероприятий</b>", lambda: kb.get_events_list_kb(db.get_active_events())),
-            "event_pending_list": ("⏳ <b>Мероприятия на модерации</b>", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
+            "event_list": ("📅 <b>Наши приключения</b>\nАктуальные выезды и мероприятия:", lambda: kb.get_events_list_kb(db.get_active_events())),
+            "event_pending_list": ("⏳ <b>Новые заявки</b>\nМероприятия, ожидающие одобрения:", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
             "landing": (None, None), # Специальный вызов через get_landing_data
         }
         
@@ -309,7 +310,7 @@ class UIService:
                 f"🔐 <b>Твой статус:</b> {access_status}\n\n"
                 f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
             )
-            return await UIService.sterile_show(state, event, text, reply_markup=kb.user_topic_detail_kb())
+            return await UIService.sterile_show(state, event, text, reply_markup=kb.user_topic_detail_kb(t_id))
 
         # Модерация топиков
         if cmd.startswith("mod_topic_select") or cmd.startswith("mod_back_to_topic"):
