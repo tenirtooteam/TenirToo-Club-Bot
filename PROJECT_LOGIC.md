@@ -56,7 +56,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.27] **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards.
-- [PL-2.2.30] **keyboards/pagination_util.py** — Pagination helper: `build_paginated_menu`.
+- [PL-2.2.30] **keyboards/pagination_util.py** — Universal keyboard utilities: `build_paginated_menu` (Paginated lists with search support), `add_nav_footer(builder, back_data=None, include_close=True, help_key=None)` (Split footer protocol [PL-5.1.14]).
 - [PL-2.2.31] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_audit_log_kb`.
 - [PL-2.2.32] **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
 - [PL-2.2.33] **local_scripts/dev_run.py** — Developer-only hot-reload runner.
@@ -246,6 +246,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.11] **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
 - [PL-5.1.12] **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `sterile_redirect`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
 - [PL-5.1.13] **Orphan Notification Protocol**: Any message sent via direct `bot.send_message` (e.g., from `EventService.notify_admins_for_approval`) is considered an "Orphan Notification". These messages MUST be terminated via `UIService.delete_msg(callback.message)` upon user interaction (CallbackQuery) to ensure buttons are removed and the UI remains sterile.
+- [PL-5.1.14] **Split Navigation Footer**: Standardized "footer" for all menus. "Back" and "Close" buttons MUST reside in the same bottom row (split 1:1) to separate navigation from content. Implemented via `pagination_util.add_nav_footer`.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:

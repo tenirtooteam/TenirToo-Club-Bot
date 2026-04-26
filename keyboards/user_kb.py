@@ -1,6 +1,7 @@
 # File: keyboards/user_kb.py
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
+from keyboards.pagination_util import add_nav_footer
 
 
 def user_main_kb():
@@ -8,8 +9,8 @@ def user_main_kb():
     builder.button(text="📍 Мои топики", callback_data="user_topics")
     builder.button(text="🏔 Мероприятия", callback_data="event_list")
     builder.button(text="👤 Мой профиль", callback_data="user_profile_view")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder)
     return builder.as_markup()
 
 
@@ -35,23 +36,18 @@ def user_topics_list_kb(user_id: int):
             callback_data=f"u_topic_info_{t_id}"
         )
 
-    builder.button(text="⬅️ Назад", callback_data="user_main")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data="user_main")
     return builder.as_markup()
 
 
 def user_profile_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад", callback_data="user_main")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
+    add_nav_footer(builder, back_data="user_main")
     return builder.as_markup()
 
 
 def user_topic_detail_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ К списку топиков", callback_data="user_topics")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
+    add_nav_footer(builder, back_data="user_topics")
     return builder.as_markup()

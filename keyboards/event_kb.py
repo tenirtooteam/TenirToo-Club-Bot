@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from keyboards.pagination_util import add_nav_footer
 
 def get_events_list_kb(events: list, is_admin: bool = False) -> InlineKeyboardMarkup:
     """Клавиатура списка мероприятий."""
@@ -21,7 +22,7 @@ def get_events_list_kb(events: list, is_admin: bool = False) -> InlineKeyboardMa
             InlineKeyboardButton(text="⏳ На модерации", callback_data="event_pending_list")
         )
     
-    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="user_main"))
+    add_nav_footer(builder, back_data="user_main")
     return builder.as_markup()
 
 def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> InlineKeyboardMarkup:
@@ -41,7 +42,7 @@ def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> In
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"event_delete:{event_id}")
         )
         
-    builder.row(InlineKeyboardButton(text="🔙 К списку", callback_data="event_list"))
+    add_nav_footer(builder, back_data="event_list")
     return builder.as_markup()
 
 def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:
@@ -51,14 +52,14 @@ def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="✅ Одобрить", callback_data=f"event_approve:{event_id}"),
         InlineKeyboardButton(text="❌ Отклонить", callback_data=f"event_reject:{event_id}")
     )
-    builder.row(InlineKeyboardButton(text="🔙 К списку", callback_data="event_pending_list"))
+    add_nav_footer(builder, back_data="event_pending_list")
     return builder.as_markup()
 
-def get_event_cancel_kb() -> InlineKeyboardMarkup:
+def get_event_cancel_kb() -> InlineKeyboardBuilder:
     """Кнопка отмены при создании мероприятия."""
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="❌ Отмена", callback_data="event_list")]
-    ])
+    builder = InlineKeyboardBuilder()
+    add_nav_footer(builder, back_data="event_list")
+    return builder.as_markup()
 
 def get_audit_log_kb() -> InlineKeyboardMarkup:
     """Клавиатура под лог-сообщением после решения по заявке."""

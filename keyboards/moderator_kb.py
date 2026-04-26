@@ -1,6 +1,7 @@
 # Файл: keyboards/moderator_kb.py
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
+from keyboards.pagination_util import add_nav_footer
 
 
 def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
@@ -48,9 +49,8 @@ def moderator_topic_menu_kb(topic_id: int):
         text="👑 Модераторы топика",
         callback_data=f"mod_topic_moderators_{topic_id}"
     )
-    builder.button(text="⬅️ Назад", callback_data="moderator")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data="moderator")
     return builder.as_markup()
 
 
@@ -75,14 +75,8 @@ def moderator_group_list_kb(topic_id: int, page: int = 1, limit: int = 7):
             text="➕ Привязать существующую группу",
             callback_data=f"mod_gr_addlist_{topic_id}"
         ),
-        InlineKeyboardButton(
-            text="⬅️ Назад",
-            callback_data=f"mod_topic_select_{topic_id}"
-        ),
-        InlineKeyboardButton(text="❓ О шаблонах", callback_data=f"help:templates:mod_topic_groups_{topic_id}"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_topic_groups_{topic_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_topic_groups_{topic_id}", help_key="templates")
 
 
 def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
@@ -101,15 +95,8 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
                 callback_data=f"mod_gr_link_{g_id}_{topic_id}"
             ))
         
-    static_buttons = [
-        InlineKeyboardButton(
-            text="⬅️ Назад",
-            callback_data=f"mod_topic_groups_{topic_id}"
-        ),
-        InlineKeyboardButton(text="❓ О шаблонах", callback_data=f"help:templates:mod_gr_addlist_{topic_id}"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
-    ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_gr_addlist_{topic_id}")
+    static_buttons = []
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_gr_addlist_{topic_id}", help_key="templates")
 
 
 

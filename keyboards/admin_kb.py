@@ -2,6 +2,7 @@
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 from database import db
+from keyboards.pagination_util import add_nav_footer
 
 
 def main_admin_kb():
@@ -13,13 +14,13 @@ def main_admin_kb():
     builder.button(text="🛡 Роли", callback_data="roles_dashboard")
     builder.button(text="📊 Выгрузка в Google", callback_data="sheets_export_all")
     builder.button(text="📥 Импорт из Google", callback_data="sheets_import_all")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder)
     return builder.as_markup()
 
 def back_to_main_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ В панель управления", callback_data="admin_main")
+    add_nav_footer(builder, back_data="admin_main")
     return builder.as_markup()
 
 def all_topics_kb(page: int = 1, limit: int = 7):
@@ -47,12 +48,10 @@ def topic_edit_kb(topic_id, group_id=0):
     builder.button(text="📝 Переименовать", callback_data=f"topic_rename_{topic_id}_{group_id}")
     if group_id != 0:
         builder.button(text="🗑 Убрать из группы", callback_data=f"topic_del_{topic_id}_{group_id}")
-        builder.button(text="⬅️ Назад", callback_data=f"group_topics_list_{group_id}")
-    else:
-        builder.button(text="🗑 Удалить из БД", callback_data=f"global_topic_del_{topic_id}")
-        builder.button(text="⬅️ Назад", callback_data="all_topics_list")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    
+    back_data = f"group_topics_list_{group_id}" if group_id != 0 else "all_topics_list"
+    add_nav_footer(builder, back_data=back_data)
     return builder.as_markup()
 
 def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
@@ -72,7 +71,7 @@ def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"group_topics_list_{group_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"group_topics_list_{group_id}", help_key="templates")
 
 def available_topics_kb(group_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
@@ -121,10 +120,8 @@ def group_edit_kb(group_id):
     builder.button(text="⚡ Применить шаблон к топику", callback_data=f"tmpl_act_start_apply_{group_id}")
     builder.button(text="🔄 Синхронизировать топик", callback_data=f"tmpl_act_start_sync_{group_id}")
     builder.button(text="🗑 Удалить шаблон", callback_data=f"del_group_{group_id}")
-    builder.button(text="❓ О шаблонах", callback_data=f"help:templates:group_info_{group_id}")
-    builder.button(text="⬅️ Назад", callback_data="manage_groups")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data="manage_groups", help_key="templates")
     return builder.as_markup()
 
 def template_action_topic_select_kb(group_id: int, action: str, page: int = 1, limit: int = 7):
@@ -172,9 +169,8 @@ def user_edit_kb(user_id, is_superadmin: bool = False):
     if is_superadmin:
         builder.button(text="🗑 Удалить пользователя", callback_data=f"user_delete_{user_id}")
         
-    builder.button(text="⬅️ Назад", callback_data="manage_users")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data="manage_users")
     return builder.as_markup()
 
 def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
@@ -198,10 +194,8 @@ def roles_dashboard_kb(is_admin: bool):
     builder = InlineKeyboardBuilder()
     builder.button(text="ℹ️ Описание ролей (FAQ)", callback_data="roles_faq")
     builder.button(text="📋 Список пользователей с ролями", callback_data="list_users_roles")
-    back_data = "admin_main" if is_admin else "moderator"
-    builder.button(text="⬅️ Назад", callback_data=back_data)
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data="admin_main" if is_admin else "moderator")
     return builder.as_markup()
 
 
@@ -225,9 +219,8 @@ def role_selection_kb(user_id: int):
         display_name = "👑 Админ" if role_name == "admin" else "🛡 Модератор" if role_name == "moderator" else role_name.capitalize()
         builder.button(text=display_name, callback_data=callback_data)
         
-    builder.button(text="⬅️ Назад", callback_data=f"user_roles_manage_{user_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data=f"user_roles_manage_{user_id}")
     return builder.as_markup()
 
 
@@ -250,9 +243,8 @@ def user_roles_manage_kb(user_id: int):
             callback = f"role_revoke_{user_id}_{db.get_role_id(role_name)}_{topic_id}"
         builder.button(text=display, callback_data=callback)
     builder.button(text="➕ Назначить роль", callback_data=f"role_assign_user_{user_id}")
-    builder.button(text="⬅️ Назад", callback_data=f"user_info_{user_id}")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
     builder.adjust(1)
+    add_nav_footer(builder, back_data=f"user_info_{user_id}")
     return builder.as_markup()
 
 
@@ -276,9 +268,7 @@ def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
 
 def back_to_roles_dashboard_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад", callback_data="roles_dashboard")
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
+    add_nav_footer(builder, back_data="roles_dashboard")
     return builder.as_markup()
 
 
@@ -320,9 +310,7 @@ def confirmation_kb(action_type: str, target_id: int, back_callback: str, extra_
 def simple_back_kb(back_data: str):
     """Универсальная клавиатура с одной кнопкой 'Назад'."""
     builder = InlineKeyboardBuilder()
-    builder.button(text="⬅️ Назад", callback_data=back_data)
-    builder.button(text="❌ Закрыть", callback_data="close_menu")
-    builder.adjust(1)
+    add_nav_footer(builder, back_data=back_data)
     return builder.as_markup()
 
 
