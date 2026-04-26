@@ -41,10 +41,8 @@ class AdminStates(StatesGroup):
 @UIService.sterile_command(redirect=True, error_prefix="админ-панель")
 async def admin_dashboard(message: types.Message, state: FSMContext):
     """[ALIAS] Прямой вход в админку (для отладки)."""
-    user_id = message.from_user.id
-    is_superadmin = PermissionService.is_superadmin(user_id)
-    
-    return "🛠 <b>Панель управления</b>", kb.main_admin_kb()
+    text, kb_func = await UIService.get_landing_data(message.from_user.id, role_override="admin")
+    return text, kb_func()
 
 
 @router.callback_query(F.data == "admin_main")

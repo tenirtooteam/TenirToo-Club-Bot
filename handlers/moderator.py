@@ -56,13 +56,8 @@ def extract_topic_id_from_callback(callback: types.CallbackQuery) -> int:
 @UIService.sterile_command(redirect=True, error_prefix="панель модератора")
 async def moderator_dashboard(message: types.Message, state: FSMContext):
     """[ALIAS] Прямой вход в панель модератора (для отладки)."""
-    user_id = message.from_user.id
-    manageable_topics = PermissionService.get_manageable_topics(user_id)
-
-    if not manageable_topics:
-        return "❌ У вас нет прав на управление каким-либо топиком.", None
-
-    return "🛠 <b>Панель модератора</b>\nВыберите топик для управления:", kb.moderator_topics_list_kb(manageable_topics)
+    text, kb_func = await UIService.get_landing_data(message.from_user.id, role_override="moderator")
+    return text, kb_func() if kb_func else None
 
 
 @router.callback_query(F.data.startswith("moderator"))

@@ -184,24 +184,35 @@ class UIService:
             await state.set_state(state_to_set)
         return sent
     @staticmethod
-    async def get_landing_data(user_id: int) -> tuple[str, any]:
+    async def get_landing_data(user_id: int, role_override: str = None) -> tuple[str, any]:
         """
         Определяет стартовый экран для пользователя в зависимости от прав [CP-3.13].
+        Параметр role_override позволяет принудительно показать конкретную панель (для алиасов /admin, /mod).
         Возвращает (text, keyboard_func).
         """
         from services.permission_service import PermissionService
         import keyboards as kb
         
-        # 1. Глобальный админ
+        # 1. Принудительный выбор роли (debug aliases)
+        if role_override == "admin":
+            return "🛠 <b>Панель управления</b>", kb.main_admin_kb
+        elif role_override == "moderator":
+            manageable = PermissionService.get_manageable_topics(user_id)
+            if not manageable:
+                return "❌ У вас нет прав модератора.", None
+            return "🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(manageable)
+
+        # 2. Обычный Traffic Controller (автоматический выбор)
+        # 2.1 Глобальный админ
         if PermissionService.is_global_admin(user_id):
             return "🛠 <b>Панель управления</b>", kb.main_admin_kb
             
-        # 2. Модератор (есть хотя бы один управляемый топик)
+        # 2.2 Модератор (есть хотя бы один управляемый топик)
         manageable = PermissionService.get_manageable_topics(user_id)
         if manageable:
             return "🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(manageable)
             
-        # 3. Обычный участник
+        # 2.3 Обычный участник
         return (
             f"Привет! 👋\n\n"
             f"Добро пожаловать в систему управления клуба <b>«Теңир-Too»</b>.\n\n"
