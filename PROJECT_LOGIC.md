@@ -40,7 +40,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.11] **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
 - [PL-2.2.12] **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
 - [PL-2.2.13] **database/db.py** — Single facade re-exporting all database functions (including audit.py). **The only permitted import point for data operations.**
-- [PL-2.2.14] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui` (физическое удаление ID из БД), `delete_msg` (удаление одного сообщения), `terminate_input` (терминация ввода: очистка промпта + сообщения юзера), `sterile_redirect` (перенос в ЛС с зачисткой триггера), `sterile_show` (стерильное отображение: swap для колбэков, зачистка промпта для сообщений), `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask` (первичный терминатор: удаляет старое меню и шлет промпт), `show_temp_message` (всплывающее уведомление в стек), `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command` (декоратор-фильтр), `get_confirmation_ui`, `format_user_card`.
+- [PL-2.2.14] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - [PL-2.2.15] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - [PL-2.2.16] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
 - [PL-2.2.17] **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
@@ -52,7 +52,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.23] **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
 - [PL-2.2.24] **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
 - [PL-2.2.25] **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`. Functions: `show_events_list`, `show_pending_events`, `start_event_creation`, `process_event_title`, `process_event_dates`, `view_event`, `join_event`, `leave_event`, `delete_event_init`, `approve_event_handler`, `reject_event_handler`.
-- [PL-2.2.26] **handlers/user.py** — User flows: `/start`, profile, topics.
+- [PL-2.2.26] **handlers/user.py** — User flows: Unified `/start` (Traffic Controller), profile, topics.
 - [PL-2.2.27] **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards.
@@ -266,6 +266,15 @@ All keys stored in FSM state across the application:
 
 ### [PL-5.5] Callback Resilience
 [PL-5.5.1] `safe_callback()` decorator wraps all callback handlers. Suppresses `TelegramBadRequest` ("message is not modified") from rapid double-tapping.
+
+### [PL-5.6] Unified Entry Point (Traffic Controller)
+- [PL-5.6.1] **Unified /start**: The bot uses a single public entry point (`/start`). Separate commands like `/admin` and `/mod` are deprecated for general use and maintained only as hidden debug aliases.
+- [PL-5.6.2] **Role-Based Routing**: When a user triggers `/start`, the system calls `UIService.get_landing_data`, which resolves the appropriate dashboard (Admin, Moderator, or User) based on the user's effective permissions.
+- [PL-5.6.3] **Landing States**:
+    - **Global Admin**: Redirects to `Admin Dashboard`.
+    - **Moderator**: Redirects to `Moderator Dashboard` (topic selection).
+    - **User**: Redirects to `User Main Menu`.
+- [PL-5.6.4] **Navigation Parity**: The same landing logic is triggered when a user returns to the "Main Menu" via inline buttons (Callback `landing`).
 
 ---
 

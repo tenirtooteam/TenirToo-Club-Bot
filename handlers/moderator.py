@@ -55,7 +55,7 @@ def extract_topic_id_from_callback(callback: types.CallbackQuery) -> int:
 @router.message(Command("mod"))
 @UIService.sterile_command(redirect=True, error_prefix="панель модератора")
 async def moderator_dashboard(message: types.Message, state: FSMContext):
-    """Главное меню модератора (выбор своего топика). Поддерживает переход из групп в ЛС."""
+    """[ALIAS] Прямой вход в панель модератора (для отладки)."""
     user_id = message.from_user.id
     manageable_topics = PermissionService.get_manageable_topics(user_id)
 

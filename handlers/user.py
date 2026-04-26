@@ -15,20 +15,17 @@ router = Router()
 @router.message(Command("start"))
 @UIService.sterile_command(redirect=True, error_prefix="меню")
 async def cmd_start(message: types.Message, state: FSMContext):
-    """Главное меню пользователя с поддержкой перехода из групп в ЛС."""
-    welcome_text = (
-        f"Привет, {message.from_user.first_name}! 👋\n\n"
-        f"Добро пожаловать в систему управления доступом клуба <b>«Теңир-Too»</b>.\n\n"
-        f"Используй кнопки ниже для навигации:"
-    )
-
-    return welcome_text, kb.user_main_kb()
+    """Единая точка входа: определяет роль и показывает нужный дашборд [RA-1]."""
+    user_id = message.from_user.id
+    text, kb_func = await UIService.get_landing_data(user_id)
+    return text, kb_func()
 
 
 @router.callback_query(F.data == "user_main")
 @safe_callback()
 async def back_to_user_main(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+    """Возврат на главную панель (ролевой роутинг)."""
+    await UIService.generic_navigator(state, callback, "landing")
 
 
 @router.callback_query(F.data == "user_profile_view")

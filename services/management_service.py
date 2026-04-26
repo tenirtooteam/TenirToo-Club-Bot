@@ -219,7 +219,7 @@ class ManagementService:
         elif entity_type in ["event", "event_approval", "event_participation"]:
             event = db.get_event_details(entity_id)
             return event["title"] if event else f"Мероприятие {entity_id}"
-        return "Неизвестная сущность"
+        return "Неизвестный объект"
 
     @staticmethod
     def execute_deletion(action: str, target_id: int, extra_id: int = 0) -> tuple[bool, str, str]:
@@ -477,17 +477,31 @@ class ManagementService:
                 db.delete_event(request["entity_id"])
                 logger.info(f"🗑 Мероприятие {request['entity_id']} удалено из-за отклонения заявки.")
 
-        # Формируем уведомление пользователю
+        # Формируем человекочитаемое уведомление [CC-2]
         entity_name = ManagementService.get_entity_name(request["entity_type"], request["entity_id"])
         status_icon = "✅" if status == "approved" else "❌"
-        status_text = "одобрена" if status == "approved" else "отклонена"
+        is_approved = status == "approved"
+
+        # Маппинг названий и окончаний в зависимости от рода
+        naming_map = {
+            "event_approval": ("Ваше мероприятие", "одобрено", "отклонено"),
+            "event_participation": ("Ваша запись на мероприятие", "одобрена", "отклонена"),
+            "group": ("Ваша группа", "одобрена", "отклонена"),
+            "topic": ("Ваш топик", "одобрен", "отклонен"),
+            "user": ("Пользователь", "одобрен", "отклонен")
+        }
         
-        notify_text = (
-            f"{status_icon} Ваша заявка по сущности <b>{entity_name}</b> {status_text}.\n"
+        prefix, ok_text, fail_text = naming_map.get(
+            request["entity_type"], 
+            ("Ваша заявка по объекту", "одобрена", "отклонена")
         )
+        
+        res_text = ok_text if is_approved else fail_text
+        notify_text = f"{status_icon} {prefix} <b>{entity_name}</b> {res_text}.\n"
+        
         if comment:
             notify_text += f"💬 Комментарий: <i>{comment}</i>"
 
         await NotificationService.send_to_users(bot, [request["user_id"]], notify_text)
         
-        return True, f"✅ Заявка {request_id} разрешена ({status_text})."
+        return True, f"✅ Заявка {request_id} разрешена ({res_text})."

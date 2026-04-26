@@ -184,6 +184,32 @@ class UIService:
             await state.set_state(state_to_set)
         return sent
     @staticmethod
+    async def get_landing_data(user_id: int) -> tuple[str, any]:
+        """
+        Определяет стартовый экран для пользователя в зависимости от прав [CP-3.13].
+        Возвращает (text, keyboard_func).
+        """
+        from services.permission_service import PermissionService
+        import keyboards as kb
+        
+        # 1. Глобальный админ
+        if PermissionService.is_global_admin(user_id):
+            return "🛠 <b>Панель управления</b>", kb.main_admin_kb
+            
+        # 2. Модератор (есть хотя бы один управляемый топик)
+        manageable = PermissionService.get_manageable_topics(user_id)
+        if manageable:
+            return "🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(manageable)
+            
+        # 3. Обычный участник
+        return (
+            f"Привет! 👋\n\n"
+            f"Добро пожаловать в систему управления клуба <b>«Теңир-Too»</b>.\n\n"
+            f"Используй кнопки ниже для навигации:",
+            kb.user_main_kb
+        )
+
+    @staticmethod
     async def generic_navigator(state: FSMContext, event: types.Message | types.CallbackQuery, callback_data: str):
         """Ультимативный роутер: callback_data -> UI экран."""
         from database import db
@@ -208,6 +234,7 @@ class UIService:
             "templates_faq": (None, None), # Redirects to help_service logic
             "event_list": ("📅 <b>Список мероприятий</b>", lambda: kb.get_events_list_kb(db.get_active_events())),
             "event_pending_list": ("⏳ <b>Мероприятия на модерации</b>", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
+            "landing": (None, None), # Специальный вызов через get_landing_data
         }
         
         cmd = callback_data.split("_pg_")[0]
@@ -222,6 +249,9 @@ class UIService:
             if cmd == "user_profile_view":
                 # Переходим к блоку "Инфо-карточки" ниже
                 pass
+            elif cmd == "landing":
+                text, kb_func = await UIService.get_landing_data(user_id)
+                return await UIService.sterile_show(state, event, text, reply_markup=kb_func())
             elif kb_func is not None:
                 if cmd in UIService.PAGINATED_CMDS:
                     markup = kb_func(page=page)

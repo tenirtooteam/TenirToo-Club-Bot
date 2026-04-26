@@ -40,7 +40,7 @@ class AdminStates(StatesGroup):
 @router.message(Command("admin"))
 @UIService.sterile_command(redirect=True, error_prefix="админ-панель")
 async def admin_dashboard(message: types.Message, state: FSMContext):
-    """Панель управления администратора с поддержкой перехода из групп в ЛС."""
+    """[ALIAS] Прямой вход в админку (для отладки)."""
     user_id = message.from_user.id
     is_superadmin = PermissionService.is_superadmin(user_id)
     
