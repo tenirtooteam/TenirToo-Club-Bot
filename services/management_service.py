@@ -395,7 +395,13 @@ class ManagementService:
 
     @staticmethod
     def create_event_action(title: str, start_date: str, creator_id: int, is_approved: int = 0) -> int:
-        """Бизнес-логика создания мероприятия: регистрация автора как лидера и участника."""
+        """
+        Бизнес-логика создания мероприятия [PL-6.7]: 
+        санитизация ввода и регистрация автора как лидера.
+        """
+        title = html.escape(title.strip())[:100]
+        start_date = html.escape(start_date.strip())[:100]
+        
         event_id = db.create_event(title, start_date, "", creator_id, is_approved)
         if event_id > 0:
             db.add_event_participant(event_id, creator_id)
