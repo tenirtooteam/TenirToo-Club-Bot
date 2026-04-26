@@ -118,6 +118,19 @@ def init_db():
                     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )""")
 
+                # Таблица заявок на аудит
+                c.execute("""CREATE TABLE IF NOT EXISTS audit_requests (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id     INTEGER NOT NULL,
+                    entity_type TEXT    NOT NULL,
+                    entity_id   INTEGER NOT NULL,
+                    status      TEXT    NOT NULL DEFAULT 'pending',
+                    comment     TEXT,
+                    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                )""")
+
                 # Индексы
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)")
@@ -125,6 +138,8 @@ def init_db():
                 c.execute("CREATE INDEX IF NOT EXISTS idx_direct_topic_access_user_id ON direct_topic_access(user_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_event_participants_event_id ON event_participants(event_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_event_leads_event_id ON event_leads(event_id)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_requests(entity_type, entity_id)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_requests(user_id, status)")
 
                 # Предзаполнение ролей
                 c.execute("INSERT OR IGNORE INTO roles (name) VALUES ('superadmin')")

@@ -32,7 +32,7 @@ async def test_navigator_simple_routes_stability(mock_state, mock_callback):
     ]
     
     # Патчим зависимости, чтобы не лезть в БД и не слать сообщения
-    with patch("services.ui_service.UIService.show_menu", AsyncMock()) as mock_show:
+    with patch("services.ui_service.UIService.sterile_show", AsyncMock()) as mock_show:
         with patch("services.permission_service.PermissionService.is_global_admin", return_value=True):
             with patch("services.permission_service.PermissionService.get_manageable_topics", return_value=[1]):
                 with patch("database.db.get_user_name", return_value="Test User"):

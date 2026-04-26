@@ -18,7 +18,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Template-Based Access Control**: Access is governed exclusively by granular per-topic user grants (`direct_topic_access`). Global groups serve as **non-runtime templates** for bulk assignment and synchronization, decoupling runtime permissions from group membership.
 - **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
 - **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware` delegating to `ManagementService.ensure_user_registered`.
-- **Sterile UI & Multi-Message Stack**: Zero "dirty chat" via stack-based message cleanup (`last_menu_ids`). The service uses a **Multi-Message Stack** to track and delete multiple system alerts/menus in a single transition. The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The `UIService.format_user_card` method is the single source of truth for rendering user profiles. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
+- **Sterile UI & Multi-Message Stack**: Zero "dirty chat" via stack-based message cleanup (`last_menu_ids`). The service uses a **Multi-Message Stack** to track and delete multiple system alerts/menus in a single transition. The core methods are `sterile_ask` (terminates previous menu before prompt) and `sterile_show` (terminates prompt before result). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
 - **Help Infrastructure**: Centralized help tooltips via `HelpService` and unified routing via `generic_navigator` (using `help:{key}` pattern). Handlers are decoupled from static content.
 - **Batch-Fetching ([PL-HI])**: Optimized N+1 query elimination for list building using batch-fetch helpers.
 - **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
@@ -34,7 +34,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 - **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
 - **Sterile Handler Architecture**: Handlers are 100% decoupled from the database facade. All data interaction (both reads and mutations) is mediated by the appropriate service layer (`PermissionService`, `ManagementService`, `EventService`).
 - **Expedition Protocol (Events)**: A complete lifecycle for club events (hikes, meetups). Includes multi-step creation (Title -> Dates), admin moderation queue (`is_approved` flag), participant tracking, and lead assignment. Standardized UI via `event_kb` and business logic via `EventService`. Includes robust input validation for non-text content.
-- **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `group_topics` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
+- **Audit & Notification Layer**: Asynchronous approval workflow for critical actions (event creation, registration). Uses an atomic, idempotent resolution protocol in `ManagementService`. Statuses: `pending`, `approved`, `rejected`. Includes targeted notifications to users when their requests are processed.
+- **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `audit_requests` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md**.
 
@@ -51,7 +52,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 3. **FSM HYGIENE**: Never use `state.clear()` — it destroys UI metadata (`last_menu_id`). Always use `state.set_state(None)`.
    > Rationale: `state.clear()` wipes all FSM data keys, including `last_menu_id`, silently breaking the Sterile Interface Protocol with no runtime error — the next menu will be deployed without cleaning the previous one.
 
-4. **FSM CHAIN PROTECTION**: When using `UIService.show_menu` or `UIService.finish_input` during a multi-step input process (e.g., Title -> Dates), ensure that state is NOT reset prematurely. `UIService.show_menu` automatically handles this by calling `finish_input(reset_state=False)` when processing messages. 
+4. **FSM CHAIN PROTECTION**: When using `UIService.sterile_show` or `UIService.terminate_input` during a multi-step input process (e.g., Title -> Dates), ensure that state is NOT reset prematurely. `UIService.sterile_show` automatically handles this by calling `terminate_input(reset_state=False)` when processing messages. 
    > Rationale: Aggressive state resetting during intermediate input steps causes the bot to "forget" the current flow, leading to silent failures when the user provides the next piece of data.
 
 5. **TILDE BLOCKS**: Use ONLY tilde-based code blocks (~~~). Triple backticks (```) are forbidden.
@@ -75,8 +76,8 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 9. **TOPIC RENAME SYNC**: When renaming a topic via the admin panel, the change must be applied to both the local DB (`db.update_topic_name`) **and** the Telegram API (`bot.edit_forum_topic`).
    > Rationale: A DB-only rename creates a divergence causing user-visible inconsistency.
 
-10. **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.finish_input(state, message)`. For command-level handlers (`@router.message(Command(...))`), use the `@UIService.sterile_command(redirect=True/False, error_prefix="...")` decorator instead of calling `UIService.send_redirected_menu` directly. The decorated handler must return a `(text, reply_markup)` tuple or just `text`.
-    > Rationale: The decorator centralizes redirect logic, PM error fallback, trigger cleanup, and `last_menu_id` tracking into a single declarative line. Bypassing the decorator and calling `send_redirected_menu` manually is redundant and error-prone.
+10. **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.terminate_input(state, message)`. For command-level handlers (`@router.message(Command(...))`), use the `@UIService.sterile_command(redirect=True/False, error_prefix="...")` decorator instead of calling `UIService.sterile_redirect` directly. The decorated handler must return a `(text, reply_markup)` tuple or just `text`.
+    > Rationale: The decorator centralizes redirect logic, PM error fallback, trigger cleanup, and `last_menu_id` tracking into a single declarative line. Bypassing the decorator and calling `sterile_redirect` manually is redundant and error-prone.
 
 11. **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
     > Rationale: Duplicated handlers cause router dispatch conflicts, leading to unpredictable double-executions or arbitrary routing based on aiogram load order.
@@ -89,7 +90,7 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 14. **STRICT DATABASE FUSE**: Do not attempt to bypass or weaken the Foreign Key check in `init_db()`.
     > Rationale: Native `ON DELETE CASCADE` is critical for data integrity. Running on a system without FK support will result in orphaned records and silent database corruption.
 
-15. **UIService.show_menu AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `bot.edit_message_reply_markup(...)` are prohibited in handlers. When initiating FSM text input that requires a cancel button or other controls, pass `reply_markup` directly to `UIService.ask_input(..., reply_markup=...)`.
+15. **UIService.sterile_show AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.sterile_show(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `bot.edit_message_reply_markup(...)` are prohibited in handlers. When initiating FSM text input that requires a cancel button or other controls, pass `reply_markup` directly to `UIService.sterile_ask(..., reply_markup=...)`.
     > Rationale: `UIService` methods are the single source of truth for UI lifecycle management. They handle `last_menu_id` tracking, cleanup, and state protection automatically. Manual Bot API calls bypass this infrastructure, leading to "dirty chat" and UI inconsistency.
 
 16. **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
@@ -143,6 +144,12 @@ The bot manages user access to forum topics within a Telegram Supergroup and han
 
 31. **CONTENT ISOLATION**: All user-facing documentation, help tooltips, and long static messages MUST reside in `services/help_service.py`. Handlers MUST NOT contain hardcoded help strings. [CC-2]
     > Rationale: Ensures a clean separation of concerns, simplifies localization, and prevents code bloat in UI handlers.
+
+32. **delete_msg AS ORPHAN TERMINATOR**: Notifications and push-messages sent via direct `bot.send_message` (outside FSM tracking) MUST be finalized using `UIService.delete_msg(callback.message)`. Using `UIService.sterile_show` for these "orphan" messages is an architectural violation.
+    > Rationale: Orphan messages have no FSM `last_menu_id` entry. `sterile_show` attempts to track state, which fails for orphan messages, potentially leaving active buttons in the chat history. `delete_msg` ensures the UI is cleaned and the callback is answered without state side-effects.
+
+33. **UI TRACE ENFORCEMENT**: When analyzing or proposing changes to UI transitions, the AI MUST perform a step-by-step trace of `last_menu_ids` state. It must explicitly identify which method (e.g., `sterile_ask`, `terminate_input`, or `sterile_show`) is responsible for deleting specific message IDs at each stage of the interaction.
+    > Rationale: Prevents shallow trace errors where the AI assumes cleanup happens by "magic", which leads to logic regressions and double-deletion attempts.
 
 ---
 

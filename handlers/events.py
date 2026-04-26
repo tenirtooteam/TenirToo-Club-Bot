@@ -32,7 +32,7 @@ async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMCont
     reply_markup = kb.get_events_list_kb(events, is_admin)
     
     # [CC-4] Используем UIService для отображения меню
-    await UIService.show_menu(state, event_or_msg, text, reply_markup=reply_markup)
+    await UIService.sterile_show(state, event_or_msg, text, reply_markup=reply_markup)
 
 @router.callback_query(F.data == "event_pending_list")
 async def show_pending_events(callback: CallbackQuery, state: FSMContext):
@@ -46,7 +46,7 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
     events = EventService.get_pending_events()
     reply_markup = kb.get_events_list_kb(events, is_admin=True)
     
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state,
         callback,
         "⏳ <b>Мероприятия на модерации</b>\nВыберите мероприятие для проверки:",
@@ -56,9 +56,9 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "event_create")
 async def start_event_creation(callback: CallbackQuery, state: FSMContext):
     # [CC-10] Sterile UI: очистка перед началом нового ввода
-    await UIService.finish_input(state, callback.message, reset_state=True)
+    await UIService.terminate_input(state, callback.message, reset_state=True)
     
-    await UIService.ask_input(
+    await UIService.sterile_ask(
         state, 
         callback, 
         "Отлично! Введите <b>Название</b> мероприятия (например, 'Поход на Ала-Арчу'):", 
@@ -72,8 +72,8 @@ async def process_event_title(message: Message, state: FSMContext):
         return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текстовое</b> название мероприятия.")
         
     await state.update_data(title=message.text.strip()[:100])
-    # [CC-4] Переход к следующему шагу через UIService.show_menu (сброс текста промпта)
-    await UIService.show_menu(
+    # [CC-4] Переход к следующему шагу через UIService.sterile_show (сброс текста промпта)
+    await UIService.sterile_show(
         state,
         message,
         "Теперь введите <b>Даты</b> (например, '10-12 Июля' или 'Каждые выходные'):",
@@ -107,6 +107,8 @@ async def process_event_dates(message: Message, state: FSMContext):
             success_text = "✅ <b>Мероприятие успешно создано и опубликовано!</b>"
         else:
             success_text = "⏳ <b>Мероприятие отправлено на модерацию администраторам.</b>"
+            # Регистрируем заявку на аудит [CC-1]
+            ManagementService.submit_request(user_id, "event_approval", event_id)
             await EventService.notify_admins_for_approval(message.bot, event_id)
             
         await show_events_list(message, state, custom_text=success_text)
@@ -133,14 +135,24 @@ async def view_event(callback: CallbackQuery, state: FSMContext):
     else:
         reply_markup = kb.get_event_card_kb(event_id, is_participant, can_edit)
         
-    await UIService.show_menu(state, callback, card_text, reply_markup=reply_markup)
+    await UIService.sterile_show(state, callback, card_text, reply_markup=reply_markup)
 
 @router.callback_query(F.data.startswith("event_join:"))
 async def join_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
-    # [CC-3] Мутация через ManagementService
-    success, msg = ManagementService.toggle_event_participation(event_id, callback.from_user.id)
-    await callback.answer(msg)
+    user_id = callback.from_user.id
+    
+    if EventService.is_event_participant(event_id, user_id):
+        return await callback.answer("⚠️ Вы уже участвуете в этом мероприятии.", show_alert=True)
+
+    # Проверяем, нет ли уже активной заявки [CC-1]
+    existing_req = ManagementService.get_user_pending_request_id(user_id, "event_participation", event_id)
+    if existing_req:
+        return await callback.answer("⏳ Ваша заявка на участие уже находится на рассмотрении.", show_alert=True)
+
+    # Регистрируем заявку на участие [CC-1]
+    ManagementService.submit_request(user_id, "event_participation", event_id)
+    await callback.answer("✅ Ваша заявка на участие отправлена организаторам!", show_alert=True)
     await view_event(callback, state)
 
 @router.callback_query(F.data.startswith("event_leave:"))
@@ -161,7 +173,7 @@ async def delete_event_init(callback: CallbackQuery, state: FSMContext):
         return await callback.answer("❌ У вас нет прав.", show_alert=True)
         
     text, back = UIService.get_confirmation_ui("event_del", event_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("event_del", event_id, back)
     )
@@ -172,13 +184,21 @@ async def approve_event_handler(callback: CallbackQuery, state: FSMContext):
     if not PermissionService.is_global_admin(callback.from_user.id):
         return await callback.answer("❌ Нет прав.", show_alert=True)
         
-    # [CC-3] Мутация через ManagementService
-    if ManagementService.approve_event_action(event_id):
-        await callback.answer("✅ Мероприятие опубликовано.")
-        # [CC-4] Обновляем через show_menu
-        await view_event(callback, state)
-    else:
-        await callback.answer("❌ Ошибка при одобрении.", show_alert=True)
+    # Находим ID заявки [CC-1]
+    request_id = ManagementService.get_pending_request_id("event_approval", event_id)
+    if not request_id:
+        await callback.answer("⚠️ Заявка не найдена. Возможно, она уже была обработана.", show_alert=True)
+        return await view_event(callback, state)
+
+    # Разрешаем через универсальный сервис [CC-1] [CC-2]
+    success, msg = await ManagementService.resolve_request(callback.bot, request_id, "approved")
+    
+    if not success:
+        await callback.answer(msg, show_alert=True)
+        return await view_event(callback, state)
+
+    await callback.answer("✅ Мероприятие одобрено")
+    await UIService.delete_msg(callback.message)
 
 @router.callback_query(F.data.startswith("event_reject:"))
 async def reject_event_handler(callback: CallbackQuery, state: FSMContext):
@@ -186,8 +206,19 @@ async def reject_event_handler(callback: CallbackQuery, state: FSMContext):
     if not PermissionService.is_global_admin(callback.from_user.id):
         return await callback.answer("❌ Нет прав.", show_alert=True)
         
-    # [CC-3] Удаление через ManagementService (через execute_deletion или напрямую)
-    # Для отклонения используем execute_deletion если хотим единый флоу
-    success, msg, next_kb = ManagementService.execute_deletion("event_del", event_id)
-    await callback.answer(msg)
-    await show_pending_events(callback, state)
+    # Находим ID заявки [CC-1]
+    request_id = ManagementService.get_pending_request_id("event_approval", event_id)
+    if not request_id:
+        await callback.answer("⚠️ Заявка не найдена или уже обработана.", show_alert=True)
+        return await view_event(callback, state)
+
+    # Разрешаем через универсальный сервис [CC-1] [CC-2]
+    # Сервис САМ удалит черновик мероприятия при отклонении event_approval
+    success, msg = await ManagementService.resolve_request(callback.bot, request_id, "rejected", comment="Отклонено администратором.")
+    
+    if not success:
+        await callback.answer(msg, show_alert=True)
+        return await view_event(callback, state)
+
+    await callback.answer("❌ Заявка отклонена")
+    await UIService.delete_msg(callback.message)

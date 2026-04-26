@@ -1,9 +1,12 @@
 # Файл: services/management_service.py
 import logging
 import html
+from typing import Optional, List
 from aiogram.types import User
+from aiogram import Bot
 from database import db
 from services.permission_service import PermissionService
+from services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -206,13 +209,14 @@ class ManagementService:
     @staticmethod
     def get_entity_name(entity_type: str, entity_id: int) -> str:
         """Возвращает название сущности для вывода в UI."""
+        logger.debug(f"🔍 Определение имени сущности: {entity_type} (ID: {entity_id})")
         if entity_type == "group":
             return db.get_group_name(entity_id) or f"Группа {entity_id}"
         elif entity_type == "topic":
             return db.get_topic_name(entity_id) or f"Топик {entity_id}"
         elif entity_type == "user":
             return db.get_user_name(entity_id) or f"Пользователь {entity_id}"
-        elif entity_type == "event":
+        elif entity_type in ["event", "event_approval", "event_participation"]:
             event = db.get_event_details(entity_id)
             return event["title"] if event else f"Мероприятие {entity_id}"
         return "Неизвестная сущность"
@@ -412,3 +416,72 @@ class ManagementService:
     def approve_event_action(event_id: int) -> bool:
         """Одобрение мероприятия администратором."""
         return db.approve_event(event_id)
+
+    @staticmethod
+    def submit_request(user_id: int, entity_type: str, entity_id: int) -> int:
+        """
+        Создает заявку на аудит. Если заявка уже существует, возвращает её ID.
+        """
+        existing = db.get_user_pending_request(user_id, entity_type, entity_id)
+        if existing:
+            return existing
+        return db.create_audit_request(user_id, entity_type, entity_id)
+
+    @staticmethod
+    def get_pending_request_id(entity_type: str, entity_id: int) -> Optional[int]:
+        """Возвращает ID первой активной заявки для сущности."""
+        requests = db.get_pending_requests_by_type(entity_type, entity_id)
+        return requests[0] if requests else None
+
+    @staticmethod
+    def get_user_pending_request_id(user_id: int, entity_type: str, entity_id: int) -> Optional[int]:
+        """Возвращает ID активной заявки конкретного пользователя."""
+        return db.get_user_pending_request(user_id, entity_type, entity_id)
+
+    @staticmethod
+    async def resolve_request(bot: Bot, request_id: int, status: str, comment: str = None) -> tuple[bool, str]:
+        """
+        Разрешает заявку (одобрено/отклонено), выполняет действие в БД и уведомляет пользователя.
+        Идемпотентен: проверяет текущий статус перед выполнением.
+        """
+        request = db.get_audit_request(request_id)
+        if not request:
+            return False, "❌ Заявка не найдена."
+
+        # Проверка на повторное решение [CC-2]
+        if request["status"] != "pending":
+            logger.warning(f"⚠️ Попытка повторного решения заявки {request_id} (Текущий статус: {request['status']})")
+            return False, f"⚠️ Эта заявка уже была обработана ({request['status']})."
+
+        logger.info(f"🛡 [AUDIT] Резолв заявки {request_id}: {status} (Тип: {request['entity_type']}, ID: {request['entity_id']})")
+
+        if not db.resolve_audit_request(request_id, status, comment):
+            return False, "❌ Ошибка при обновлении статуса в БД."
+
+        # Выполняем действие в БД в зависимости от статуса [CC-1]
+        if status == "approved":
+            if request["entity_type"] == "event_approval":
+                db.approve_event(request["entity_id"])
+            elif request["entity_type"] == "event_participation":
+                db.add_event_participant(request["entity_id"], request["user_id"])
+        
+        elif status == "rejected":
+            if request["entity_type"] == "event_approval":
+                # Если отклонили создание мероприятия — удаляем черновик [CC-1]
+                db.delete_event(request["entity_id"])
+                logger.info(f"🗑 Мероприятие {request['entity_id']} удалено из-за отклонения заявки.")
+
+        # Формируем уведомление пользователю
+        entity_name = ManagementService.get_entity_name(request["entity_type"], request["entity_id"])
+        status_icon = "✅" if status == "approved" else "❌"
+        status_text = "одобрена" if status == "approved" else "отклонена"
+        
+        notify_text = (
+            f"{status_icon} Ваша заявка по сущности <b>{entity_name}</b> {status_text}.\n"
+        )
+        if comment:
+            notify_text += f"💬 Комментарий: <i>{comment}</i>"
+
+        await NotificationService.send_to_users(bot, [request["user_id"]], notify_text)
+        
+        return True, f"✅ Заявка {request_id} разрешена ({status_text})."

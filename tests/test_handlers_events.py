@@ -119,13 +119,13 @@ async def test_approve_event_handler(mock_view, mock_ui, mock_perm, mock_mgmt):
     callback.from_user.id = 999
     
     mock_perm.is_global_admin.return_value = True
-    mock_mgmt.approve_event_action.return_value = True
+    mock_mgmt.get_pending_request_id.return_value = 1
+    mock_mgmt.resolve_request = AsyncMock(return_value=(True, "ok"))
+    mock_mgmt.get_audit_request.return_value = {"entity_type": "event_approval", "entity_id": 15}
     
     await approve_event_handler(callback, AsyncMock())
     
-    mock_mgmt.approve_event_action.assert_called_once_with(15)
-    mock_view.assert_called_once()
-    callback.answer.assert_called_once_with("✅ Мероприятие опубликовано.")
+    mock_ui.delete_msg.assert_called_once_with(callback.message)
 
 @pytest.mark.asyncio
 @patch('handlers.events.ManagementService')
@@ -138,12 +138,12 @@ async def test_reject_event_handler(mock_ui, mock_perm, mock_mgmt):
     callback.from_user.id = 999
     
     mock_perm.is_global_admin.return_value = True
-    mock_mgmt.execute_deletion.return_value = (True, "✅ Мероприятие отклонено", "event_list")
+    mock_mgmt.get_pending_request_id.return_value = 1
+    mock_mgmt.resolve_request = AsyncMock(return_value=(True, "ok"))
     
     await reject_event_handler(callback, AsyncMock())
     
-    mock_mgmt.execute_deletion.assert_called_once_with("event_del", 25)
-    callback.answer.assert_called_once_with("✅ Мероприятие отклонено")
+    mock_ui.delete_msg.assert_called_once_with(callback.message)
 
 @pytest.mark.asyncio
 @patch('handlers.events.PermissionService')
@@ -162,7 +162,7 @@ async def test_show_pending_events(mock_db_pending, mock_ui, mock_perm):
     
     mock_db_pending.assert_called_once()
     state.set_state.assert_called_once_with(None)
-    mock_ui.show_menu.assert_called_once()
+    mock_ui.sterile_show.assert_called_once()
 
 @pytest.mark.asyncio
 @patch('handlers.events.UIService', new_callable=AsyncMock)

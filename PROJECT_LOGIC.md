@@ -31,20 +31,21 @@ Complete file list with individual responsibilities and full function inventory:
 - **config.py** — Environment variable loader and global constants definition.
 - **database/__init__.py** — Package initializer for DB facade pattern.
 - **database/connection.py** — Connection context manager, WAL activation, and Foreign Key enforcement.
+- **database/audit.py** — Audit requests management: `create_audit_request`, `get_audit_request`, `resolve_audit_request`, `get_pending_requests_by_type`, `get_user_pending_request`.
 - **database/members.py** — User entity management: `add_user`, `user_exists`, `get_all_users`, `get_user_name`, `get_user_names_by_ids` (Batch-Fetch, N+1 fix), `update_user_name`, `delete_user`, `find_users_by_query`.
 - **database/topics.py** — Forum topic management: `add_topic`, `rename_topic`, `get_topic_name`, `get_all_unique_topics`, `get_topic_names_by_ids` (Batch-Fetch), `delete_topic`.
 - **database/groups.py** — Global templates management: `create_group`, `delete_group`, `get_all_groups`, `get_group_name`, `add_topic_to_group`, `remove_topic_from_group`, `get_topics_of_group`, `get_group_ids_by_topic`, `get_group_template_members`, `add_to_group_template`, `remove_from_group_template`.
 - **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
 - **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
 - **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
-- **database/db.py** — Single facade re-exporting all database functions. **The only permitted import point for data operations.**
-- **services/ui_service.py** — Centralized UI lifecycle via `UIService`: `clear_last_menu`, `delete_msg`, `finish_input` (FSM protection support), `send_redirected_menu`, `show_menu`, `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `ask_input` (supports optional `reply_markup`), `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- **database/db.py** — Single facade re-exporting all database functions (including audit.py). **The only permitted import point for data operations.**
+- **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui` (физическое удаление ID из БД), `delete_msg` (удаление одного сообщения), `terminate_input` (терминация ввода: очистка промпта + сообщения юзера), `sterile_redirect` (перенос в ЛС с зачисткой триггера), `sterile_show` (стерильное отображение: swap для колбэков, зачистка промпта для сообщений), `generic_navigator` (Defensive Router), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask` (первичный терминатор: удаляет старое меню и шлет промпт), `show_temp_message` (всплывающее уведомление в стек), `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command` (декоратор-фильтр), `get_confirmation_ui`, `format_user_card`.
 - **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
 - **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
-- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action`, `toggle_event_participation`, `approve_event_action`, `search_entities`.
+- **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action`, `toggle_event_participation`, `approve_event_action`, `submit_request`, `resolve_request` (Atomic Audit), `get_pending_request_id`, `get_user_pending_request_id`, `get_entity_name`, `search_entities`.
 - **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`, `get_user_display_name`, `get_role_name`, `get_role_id`, `get_access_sets`.
-- **services/notification_service.py** — Notification logic: `send_native_all`.
+- **services/notification_service.py** — Notification logic: `send_native_all`, `send_to_users` (Targeted Broadcast).
 - **services/callback_guard.py** — `safe_callback()` decorator factory.
 - **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`. **Decoupled**: Uses `ManagementService.search_entities`.
 - **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
@@ -55,10 +56,11 @@ Complete file list with individual responsibilities and full function inventory:
 - **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - **keyboards/moderator_kb.py** — Moderator keyboards.
 - **keyboards/pagination_util.py** — Pagination helper: `build_paginated_menu`.
-- **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`.
+- **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_audit_log_kb`.
 - **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
 - **local_scripts/dev_run.py** — Developer-only hot-reload runner.
 - **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
+- **tests/test_smoke.py** — Smoke testing suite for import integrity and basic signatures.
 
 ### 2.3. Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -166,6 +168,18 @@ CREATE TABLE IF NOT EXISTS event_participants (
     FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS audit_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
 ~~~
 
 - **Transactional Integrity**: Native `ON DELETE CASCADE` is enforced at the database level via `PRAGMA foreign_keys = ON;` executed on every connection open. **Strict Enforcement**: `init_db()` performs a runtime check at startup; if `PRAGMA foreign_keys` returns `0`, the bot throws a `RuntimeError` and terminates immediately to prevent data corruption.
@@ -220,14 +234,17 @@ All three stages follow a **fail-open** strategy: non-critical exceptions are ca
 ### 5.1. The "Sterile Interface" Protocol
 - **last_menu_id**: FSM key tracking the message ID of the currently active inline keyboard or system message. Set via `state.update_data(last_menu_id=sent_message.message_id)` immediately after every menu deployment.
 - **last_menu_ids**: FSM key holding a list (stack) of message IDs for transient alerts, error messages, or multi-step menus that require bulk deletion.
-- **UIService.clear_last_menu**: Reads `last_menu_id` and `last_menu_ids` from FSM state, deletes all tracked messages, nullifies FSM data in a `finally` block (guaranteed even if deletion fails).
-- **UIService.finish_input**: Atomic sequence: (1) `clear_last_menu`, (2) `delete_msg` (user's trigger message), (3) `state.set_state(None)` IF `reset_state=True`. **Systemic Guard**: To maintain FSM chains (like Title -> Dates), `finish_input` must be called with `reset_state=False` in intermediate steps.
-- **UIService.ask_input**: Clears previous menu, deletes trigger message if in group, sends prompt, tracks it as `last_menu_id`, sets FSM state. Used for all FSM text-input initiation flows.
-- **UIService.show_temp_message**: Clears previous menu, deletes trigger, sends self-cleaning status or error message tracked as `last_menu_id`. Used for all transient error/status notifications.
-- **UIService.show_menu**: The primary gateway for all UI transitions. Automatically handles `last_menu_id` tracking. When called with a `Message` (user input), it calls `finish_input(reset_state=False)` to maintain flow continuity while cleaning the UI.
+- **UIService.delete_tracked_ui**: Reads `last_menu_id` and `last_menu_ids` from FSM state, deletes all tracked messages, nullifies FSM data in a `finally` block (guaranteed even if deletion fails).
+- **UIService.terminate_input**: Atomic sequence: (1) `delete_tracked_ui`, (2) `delete_msg` (user's trigger message), (3) `state.set_state(None)` IF `reset_state=True`. **Systemic Guard**: To maintain FSM chains (like Title -> Dates), `terminate_input` must be called with `reset_state=False` in intermediate steps.
+- **UIService.sterile_ask**: Clears previous menu, deletes trigger message if in group, sends prompt, tracks it as `last_menu_id`, sets FSM state. Used for all FSM text-input initiation flows.
+- **UIService.delete_tracked_ui**: Физически удаляет массив сообщений из `last_menu_ids`. Единственная точка физического уничтожения интерфейса в БД.
+- **UIService.sterile_ask**: Первичный терминатор. Используется ПЕРЕД запросом текстовых данных у пользователя. Удаляет предыдущее меню (`delete_tracked_ui`), шлет промпт (например, "Введите название") и ставит его на слежение.
+- **UIService.sterile_show**: Основной шлюз UI-переходов. Если вызван из колбэка — редактирует текущее сообщение (Swap). Если вызван из Message-хендлера (после ввода пользователя) — вызывает `terminate_input(reset_state=False)`, что удаляет промпт (созданный через `sterile_ask`) и сообщение пользователя, после чего шлет новое чистое меню.
+- **UIService.terminate_input**: Полная зачистка следов ввода. Удаляет tracked_ui (промпт) и само сообщение пользователя, опционально сбрасывая FSM-состояние.
 - **UIService.generic_navigator**: Unified entry point for all UI transitions. Maps callback data strings to specific `UIService` show methods or keyboard builders. Supports global panels (Admin, Moderator, User), profile views, topic details, and **Help Infrastructure** (prefix `help:`). Decoupled help text via `HelpService` using `help:{key}:{back_data}` format. Uses the `PAGINATED_CMDS` class constant to explicitly determine if a keyboard requires the `page` argument. Includes fallback logging for unknown commands. `[AI-1]` Standard: All standard UI returns and transitions MUST traverse this router.
 - **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
-- **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `send_redirected_menu`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
+- **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `sterile_redirect`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
+- **Orphan Notification Protocol**: Any message sent via direct `bot.send_message` (e.g., from `EventService.notify_admins_for_approval`) is considered an "Orphan Notification". These messages MUST be terminated via `UIService.delete_msg(callback.message)` upon user interaction (CallbackQuery) to ensure buttons are removed and the UI remains sterile.
 
 ### 5.2. FSM Data Keys
 All keys stored in FSM state across the application:
@@ -254,13 +271,14 @@ All keys stored in FSM state across the application:
 ## 6. OPERATIONAL CONSTRAINTS FOR AI AGENTS
 - **Facade Integrity**: Never import internal routing segments bypassing the Facade logic (Db or Keyboards). All calls must traverse the main `__init__.py` boundaries respectively.
 - **Handlers Sterile Isolation**: Handlers (`handlers/*.py`) are strictly prohibited from importing `from database import db`. All data interaction must be mediated by the appropriate service layer.
-- **FSM Maintenance**: Every handler that sends a new menu must immediately update `last_menu_id` in FSM state with the sent message ID. Use `UIService.show_menu` — it handles `last_menu_id` tracking automatically. Manual `state.update_data(last_menu_id=...)` is only required in edge cases not covered by `UIService`.
-- **UIService.show_menu as Single UI Gateway**: All menu transitions MUST use `UIService.show_menu(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` from handlers are prohibited.
-- **Unified Navigation Protocol**: All standard UI returns and transitions from handlers SHOULD use `UIService.generic_navigator` instead of direct `UIService.show_menu` calls where possible, to centralize routing logic.
-- **Handler State Signature Rule**: Every handler that calls `UIService.show_menu`, `UIService.ask_input`, or any other `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
+- **FSM Maintenance**: Every handler that sends a new menu must immediately update `last_menu_ids` in FSM state with the sent message ID. Use `UIService.sterile_show` — it handles tracking automatically.
+- **UIService.sterile_show as Single UI Gateway**: All menu transitions MUST use `UIService.sterile_show(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` from handlers are prohibited. **Prohibited Pattern**: Never "edit" a menu message into a status/log message (e.g., "Event Approved"). Use `delete_msg` to remove the interface and `NotificationService` to send a NEW message if feedback is required.
+- **Unified Navigation Protocol**: All standard UI returns and transitions from handlers SHOULD use `UIService.generic_navigator` instead of direct `UIService.sterile_show` calls where possible, to centralize routing logic.
+- **Handler State Signature Rule**: Every handler that calls `UIService.sterile_show`, `UIService.sterile_ask`, or any other `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
 - **ManagementService Mutation Protocol**: All entity mutations MUST traverse `ManagementService`. Handlers are prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` writes. The service is responsible for "sanitizing" intent and returning a user-facing result. **Exception**: Data retrieval for keyboard rendering (GET-only) remains direct via `database.db`.
 - **Search Delegation Rule**: Handlers must respect the `"SEARCH_REQUIRED"` signal from the management service. This ensures that complex search and disambiguation logic is shared rather than duplicated across admin and moderator flows.
-- **Sterile UI Protocol Enforcement**: The system has moved away from direct Telegram API calls in handlers. Any new UI development must strictly follow the `UIService.show_menu` gateway pattern.
+- **Sterile UI Protocol Enforcement**: The system has moved away from direct Telegram API calls in handlers. Any new UI development must strictly follow the `UIService.sterile_show` gateway pattern.
+- **Orphan Message Constraint**: Audit-notifications and other push-messages sent without FSM context MUST use `UIService.delete_msg(callback.message)` for finalization. Using `UIService.sterile_show` for orphan messages is an architectural violation as it risks leaving "zombie" buttons.
 - **Sync Parity**: Administrative changes to topic names must be propagated both to the local DB (`db.update_topic_name`) and to the Telegram API (`bot.edit_forum_topic`).
 - **IsGlobalAdmin Filter Pattern**: The `IsGlobalAdmin` custom filter applied at router level (`router.message.filter(IsGlobalAdmin())` + `router.callback_query.filter(IsGlobalAdmin())`) is the single authoritative access control for admin handlers. Do not add redundant inline `if user_id != ADMIN_ID: return` checks inside individual handlers.
 - **noop Callback**: The `"noop"` callback data produced by `available_topics_kb()` has no registered handler. This is intentional.

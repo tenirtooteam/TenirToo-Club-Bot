@@ -43,3 +43,21 @@ class NotificationService:
             logger.info(f"✅ Нативное оповещение отправлено в топик {topic_id} ({len(authorized_users[:50])} чел.)")
         except Exception as e:
             logger.error(f"❌ Критическая ошибка при отправке @all: {e}")
+
+    @staticmethod
+    async def send_to_users(bot: Bot, user_ids: list[int], text: str, reply_markup=None):
+        """
+        Отправляет личное сообщение списку пользователей.
+        Используется для уведомлений о результатах аудита и т.д.
+        """
+        for u_id in set(user_ids):
+            try:
+                await bot.send_message(
+                    chat_id=u_id,
+                    text=text,
+                    reply_markup=reply_markup,
+                    parse_mode="HTML"
+                )
+                logger.info(f"✉️ Уведомление отправлено пользователю {u_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось отправить уведомление {u_id}: {e}")

@@ -33,4 +33,8 @@ from .events import (
     add_event_lead, add_event_participant, remove_event_participant,
     is_event_participant, get_event_details, get_active_events, get_pending_events
 )
+from .audit import (
+    create_audit_request, get_audit_request, resolve_audit_request,
+    get_pending_requests_by_type, get_user_pending_request
+)
 

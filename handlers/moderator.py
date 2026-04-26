@@ -88,7 +88,7 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
         return
 
     await state.update_data(moderator_edit_topic_id=topic_id)
-    await UIService.ask_input(state, callback, "✍️ Введите новое название топика:", ModeratorStates.waiting_for_topic_name)
+    await UIService.sterile_ask(state, callback, "✍️ Введите новое название топика:", ModeratorStates.waiting_for_topic_name)
 
 
 @router.message(ModeratorStates.waiting_for_topic_name)
@@ -156,7 +156,7 @@ async def moderator_remove_group_init(callback: types.CallbackQuery, state: FSMC
     parts = callback.data.split("_")
     group_id, topic_id = int(parts[3]), int(parts[4])
     text, back = UIService.get_confirmation_ui("mod_topic_del", topic_id, extra_id=group_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("mod_topic_del", topic_id, back, extra_id=group_id)
     )
@@ -212,7 +212,7 @@ async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMConte
 
     await state.update_data(moderator_direct_access_topic=topic_id)
     await state.set_state(ModeratorStates.waiting_for_direct_access_user)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, 
         "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:\n\nИли выберите из списка:",
         reply_markup=kb.moderator_users_to_add_kb(topic_id, page=page)
@@ -267,7 +267,7 @@ async def moderator_add_moderator_start(callback: types.CallbackQuery, state: FS
         return
 
     await state.update_data(search_type="user", search_action="mod_add", search_context=topic_id)
-    await UIService.ask_input(state, callback, "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:", SearchStates.waiting_for_query)
+    await UIService.sterile_ask(state, callback, "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:", SearchStates.waiting_for_query)
 
 
 @router.callback_query(F.data.startswith("mod_moderator_remove_"))
@@ -277,7 +277,7 @@ async def moderator_remove_moderator_init(callback: types.CallbackQuery, state: 
     parts = callback.data.split("_")
     target_user_id, topic_id = int(parts[3]), int(parts[4])
     text, back = UIService.get_confirmation_ui("mod_rem", target_user_id, extra_id=topic_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("mod_rem", target_user_id, back, extra_id=topic_id)
     )

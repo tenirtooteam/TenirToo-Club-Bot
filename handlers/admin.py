@@ -94,7 +94,7 @@ async def group_detail(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "add_group_start")
 @safe_callback()
 async def add_group_init(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.ask_input(state, callback, "✍️ Введи название для новой группы:", AdminStates.waiting_for_group_name)
+    await UIService.sterile_ask(state, callback, "✍️ Введи название для новой группы:", AdminStates.waiting_for_group_name)
 
 
 @router.message(AdminStates.waiting_for_group_name)
@@ -112,7 +112,7 @@ async def process_group_add(message: types.Message, state: FSMContext):
 async def delete_group_init(callback: types.CallbackQuery, state: FSMContext):
     group_id = int(callback.data.split("_")[-1])
     text, back = UIService.get_confirmation_ui("group_del", group_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text, 
         reply_markup=kb.confirmation_kb("group_del", group_id, back)
     )
@@ -131,7 +131,7 @@ async def group_template_action_choose_topic(callback: types.CallbackQuery, stat
     group_id = int(parts[4])
     
     title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
-    await UIService.show_menu(state, callback, title, reply_markup=kb.template_action_topic_select_kb(group_id, action))
+    await UIService.sterile_show(state, callback, title, reply_markup=kb.template_action_topic_select_kb(group_id, action))
 
 
 @router.callback_query(F.data.startswith("tmpl_act_exec_"))
@@ -178,7 +178,7 @@ async def remove_topic_from_group_init(callback: types.CallbackQuery, state: FSM
     parts = callback.data.split("_")
     topic_id, group_id = int(parts[2]), int(parts[3])
     text, back = UIService.get_confirmation_ui("topic_del", topic_id, extra_id=group_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("topic_del", topic_id, back, extra_id=group_id)
     )
@@ -190,7 +190,7 @@ async def add_topic_to_group_init(callback: types.CallbackQuery, state: FSMConte
     parts = callback.data.split("_pg_")
     page = int(parts[1]) if len(parts) > 1 else 1
     group_id = int(parts[0].replace("add_topic_to_", ""))
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, 
         "📍 Выберите топик для добавления в группу:",
         reply_markup=kb.available_topics_kb(group_id, page=page)
@@ -213,7 +213,7 @@ async def topic_rename_init(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
     t_id, g_id = int(parts[2]), int(parts[3])
     await state.update_data(edit_topic_id=t_id, edit_group_id=g_id)
-    await UIService.ask_input(state, callback, f"✍️ Введи новое название для ID: {t_id}:", AdminStates.waiting_for_topic_name)
+    await UIService.sterile_ask(state, callback, f"✍️ Введи новое название для ID: {t_id}:", AdminStates.waiting_for_topic_name)
 
 
 @router.message(AdminStates.waiting_for_topic_name)
@@ -247,7 +247,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
 async def global_topic_delete_init(callback: types.CallbackQuery, state: FSMContext):
     topic_id = int(callback.data.split("_")[-1])
     text, back = UIService.get_confirmation_ui("global_topic_del", topic_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("global_topic_del", topic_id, back)
     )
@@ -264,7 +264,7 @@ async def show_users(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "add_user_start")
 @safe_callback()
 async def add_user_init(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.ask_input(state, callback, "✍️ Введи: <code>ID Имя Фамилия</code>", AdminStates.waiting_for_user_data)
+    await UIService.sterile_ask(state, callback, "✍️ Введи: <code>ID Имя Фамилия</code>", AdminStates.waiting_for_user_data)
 
 
 @router.message(AdminStates.waiting_for_user_data)
@@ -288,7 +288,7 @@ async def user_detail(callback: types.CallbackQuery, state: FSMContext):
 async def user_rename_init(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split("_")[-1])
     await state.update_data(edit_user_id=user_id)
-    await UIService.ask_input(state, callback, "✍️ Введи новое Имя и Фамилию:", AdminStates.waiting_for_new_name)
+    await UIService.sterile_ask(state, callback, "✍️ Введи новое Имя и Фамилию:", AdminStates.waiting_for_new_name)
 
 
 @router.message(AdminStates.waiting_for_new_name)
@@ -331,7 +331,7 @@ async def toggle_group(callback: types.CallbackQuery, state: FSMContext):
 async def user_delete_init(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(callback.data.split("_")[-1])
     text, back = UIService.get_confirmation_ui("user_del", user_id)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb("user_del", user_id, back)
     )
@@ -346,7 +346,7 @@ async def user_delete_init(callback: types.CallbackQuery, state: FSMContext):
 async def role_assign_choose_user(callback: types.CallbackQuery, state: FSMContext):
     """Обработчик кнопки 'Назначить роль' из карточки пользователя."""
     user_id = int(callback.data.split("_")[-1])
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, 
         f"Выберите роль для пользователя {PermissionService.get_user_display_name(user_id)}:",
         reply_markup=kb.role_selection_kb(user_id)
@@ -369,7 +369,7 @@ async def role_pick_handler(callback: types.CallbackQuery, state: FSMContext):
     role_name = PermissionService.get_role_name(role_id)
     
     if role_name == 'moderator':
-        await UIService.show_menu(
+        await UIService.sterile_show(
             state, callback, 
             f"📍 Выбери топик для назначения модератором:",
             reply_markup=kb.topic_selection_for_role_kb(user_id)
@@ -409,7 +409,7 @@ async def role_revoke_init(callback: types.CallbackQuery, state: FSMContext):
     extra = 0 if topic_id_str == "None" else int(topic_id_str)
     
     text, back = UIService.get_confirmation_ui(f"role_rev_{role_id}", user_id, extra_id=extra)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback, text,
         reply_markup=kb.confirmation_kb(f"role_rev_{role_id}", user_id, back, extra_id=extra)
     )

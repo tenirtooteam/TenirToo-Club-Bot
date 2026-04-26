@@ -54,7 +54,7 @@ async def show_help_view(state: FSMContext, event: types.Message | types.Callbac
     # Создаем клавиатуру с кнопкой возврата
     markup = kb.simple_back_kb(back_data)
     
-    await UIService.show_menu(state, event, help_text, reply_markup=markup)
+    await UIService.sterile_show(state, event, help_text, reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith("help:"))
@@ -119,7 +119,7 @@ async def search_start_handler(callback: types.CallbackQuery, state: FSMContext)
         search_context=search_context
     )
     
-    await UIService.ask_input(state, callback, f"🔎 {prompts.get(search_type, 'Введите запрос:')}", SearchStates.waiting_for_query)
+    await UIService.sterile_ask(state, callback, f"🔎 {prompts.get(search_type, 'Введите запрос:')}", SearchStates.waiting_for_query)
 
 
 @router.message(SearchStates.waiting_for_query)
@@ -143,7 +143,7 @@ async def search_query_handler(message: types.Message, state: FSMContext):
         return
 
     markup = kb.search_results_kb(results, s_type, s_action, s_context, page=1)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, message,
         f"🔍 Найдено вариантов: {len(results)}. Выберите нужный:",
         reply_markup=markup
@@ -168,7 +168,7 @@ async def search_results_pagination(callback: types.CallbackQuery, state: FSMCon
 
     results = ManagementService.search_entities(s_type, query)
     markup = kb.search_results_kb(results, s_type, s_action, s_context, page=page)
-    await UIService.show_menu(
+    await UIService.sterile_show(
         state, callback,
         f"🔍 Найдено вариантов: {len(results)}. Выберите нужный:",
         reply_markup=markup
@@ -196,11 +196,11 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
         
     if s_action == "mod_add":
         success, result = ManagementService.assign_moderator_role_by_id(item_id, int(s_context))
-        return await UIService.show_menu(state, event, result, reply_markup=kb.back_to_main_kb())
+        return await UIService.sterile_show(state, event, result, reply_markup=kb.back_to_main_kb())
         
     if s_action == "dir_add":
         success, result = ManagementService.grant_direct_access_by_id(item_id, int(s_context))
-        return await UIService.show_menu(state, event, result, reply_markup=kb.back_to_main_kb())
+        return await UIService.sterile_show(state, event, result, reply_markup=kb.back_to_main_kb())
 
     if s_action == "admin_role_target":
         return await UIService.generic_navigator(state, event, f"user_roles_manage_{item_id}")

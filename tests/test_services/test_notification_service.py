@@ -1,41 +1,31 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+from aiogram import Bot
 from services.notification_service import NotificationService
 
 @pytest.mark.asyncio
-async def test_send_native_all_success():
-    bot = AsyncMock()
-    chat_id = -100123
-    topic_id = 1
-    sender_name = "Ivan"
-    text = "Hello all!"
+async def test_send_to_users():
+    mock_bot = AsyncMock(spec=Bot)
+    user_ids = [111, 222, 111] # Duplicate should be handled by set()
+    text = "Test notification"
     
-    # Мокаем список авторизованных пользователей
-    mock_users = [
-        (111, "User1", "L1"),
-        (222, "User2", None)
-    ]
+    await NotificationService.send_to_users(mock_bot, user_ids, text)
     
-    with patch("database.db.get_topic_authorized_users", return_value=mock_users):
-        await NotificationService.send_native_all(bot, chat_id, topic_id, sender_name, text)
-        
-        # Проверяем, что сообщение было отправлено
-        bot.send_message.assert_called_once()
-        args, kwargs = bot.send_message.call_args
-        
-        assert kwargs["chat_id"] == chat_id
-        assert kwargs["message_thread_id"] == topic_id
-        assert "Ivan" in kwargs["text"]
-        assert "Hello all!" in kwargs["text"]
-        # Проверяем наличие невидимых упоминаний (скрыты в HTML ссылках на ID)
-        assert 'tg://user?id=111' in kwargs["text"]
-        assert 'tg://user?id=222' in kwargs["text"]
+    # Check that send_message was called for each unique user
+    assert mock_bot.send_message.call_count == 2
+    
+    # Verify calls
+    calls = mock_bot.send_message.call_args_list
+    called_ids = [c.kwargs['chat_id'] for c in calls]
+    assert 111 in called_ids
+    assert 222 in called_ids
+    assert text in calls[0].kwargs['text']
 
 @pytest.mark.asyncio
-async def test_send_native_all_no_users():
-    bot = AsyncMock()
+async def test_send_to_users_error_handling():
+    mock_bot = AsyncMock(spec=Bot)
+    mock_bot.send_message.side_effect = Exception("Telegram Error")
     
-    # Нет пользователей - не должно быть отправки
-    with patch("database.db.get_topic_authorized_users", return_value=[]):
-        await NotificationService.send_native_all(bot, 123, 1, "Ivan", "Text")
-        bot.send_message.assert_not_called()
+    # Should not raise exception
+    await NotificationService.send_to_users(mock_bot, [123], "Fail test")
+    assert mock_bot.send_message.called

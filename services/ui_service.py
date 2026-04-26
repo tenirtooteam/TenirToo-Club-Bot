@@ -3,6 +3,7 @@ import logging
 from functools import wraps
 from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +13,8 @@ class UIService:
     PAGINATED_CMDS = {"manage_groups", "manage_users", "all_topics_list", "list_users_roles"}
 
     @staticmethod
-    async def clear_last_menu(state: FSMContext, bot: Bot, chat_id: int):
-        """Удаляет все запомненные системные сообщения из чата."""
+    async def delete_tracked_ui(state: FSMContext, bot: Bot, chat_id: int):
+        """Удаляет все запомненные системные сообщения (стек last_menu_ids)."""
         data = await state.get_data()
         last_ids = data.get("last_menu_ids", [])
         
@@ -39,19 +40,18 @@ class UIService:
             pass
 
     @staticmethod
-    async def finish_input(state: FSMContext, message: types.Message, reset_state: bool = True):
+    async def terminate_input(state: FSMContext, message: types.Message, reset_state: bool = True):
         """
         Единый метод завершения FSM-ввода:
-        удаляет старое меню/промпт, удаляет сообщение пользователя,
-        опционально сбрасывает состояние ввода (по умолчанию Да).
+        удаляет tracked_ui и сообщение пользователя, сбрасывает состояние.
         """
-        await UIService.clear_last_menu(state, message.bot, message.chat.id)
+        await UIService.delete_tracked_ui(state, message.bot, message.chat.id)
         await UIService.delete_msg(message)
         if reset_state:
             await state.set_state(None)
 
     @staticmethod
-    async def send_redirected_menu(
+    async def sterile_redirect(
         message: types.Message,
         state: FSMContext,
         text: str,
@@ -86,8 +86,7 @@ class UIService:
                 return sent_error
         else:
             # Если уже в личке или редирект не требуется. 
-            # Не сбрасываем состояние, так как это может быть промежуточный шаг.
-            await UIService.finish_input(state, message, reset_state=False)
+            await UIService.terminate_input(state, message, reset_state=False)
             sent_message = await message.answer(
                 text=text,
                 reply_markup=reply_markup,
@@ -116,7 +115,7 @@ class UIService:
         return sent
 
     @staticmethod
-    async def show_menu(
+    async def sterile_show(
         state: FSMContext,
         event: types.Message | types.CallbackQuery,
         text: str,
@@ -124,38 +123,42 @@ class UIService:
         parse_mode: str = "HTML"
     ):
         """
-        Универсальный метод отображения/обновления меню.
-        Соблюдает Sterile UI Protocol:
-        - Если CallbackQuery — редактирует текущее сообщение.
-        - Если Message — чистит чат и шлет новое.
-        - Всегда гарантирует актуальность last_menu_id.
+        Отображение/обновление меню по стерильному протоколу:
+        - Если CallbackQuery — редактирует (swap) текущее сообщение.
+        - Если Message — вызывает terminate_input и шлет новое.
         """
         is_cb = isinstance(event, types.CallbackQuery)
 
         if is_cb:
             try:
                 await event.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
-            except Exception:
-                # Fallback: сообщение нельзя редактировать (слишком старое или контент идентичен).
-                # Отправляем новое и удаляем старое.
-                new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
-                await UIService.delete_msg(event.message)
-                await state.update_data(last_menu_ids=[new_msg.message_id])
-            # answer() вызывается ровно один раз, в конце, вне зависимости от пути выполнения
+            except TelegramBadRequest as e:
+                if "message is not modified" in str(e):
+                    pass  # Контент идентичен — это нормально, игнорируем
+                else:
+                    # Реальная ошибка: сообщение старое или удалено — отправляем новое
+                    logger.warning(f"⚠️ [UI] edit_text failed ({e}), sending new message.")
+                    new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    await UIService.delete_msg(event.message)
+                    await state.update_data(last_menu_ids=[new_msg.message_id])
+            except Exception as e:
+                logger.error(f"❌ [UI] Unexpected error in show_menu: {e}")
+            
             try:
                 await event.answer()
             except Exception:
-                pass
+                pass  # Callback уже был закрыт — это нормально
         else:
-            # Если это сообщение (текстовый ввод), чистим чат, но СОХРАНЯЕМ состояние
-            await UIService.finish_input(state, event, reset_state=False)
+            # Если это сообщение (текстовый ввод), чистим чат (стерильная терминация)
+            await UIService.terminate_input(state, event, reset_state=False)
             new_msg = await event.bot.send_message(
                 event.chat.id, text, reply_markup=reply_markup, parse_mode=parse_mode
             )
             await state.update_data(last_menu_ids=[new_msg.message_id])
 
+
     @staticmethod
-    async def ask_input(
+    async def sterile_ask(
         state: FSMContext,
         event: types.Message | types.CallbackQuery,
         text: str,
@@ -163,12 +166,12 @@ class UIService:
         reply_markup=None
     ):
         """
-        Удаляет текущее меню, отправляет промпт и ставит его на слежение (last_menu_id).
+        Убивает предыдущий UI (delete_tracked_ui), шлет промпт и ставит на слежение.
         """
         bot = event.bot if isinstance(event, types.Message) else event.message.bot
         chat_id = event.chat.id if isinstance(event, types.Message) else event.message.chat.id
 
-        await UIService.clear_last_menu(state, bot, chat_id)
+        await UIService.delete_tracked_ui(state, bot, chat_id)
 
         if isinstance(event, types.Message):
             await UIService.delete_msg(event)
@@ -203,6 +206,8 @@ class UIService:
             "list_users_roles": ("📋 <b>Пользователи с ролями:</b>", kb.users_list_kb), # Можно заменить на спец. клавиатуру позже
             "moderator": ("🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
             "templates_faq": (None, None), # Redirects to help_service logic
+            "event_list": ("📅 <b>Список мероприятий</b>", lambda: kb.get_events_list_kb(db.get_active_events())),
+            "event_pending_list": ("⏳ <b>Мероприятия на модерации</b>", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
         }
         
         cmd = callback_data.split("_pg_")[0]
@@ -222,7 +227,7 @@ class UIService:
                     markup = kb_func(page=page)
                 else:
                     markup = kb_func()
-                return await UIService.show_menu(state, event, text, reply_markup=markup)
+                return await UIService.sterile_show(state, event, text, reply_markup=markup)
 
         # 1.5 Специальная обработка HELP (help:{key}:{back_data})
         if cmd.startswith("help:"):
@@ -241,7 +246,7 @@ class UIService:
             roles = list(db.get_user_roles(user_id))
             available_topics = db.get_user_available_topics(user_id)
             text = UIService.format_user_card(user_id, user_name, groups_str, roles, available_topics)
-            return await UIService.show_menu(state, event, text, reply_markup=kb.user_profile_kb())
+            return await UIService.sterile_show(state, event, text, reply_markup=kb.user_profile_kb())
 
         if "user_info" in cmd: return await UIService.show_user_detail(state, event, int(p[-1]))
         if "group_info" in cmd: return await UIService.show_group_detail(state, event, int(p[-1]))
@@ -263,51 +268,51 @@ class UIService:
                 f"🔐 <b>Твой статус:</b> {access_status}\n\n"
                 f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
             )
-            return await UIService.show_menu(state, event, text, reply_markup=kb.user_topic_detail_kb())
+            return await UIService.sterile_show(state, event, text, reply_markup=kb.user_topic_detail_kb())
 
         # Модерация топиков
         if cmd.startswith("mod_topic_select") or cmd.startswith("mod_back_to_topic"):
             t_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_menu_kb(t_id))
+            return await UIService.sterile_show(state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_menu_kb(t_id))
         
         if cmd.startswith("mod_topic_groups"):
             t_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"📂 <b>Группы топика: {db.get_topic_name(t_id)}</b>", kb.moderator_group_list_kb(t_id, page=page))
+            return await UIService.sterile_show(state, event, f"📂 <b>Группы топика: {db.get_topic_name(t_id)}</b>", kb.moderator_group_list_kb(t_id, page=page))
             
         if cmd.startswith("mod_topic_moderators"):
             t_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"👑 <b>Модераторы: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_moderators_kb(t_id))
+            return await UIService.sterile_show(state, event, f"👑 <b>Модераторы: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_moderators_kb(t_id))
             
         if cmd.startswith("mod_gr_addlist"):
             t_id = int(p[-1])
-            return await UIService.show_menu(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(t_id, page=page))
+            return await UIService.sterile_show(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(t_id, page=page))
             
         if cmd.startswith("mod_users_manage"):
             t_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"👥 <b>Юзеры топика: {db.get_topic_name(t_id)}</b>", kb.moderator_users_list_kb(t_id, page=page))
+            return await UIService.sterile_show(state, event, f"👥 <b>Юзеры топика: {db.get_topic_name(t_id)}</b>", kb.moderator_users_list_kb(t_id, page=page))
 
         # Админка: управление ролями и правами
         if cmd.startswith("user_roles_manage"):
             u_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
+            return await UIService.sterile_show(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
             
         if cmd.startswith("user_templates_manage"):
             u_id = int(p[3])
-            return await UIService.show_menu(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
+            return await UIService.sterile_show(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
 
         if cmd.startswith("tmpl_act_start_"):
             action = p[3]
             g_id = int(p[4])
             title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
-            return await UIService.show_menu(state, event, title, reply_markup=kb.template_action_topic_select_kb(g_id, action, page=page))
+            return await UIService.sterile_show(state, event, title, reply_markup=kb.template_action_topic_select_kb(g_id, action, page=page))
             
         if cmd.startswith("group_topics_list"):
             g_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"📍 <b>Топики группы: {db.get_group_name(g_id)}</b>", kb.group_topics_list_kb(g_id, page=page))
+            return await UIService.sterile_show(state, event, f"📍 <b>Топики группы: {db.get_group_name(g_id)}</b>", kb.group_topics_list_kb(g_id, page=page))
             
         if cmd.startswith("topic_assign_pg"):
             u_id = int(p[-1])
-            return await UIService.show_menu(state, event, f"📍 <b>Выбор топика для: {db.get_user_name(u_id)}</b>", kb.topic_selection_for_role_kb(u_id, page=page))
+            return await UIService.sterile_show(state, event, f"📍 <b>Выбор топика для: {db.get_user_name(u_id)}</b>", kb.topic_selection_for_role_kb(u_id, page=page))
 
         # Резервный лог и сброс на главное меню (если что-то пошло не так)
         logger.warning(f"⚠️ [NAVIGATOR] Неизвестная команда или некорректные данные: {cmd} (data: {callback_data})")
@@ -319,7 +324,7 @@ class UIService:
         from services.permission_service import PermissionService
         import keyboards as kb
         
-        await UIService.show_menu(state, event, text, reply_markup=kb.main_admin_kb())
+        await UIService.sterile_show(state, event, text, reply_markup=kb.main_admin_kb())
 
     @staticmethod
     async def show_user_detail(state: FSMContext, event: types.Message | types.CallbackQuery, user_id: int):
@@ -338,7 +343,7 @@ class UIService:
         
         is_sa = PermissionService.is_superadmin(event.from_user.id)
         
-        await UIService.show_menu(state, event, text, reply_markup=kb.user_edit_kb(user_id, is_superadmin=is_sa))
+        await UIService.sterile_show(state, event, text, reply_markup=kb.user_edit_kb(user_id, is_superadmin=is_sa))
 
     @staticmethod
     async def show_group_detail(state: FSMContext, event: types.Message | types.CallbackQuery, group_id: int):
@@ -349,7 +354,7 @@ class UIService:
         g_name = db.get_group_name(group_id)
         topics_count = len(db.get_topics_of_group(group_id))
         text = f"📂 <b>Группа:</b> {g_name}\n📍 <b>Топиков:</b> {topics_count}"
-        await UIService.show_menu(state, event, text, reply_markup=kb.group_edit_kb(group_id))
+        await UIService.sterile_show(state, event, text, reply_markup=kb.group_edit_kb(group_id))
 
     @staticmethod
     async def show_topic_detail(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int, group_id: int = 0):
@@ -366,7 +371,7 @@ class UIService:
             f"<b>ID:</b> <code>{topic_id}</code>\n"
             f"<b>Доступ имеют:</b> {groups_str}"
         )
-        await UIService.show_menu(state, event, text, reply_markup=kb.topic_edit_kb(topic_id, group_id=group_id))
+        await UIService.sterile_show(state, event, text, reply_markup=kb.topic_edit_kb(topic_id, group_id=group_id))
 
     @staticmethod
     async def show_moderator_groups(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int, page: int = 1):
@@ -375,7 +380,7 @@ class UIService:
         import keyboards as kb
         t_name = db.get_topic_name(topic_id)
         text = f"📂 <b>Группы доступа для топика {t_name}</b>"
-        await UIService.show_menu(state, event, text, reply_markup=kb.moderator_group_list_kb(topic_id, page=page))
+        await UIService.sterile_show(state, event, text, reply_markup=kb.moderator_group_list_kb(topic_id, page=page))
 
     @staticmethod
     async def show_moderator_moderators(state: FSMContext, event: types.Message | types.CallbackQuery, topic_id: int):
@@ -384,7 +389,7 @@ class UIService:
         import keyboards as kb
         t_name = db.get_topic_name(topic_id)
         text = f"👑 <b>Модераторы топика {t_name}</b>"
-        await UIService.show_menu(state, event, text, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
+        await UIService.sterile_show(state, event, text, reply_markup=kb.moderator_topic_moderators_kb(topic_id))
 
     @staticmethod
     async def show_moderator_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery):
@@ -473,7 +478,7 @@ class UIService:
                     text, reply_markup = result, None
 
                 # Делегируем отправку стандартному методу
-                return await UIService.send_redirected_menu(
+                return await UIService.sterile_redirect(
                     message=message,
                     state=state,
                     text=text,

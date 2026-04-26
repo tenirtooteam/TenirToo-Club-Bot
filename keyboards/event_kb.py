@@ -59,3 +59,9 @@ def get_event_cancel_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="❌ Отмена", callback_data="event_list")]
     ])
+
+def get_audit_log_kb() -> InlineKeyboardMarkup:
+    """Клавиатура под лог-сообщением после решения по заявке."""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📂 К списку на модерации", callback_data="event_pending_list")
+    return builder.as_markup()

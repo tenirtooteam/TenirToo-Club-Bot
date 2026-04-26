@@ -29,7 +29,7 @@ async def test_ui_sterile_cleanup_logic(mock_state):
     bot.send_message = AsyncMock(return_value=AsyncMock(message_id=2002))
     
     # Вызываем show_menu с сообщением
-    await UIService.show_menu(mock_state, message, "New Menu", reply_markup=None)
+    await UIService.sterile_show(mock_state, message, "New Menu", reply_markup=None)
     
     # Проверяем, что бот пытался удалить старое сообщение (999)
     bot.delete_message.assert_any_call(chat_id=123, message_id=999)
@@ -51,8 +51,8 @@ async def test_ui_redirect_command_cleanup(mock_state):
     await mock_state.update_data(last_menu_ids=[1500])
     
     # Вызываем sterile_command декоратор (внутреннюю логику)
-    # Здесь мы тестируем UIService.clear_last_menu напрямую
-    await UIService.clear_last_menu(mock_state, bot, 123)
+    # Здесь мы тестируем UIService.delete_tracked_ui напрямую
+    await UIService.delete_tracked_ui(mock_state, bot, 123)
     
     bot.delete_message.assert_called_with(chat_id=123, message_id=1500)
     

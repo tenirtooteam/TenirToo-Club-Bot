@@ -67,7 +67,7 @@ async def test_show_help_view(mock_state):
     event = AsyncMock()
     
     with patch("services.help_service.HelpService.get_help", return_value="Test Help") as mock_get:
-        with patch("services.ui_service.UIService.show_menu", AsyncMock()) as mock_ui:
+        with patch("services.ui_service.UIService.sterile_show", AsyncMock()) as mock_ui:
             await show_help_view(mock_state, event, "test_key", "back_point")
             
             mock_get.assert_called_once_with("test_key")

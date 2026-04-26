@@ -15,7 +15,7 @@ async def test_show_menu_with_callback_query():
     callback.answer = AsyncMock()
     
     # Запускаем метод
-    await UIService.show_menu(state, callback, "Тестовый текст", reply_markup=None)
+    await UIService.sterile_show(state, callback, "Тестовый текст", reply_markup=None)
     
     # Проверяем, что были вызваны нужные методы Telegram API
     callback.message.edit_text.assert_called_once_with("Тестовый текст", reply_markup=None, parse_mode="HTML")
@@ -35,7 +35,7 @@ async def test_show_menu_with_message():
     message.bot.delete_message = AsyncMock()
     message.delete = AsyncMock()
     
-    await UIService.show_menu(state, message, "Новый текст", reply_markup=None)
+    await UIService.sterile_show(state, message, "Новый текст", reply_markup=None)
     
     # Проверяем удаление старого меню через finish_input -> clear_last_menu
     message.bot.delete_message.assert_called_with(chat_id=123, message_id=100)
@@ -60,7 +60,7 @@ async def test_finish_input_with_state_reset():
     message.chat.id = 123
     message.bot = AsyncMock()
     
-    await UIService.finish_input(state, message, reset_state=True)
+    await UIService.terminate_input(state, message, reset_state=True)
     state.set_state.assert_called_once_with(None)
 
 @pytest.mark.asyncio
@@ -73,7 +73,7 @@ async def test_finish_input_without_state_reset():
     message.chat.id = 123
     message.bot = AsyncMock()
     
-    await UIService.finish_input(state, message, reset_state=False)
+    await UIService.terminate_input(state, message, reset_state=False)
     state.set_state.assert_not_called()
 @pytest.mark.asyncio
 async def test_generic_navigator_signature_protection():
