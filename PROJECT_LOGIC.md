@@ -57,11 +57,17 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards.
 - [PL-2.2.30] **keyboards/pagination_util.py** — Universal keyboard utilities: `build_paginated_menu` (Paginated lists with search support), `add_nav_footer(builder, back_data=None, include_close=True, help_key=None)` (Split footer protocol [PL-5.1.14]).
-- [PL-2.2.31] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_audit_log_kb`.
-- [PL-2.2.32] **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
-- [PL-2.2.33] **local_scripts/dev_run.py** — Developer-only hot-reload runner.
-- [PL-2.2.34] **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
-- [PL-2.2.35] **tests/test_smoke.py** — Smoke testing suite for import integrity and basic signatures.
+- [PL-2.2.31] **database/announcements.py** — Dispatcher registry for broadcasted interactions (Events, Gear, Fees). Methods: `create_announcement`, `get_announcement`, `delete_announcements_by_target`.
+- [PL-2.2.32] **services/announcement_service.py** — Logic for quick announcements and unified dispatcher processing. Methods: `create_quick_event`.
+- [PL-2.2.33] **handlers/announcements.py** — Command-level entry for `/an` and unified callback `ann_join`.
+- [PL-2.2.34] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_audit_log_kb`.
+- [PL-2.2.35] **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
+- [PL-2.2.36] **local_scripts/dev_run.py** — Developer-only hot-reload runner.
+- [PL-2.2.37] **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
+- [PL-2.2.38] **tests/test_smoke.py** — Smoke testing suite for import integrity and basic signatures.
+- [PL-2.2.39] **tests/test_database/test_cascades.py** — Integrity tests for DB relations (FK Cascade and manual cleanup).
+- [PL-2.2.40] **tests/test_services/test_announcements.py** — Integration tests for Announcement parsing and dispatching logic.
+- [PL-2.2.41] **tests/test_handlers/test_event_fsm.py** — Asynchronous FSM journey tests simulating user transitions.
 
 ### [PL-2.3] Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -252,6 +258,9 @@ CREATE TABLE IF NOT EXISTS audit_requests (
     - **Navigation Safety**: `back_data` (for the help button) must point to the CURRENT screen to ensure the user returns to where they were. If not provided, defaults to `landing`.
 - [PL-5.1.15] **Systemic Landing Entry**: The `landing` callback is a mandatory system-wide entry point that triggers the `UIService.get_landing_data` controller. It serves as the ultimate fallback for navigation returns.
 - [PL-5.1.16] **Heartfelt UI Principle**: All user-facing strings must use welcoming, community-oriented language. Avoid technical jargon ("Management System", "Entities") in the interface. Use "Assistant", "Gid", "Rights". [RA-1]
+- [PL-5.1.17] **Universal Announcement Dispatcher**: A systemic pattern where interactive buttons in broadcast messages do not link directly to entities, but to an `announcements` registry. This allows a single callback handler to manage diverse interaction types (Participation, Payments, Gear) and enforces context-aware access control.
+- [PL-5.1.18] **Quick Announcement Protocol**: Support for `/an` command in forum topics. Automatically creates a "Rapid Event" (date set to 'Оперативно') and posts a rich announcement. Original command message is deleted to maintain thread sterility.
+- [PL-5.1.19] **Polymorphic Cascade Cleanup**: Since the `announcements` table uses polymorphic links (linking to various entity types by ID without native FKs), any service responsible for deleting a target entity (Events, etc.) MUST manually invoke `delete_announcements_by_target` to prevent data rot.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:

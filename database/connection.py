@@ -131,6 +131,18 @@ def init_db():
                     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
                 )""")
 
+                # Таблица анонсов (Dispatcher Model)
+                c.execute("""CREATE TABLE IF NOT EXISTS announcements (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL,         -- 'event', 'gear', 'fee'
+                    target_id INTEGER NOT NULL,  -- ID связанной сущности
+                    topic_id INTEGER NOT NULL,   -- Топик, к которому привязан доступ
+                    creator_id INTEGER NOT NULL, -- Кто создал анонс
+                    chat_id INTEGER,            -- ID чата, где опубликован
+                    message_id INTEGER,         -- ID сообщения
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )""")
+
                 # Индексы
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)")
@@ -140,6 +152,8 @@ def init_db():
                 c.execute("CREATE INDEX IF NOT EXISTS idx_event_leads_event_id ON event_leads(event_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_requests(entity_type, entity_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_requests(user_id, status)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_announcements_target ON announcements(type, target_id)")
+                c.execute("CREATE INDEX IF NOT EXISTS idx_announcements_topic ON announcements(topic_id)")
 
                 # Предзаполнение ролей
                 c.execute("INSERT OR IGNORE INTO roles (name) VALUES ('superadmin')")

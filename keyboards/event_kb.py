@@ -31,12 +31,14 @@ def get_event_card_kb(event_id: int, is_participant: bool, can_edit: bool) -> In
     
     # Кнопки участия
     if is_participant:
-        builder.row(InlineKeyboardButton(text="❌ Не иду", callback_data=f"event_leave:{event_id}"))
+        builder.row(InlineKeyboardButton(text="🚫 Не иду", callback_data=f"event_leave:{event_id}"))
     else:
         builder.row(InlineKeyboardButton(text="✅ Иду", callback_data=f"event_join:{event_id}"))
         
     # Кнопки редактирования
     if can_edit:
+        # Кнопка анонса видна только для одобренных ивентов
+        builder.row(InlineKeyboardButton(text="📢 Анонсировать", callback_data=f"event_announce_init:{event_id}"))
         builder.row(
             InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"event_edit:{event_id}"),
             InlineKeyboardButton(text="🗑 Удалить", callback_data=f"event_delete:{event_id}")
@@ -50,12 +52,12 @@ def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(text="✅ Одобрить", callback_data=f"event_approve:{event_id}"),
-        InlineKeyboardButton(text="❌ Отклонить", callback_data=f"event_reject:{event_id}")
+        InlineKeyboardButton(text="🛑 Отклонить", callback_data=f"event_reject:{event_id}")
     )
     add_nav_footer(builder, back_data="event_pending_list")
     return builder.as_markup()
 
-def get_event_cancel_kb() -> InlineKeyboardBuilder:
+def get_event_cancel_kb() -> InlineKeyboardMarkup:
     """Кнопка отмены при создании мероприятия."""
     builder = InlineKeyboardBuilder()
     add_nav_footer(builder, back_data="event_list")

@@ -54,9 +54,13 @@ def set_event_sheet_url(event_id: int, sheet_url: str) -> bool:
 
 def delete_event(event_id: int) -> bool:
     try:
+        from database.announcements import delete_announcements_by_target
         with get_conn() as conn:
             with conn:
                 conn.execute("DELETE FROM events WHERE event_id = ?", (event_id,))
+        
+        # Ручная зачистка анонсов (т.к. там нет FK из-за полиморфизма)
+        delete_announcements_by_target("event", event_id)
         return True
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка удаления мероприятия {event_id}: {e}")

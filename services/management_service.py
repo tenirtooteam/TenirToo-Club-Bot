@@ -25,6 +25,24 @@ class ManagementService:
     SQLITE_MAX_INT = 9223372036854775807
 
     @staticmethod
+    def create_quick_event(user_id: int, title: str) -> int:
+        """
+        Создает 'быстрое' мероприятие (без даты, авто-одобрение).
+        Централизует создание для анонсов. [PL-2.2.18]
+        """
+        event_id = db.create_event(
+            title=title,
+            start_date="Оперативно",
+            end_date=None,
+            creator_id=user_id,
+            is_approved=1
+        )
+        if event_id > 0:
+            db.add_event_lead(event_id, user_id)
+            logger.info(f"⚡ Квик-ивент создан: {title} (ID: {event_id})")
+        return event_id
+
+    @staticmethod
     async def ensure_user_registered(user: User):
         """Проверяет наличие пользователя и регистрирует при необходимости."""
         user_id = user.id

@@ -183,7 +183,7 @@ def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
     
     item_buttons = []
     for g_id, g_name in all_groups:
-        mark = "✅ " if g_id in user_template_ids else "❌ "
+        mark = "✅ " if g_id in user_template_ids else "➖ "
         item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_template_toggle_{user_id}_{g_id}"))
         
     static_buttons = [
@@ -303,7 +303,7 @@ def confirmation_kb(action_type: str, target_id: int, back_callback: str, extra_
     # Используем двоеточие как разделитель для параметров, чтобы не конфликтовать с подчеркиваниями в action_type
     callback_data = f"confirm_exe_{action_type}:{target_id}:{extra_id}"
         
-    builder.button(text="❌ Да, удалить", callback_data=callback_data)
+    builder.button(text="🗑 Да, удалить", callback_data=callback_data)
     builder.button(text="🔙 Отмена", callback_data=back_callback)
     builder.adjust(1)
     return builder.as_markup()

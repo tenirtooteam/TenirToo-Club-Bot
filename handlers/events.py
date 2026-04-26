@@ -4,6 +4,7 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
+from database import db
 import keyboards as kb
 from services.ui_service import UIService
 from services.event_service import EventService
@@ -16,6 +17,8 @@ router = Router()
 class EventCreation(StatesGroup):
     waiting_for_title = State()
     waiting_for_dates = State()
+    editing_title = State()
+    editing_dates = State()
 
 @router.callback_query(F.data == "event_list")
 async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMContext, custom_text: str = None):
@@ -121,12 +124,17 @@ async def process_event_dates(message: Message, state: FSMContext):
 @router.callback_query(F.data.startswith("event_view:"))
 async def view_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
-    user_id = callback.from_user.id
-    
+    await show_event_card(callback, event_id, state)
+
+async def show_event_card(event_or_msg: CallbackQuery | Message, event_id: int, state: FSMContext):
+    """Универсальный помощник для показа карточки мероприятия."""
+    user_id = event_or_msg.from_user.id
     event = EventService.get_event_details(event_id)
     if not event:
-        return await callback.answer("❌ Мероприятие не найдено.", show_alert=True)
-        
+        if isinstance(event_or_msg, CallbackQuery):
+            await event_or_msg.answer("❌ Мероприятие не найдено.", show_alert=True)
+        return
+
     card_text = EventService.format_event_card(event_id)
     is_participant = EventService.is_event_participant(event_id, user_id)
     can_edit = EventService.can_edit_event(user_id, event_id)
@@ -137,7 +145,61 @@ async def view_event(callback: CallbackQuery, state: FSMContext):
     else:
         reply_markup = kb.get_event_card_kb(event_id, is_participant, can_edit)
         
-    await UIService.sterile_show(state, callback, card_text, reply_markup=reply_markup)
+    await UIService.sterile_show(state, event_or_msg, card_text, reply_markup=reply_markup)
+
+@router.callback_query(F.data.startswith("event_edit:"))
+async def edit_event_init(callback: CallbackQuery, state: FSMContext):
+    """Начало процесса редактирования."""
+    event_id = int(callback.data.split(":")[1])
+    user_id = callback.from_user.id
+    
+    if not EventService.can_edit_event(user_id, event_id):
+        return await callback.answer("❌ У вас нет прав на редактирование.", show_alert=True)
+        
+    await state.update_data(edit_event_id=event_id)
+    await state.set_state(EventCreation.editing_title)
+    
+    await UIService.sterile_show(
+        state, callback, 
+        "📝 <b>Редактирование мероприятия</b>\n\nВведите новое название или пришлите <code>/cancel</code> для отмены.",
+        reply_markup=kb.get_event_cancel_kb()
+    )
+
+@router.message(EventCreation.editing_title)
+async def process_editing_title(message: Message, state: FSMContext):
+    title = message.text.strip()
+    if title.startswith("/"): return # Игнорируем команды
+    
+    await state.update_data(new_title=title)
+    await state.set_state(EventCreation.editing_dates)
+    
+    await message.answer(
+        f"✅ Название принято: <b>{title}</b>\n\nТеперь введите новые даты (например: 15-20 мая) или пришлите <code>/skip</code>, чтобы оставить прежние.",
+        reply_markup=kb.get_event_cancel_kb()
+    )
+
+@router.message(EventCreation.editing_dates)
+async def process_editing_dates(message: Message, state: FSMContext):
+    dates = message.text.strip()
+    if dates.startswith("/"):
+        if dates == "/skip":
+            data = await state.get_data()
+            event = db.get_event_details(data['edit_event_id'])
+            dates = event['start_date']
+        else:
+            return
+
+    data = await state.get_data()
+    event_id = data['edit_event_id']
+    new_title = data['new_title']
+    
+    # [PL-6.7] Мутация через базу
+    db.update_event_details(event_id, new_title, dates, "") # end_date пустой пока
+    
+    await state.clear()
+    await message.answer("✅ <b>Изменения сохранены!</b>")
+    # Возвращаемся в карточку
+    await show_event_card(message, event_id, state)
 
 @router.callback_query(F.data.startswith("event_join:"))
 async def join_event(callback: CallbackQuery, state: FSMContext):

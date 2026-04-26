@@ -162,6 +162,18 @@
 34. [CP-3.35] **UNIVERSAL INDEXING PROTOCOL**: Every logic block, rule, and pattern in strategic files MUST be assigned a unique Index ID (`CP-x` for context, `PL-x` for logic). These IDs MUST be used in `implementation_plan.md` [CP-3.25] and as in-code markers to ensure 100% traceability.
     > Rationale: Indexing eliminates the need to copy full rule text into plans, saving context window while maintaining strict architectural alignment and facilitating rapid lookups.
 
+35. [CP-3.36] **UNIVERSAL DISPATCHING**: All interactive buttons posted in broadcast messages (Announcements) MUST use the `announcements` database registry as a dispatcher. Do not link buttons directly to entity IDs (e.g. `event_join:42`). Use `ann_join:{announcement_id}` to ensure context-aware permission checks.
+    > Rationale: Dispatching abstracts the interaction from the entity, allowing unified handling and strict adherence to the "Only topic members" engagement rule.
+
+36. [CP-3.37] **QUICK ANNOUNCEMENT FORMAT**: The `/an` command MUST support the format `Title\nDescription`. The handler is responsible for creating a "Rapid Event" and cleaning up the trigger message to maintain thread sterility.
+    > Rationale: Standardization of command input ensures data integrity while maintaining the "Quick" nature of operational announcements.
+
+37. [CP-3.38] **CASCADE COMPLIANCE**: When implementing deletion of any entity (User, Topic, Event), the developer MUST verify both native DB cascades (FK) and polymorphic cleanups (e.g. removing entries from `announcements`). Failure to clean up dispatcher-based links is an architectural violation.
+    > Rationale: Polymorphic links bypass native FK protection. Explicit cleanup is the only way to prevent data rot and orphaned interaction buttons in the chat history.
+
+38. [CP-3.39] **FSM JOURNEY VALIDATION**: For any multi-step FSM scenario (Editing, Creation), the developer MUST provide or update an asynchronous journey test (e.g. `test_event_fsm.py`) to verify that the state machine doesn't hang and clears properly.
+    > Rationale: FSM is the most fragile part of the UI; automated journey tests prevent "frozen" interfaces for end-users.
+
 ---
 
 ## [CP-4] SCOPE BOUNDARY
