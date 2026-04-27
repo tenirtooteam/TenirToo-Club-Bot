@@ -37,6 +37,11 @@ const elements = {
     profileId: document.getElementById('profile-id'),
     profileName: document.getElementById('profile-name'),
     profileRoles: document.getElementById('profile-roles'),
+    
+    // Admin Views
+    adminTopicsList: document.getElementById('admin-topics-list'),
+    adminGroupsList: document.getElementById('admin-groups-list'),
+    rolesFaqContent: document.getElementById('roles-faq-content'),
 };
 
 let currentView = 'view-dashboard';
@@ -86,6 +91,9 @@ function switchView(viewId, pushToStack = true) {
     if (viewId === 'view-profile') loadProfile();
     if (viewId === 'view-events') loadEvents();
     if (viewId === 'view-dashboard') loadDashboard();
+    if (viewId === 'view-admin-topics') loadAdminTopics();
+    if (viewId === 'view-admin-groups') loadAdminGroups();
+    if (viewId === 'view-roles-faq') loadRolesFaq();
 }
 
 tg.BackButton.onClick(() => {
@@ -207,6 +215,51 @@ async function loadProfile() {
         `).join('');
     } catch (err) {
         tg.showAlert("Ошибка профиля");
+    }
+}
+
+async function loadAdminTopics() {
+    elements.adminTopicsList.innerHTML = '<div class="spinner"></div>';
+    try {
+        const topics = await apiFetch('/api/dashboard/admin/topics');
+        elements.adminTopicsList.innerHTML = topics.map(t => `
+            <div class="list-item">
+                <div class="list-item-content">
+                    <h4>${t.name}</h4>
+                    <p>ID: ${t.id} • Глобальный доступ</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        tg.showAlert("Ошибка загрузки всех топиков");
+    }
+}
+
+async function loadAdminGroups() {
+    elements.adminGroupsList.innerHTML = '<div class="spinner"></div>';
+    try {
+        const groups = await apiFetch('/api/dashboard/admin/groups');
+        elements.adminGroupsList.innerHTML = groups.map(g => `
+            <div class="list-item">
+                <div class="list-item-content">
+                    <h4>${g.name}</h4>
+                    <p>Группа/Шаблон доступа</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        tg.showAlert("Ошибка загрузки групп");
+    }
+}
+
+async function loadRolesFaq() {
+    elements.rolesFaqContent.innerHTML = '<div class="spinner"></div>';
+    try {
+        const data = await apiFetch('/api/dashboard/roles/faq');
+        // Текст из бота приходит с HTML тегами, Telegram TMA поддерживает базовый рендеринг
+        elements.rolesFaqContent.innerHTML = `<div class="faq-text">${data.text}</div>`;
+    } catch (err) {
+        tg.showAlert("Ошибка загрузки FAQ");
     }
 }
 

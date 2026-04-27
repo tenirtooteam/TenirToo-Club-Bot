@@ -39,5 +39,5 @@ from .audit import (
 )
 from .announcements import (
     create_announcement, get_announcement, delete_announcements_by_target,
-    update_announcement_metadata
+    delete_announcements_by_topic, update_announcement_metadata
 )

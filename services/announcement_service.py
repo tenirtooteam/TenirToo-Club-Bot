@@ -28,12 +28,15 @@ class AnnouncementService:
             creator_name = db.get_user_name(creator_id) or f"ID:{creator_id}"
             topic_name = db.get_topic_name(topic_id) or "Общий чат"
             
+            # [CC-2] Если дата 'Оперативно', не выводим её (квик-анонс)
+            date_str = f"📅 Дата: {event['start_date']}\n" if event['start_date'] != "Оперативно" else ""
+            
             text = (
                 f"📢 <b>НОВЫЙ АНОНС</b>\n\n"
                 f"📌 <b>{event['title']}</b>\n"
-                f"📅 Дата: {event['start_date']}\n"
+                f"{date_str}"
                 f"👤 Организатор: {creator_name}\n"
-                f"📍 Локация: {topic_name}\n\n"
+                f"📍 Топик: {topic_name}\n\n"
                 f"👥 <b>Участники ({len(participant_ids)}):</b>\n"
                 f"{participant_list or '<i>Пока никого нет</i>'}"
             )
@@ -73,6 +76,11 @@ class AnnouncementService:
     async def broadcast_event_announcement(bot, event_id: int, target_topic_id: int, creator_id: int):
         """Публикует анонс существующего мероприятия в целевой топик."""
         import config
+        
+        # [CC-2] Проверка существования топика перед публикацией
+        if target_topic_id != 0 and not db.get_topic_name(target_topic_id):
+             return False, "❌ Ошибка: Целевой топик не найден в БД (возможно, удален).", None
+
         ann_id = db.create_announcement(
             a_type="event",
             target_id=event_id,
@@ -83,14 +91,16 @@ class AnnouncementService:
         text = AnnouncementService.format_announcement_text(ann_id)
         from keyboards.announcements_kb import get_announcement_kb
 
-        sent = await bot.send_message(
-            chat_id=config.GROUP_ID, # ФИКС: Используем ID группы, а не топика!
-            text=text,
-            reply_markup=get_announcement_kb(ann_id, is_group=True),
-            message_thread_id=target_topic_id if target_topic_id != 0 else None
-        )
-        
-        # Сохраняем метаданные для возможности обновления из WebApp
-        db.update_announcement_metadata(ann_id, config.GROUP_ID, sent.message_id)
-        
-        return True, "✅ Анонс успешно опубликован!", ann_id
+        try:
+            sent = await bot.send_message(
+                chat_id=config.GROUP_ID,
+                text=text,
+                reply_markup=get_announcement_kb(ann_id, is_group=True),
+                message_thread_id=target_topic_id if target_topic_id != 0 else None
+            )
+            # Сохраняем метаданные для возможности обновления из WebApp
+            db.update_announcement_metadata(ann_id, config.GROUP_ID, sent.message_id)
+            return True, "✅ Анонс успешно опубликован!", ann_id
+        except Exception as e:
+            logger.error(f"❌ Ошибка публикации анонса: {e}")
+            return False, f"❌ Ошибка Telegram API: {e}", None

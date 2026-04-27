@@ -357,6 +357,31 @@ footer {
     font-style: italic;
 }
 
+.roles-faq-container {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 24px;
+    line-height: 1.6;
+}
+
+.faq-text {
+    font-size: 15px;
+    color: var(--accent-dim);
+}
+
+.faq-text b {
+    color: var(--text-main);
+    display: block;
+    margin-top: 16px;
+    margin-bottom: 4px;
+}
+
+.faq-text i {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
 /* Error Screen */
 #error-screen {
     flex: 1;

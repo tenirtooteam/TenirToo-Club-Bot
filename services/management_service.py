@@ -205,6 +205,17 @@ class ManagementService:
         return True, "✅ Название топика обновлено."
 
     @staticmethod
+    def handle_external_topic_deletion(topic_id: int):
+        """
+        [CC-1, CC-2] Реагирует на внешнее удаление топика в Telegram.
+        Удаляет топик из БД и все связанные анонсы.
+        """
+        logger.warning(f"🗑 [SYNC] Обнаружено внешнее удаление топика {topic_id}. Синхронизация БД...")
+        db.delete_announcements_by_topic(topic_id)
+        db.delete_topic(topic_id)
+        ManagementService._trigger_sheets_sync("all")
+
+    @staticmethod
     def add_topic_to_group(group_id: int, topic_id: int) -> tuple[bool, str]:
         """Привязывает топик к группе."""
         if db.add_topic_to_group(group_id, topic_id):

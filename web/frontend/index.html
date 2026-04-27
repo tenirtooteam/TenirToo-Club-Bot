@@ -78,9 +78,17 @@
                             <span class="menu-label">Мой профиль</span>
                         </div>
                         <!-- Admin Only Items (Hidden by default) -->
-                        <div class="menu-item admin-only hidden" data-view="view-admin-tools">
+                        <div class="menu-item admin-only hidden" data-view="view-admin-topics">
+                            <div class="menu-icon">📍</div>
+                            <span class="menu-label">Все топики</span>
+                        </div>
+                        <div class="menu-item admin-only hidden" data-view="view-admin-groups">
+                            <div class="menu-icon">📂</div>
+                            <span class="menu-label">Шаблоны</span>
+                        </div>
+                        <div class="menu-item" data-view="view-roles-faq">
                             <div class="menu-icon">🛡️</div>
-                            <span class="menu-label">Админка</span>
+                            <span class="menu-label">Роли</span>
                         </div>
                     </div>
                 </main>
@@ -130,6 +138,42 @@
                             <label>Ваши роли</label>
                             <div id="profile-roles" class="roles-list"></div>
                         </div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Admin Topics -->
+            <div id="view-admin-topics" class="view hidden">
+                <header class="sub-header">
+                    <h2>📍 Глобальный реестр топиков</h2>
+                </header>
+                <main>
+                    <div id="admin-topics-list" class="list-container">
+                        <div class="spinner"></div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Admin Groups (Templates) -->
+            <div id="view-admin-groups" class="view hidden">
+                <header class="sub-header">
+                    <h2>📂 Шаблоны доступа (Группы)</h2>
+                </header>
+                <main>
+                    <div id="admin-groups-list" class="list-container">
+                        <div class="spinner"></div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Roles FAQ -->
+            <div id="view-roles-faq" class="view hidden">
+                <header class="sub-header">
+                    <h2>🛡️ Справочник ролей</h2>
+                </header>
+                <main>
+                    <div class="roles-faq-container" id="roles-faq-content">
+                        <!-- Content from HelpService -->
                     </div>
                 </main>
             </div>

@@ -116,9 +116,8 @@ class EventService:
     @staticmethod
     async def notify_admins_of_participation_request(bot: Bot, event_id: int, user_id: int):
         """
-        Отправляет уведомление о новой заявке на участие админам и организатору. [PL-5.1.13]
+        Отправляет уведомление о новой заявке на участие ТОЛЬКО организаторам (лидам и создателю). [CC-3]
         """
-        import config
         from database.db import get_user_name
         
         event = db.get_event_details(event_id)
@@ -127,11 +126,10 @@ class EventService:
             
         user_name = get_user_name(user_id) or f"ID:{user_id}"
         
-        # Получатели: все админы + создатель мероприятия
-        admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
-        admin_ids.add(int(config.ADMIN_ID))
+        # [CC-3] Получатели: создатель + назначенные лидеры (без общего списка админов)
+        organizer_ids = set(event["leads"])
         if event["creator_id"]:
-            admin_ids.add(int(event["creator_id"]))
+            organizer_ids.add(int(event["creator_id"]))
             
         text = (
             f"🔔 <b>Новая заявка на участие!</b>\n\n"
@@ -140,18 +138,17 @@ class EventService:
             f"Рассмотрите заявку в разделе 'Аудит'."
         )
         
-        for adm_id in admin_ids:
+        for org_id in organizer_ids:
             try:
-                await bot.send_message(adm_id, text, parse_mode="HTML")
+                await bot.send_message(org_id, text, parse_mode="HTML")
             except Exception as e:
-                logger.warning(f"Не удалось отправить уведомление о записи админу {adm_id}: {e}")
+                logger.warning(f"Не удалось отправить уведомление о записи организатору {org_id}: {e}")
 
     @staticmethod
     async def notify_organizers_of_direct_join(bot: Bot, event_id: int, user_id: int):
         """
-        Отправляет уведомление о прямой записи (без аудита) админам и организатору. [PL-5.1.13]
+        Отправляет уведомление о прямой записи ТОЛЬКО организаторам. [CC-3]
         """
-        import config
         from database.db import get_user_name
         
         event = db.get_event_details(event_id)
@@ -159,10 +156,10 @@ class EventService:
         
         user_name = get_user_name(user_id) or f"ID:{user_id}"
         
-        admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
-        admin_ids.add(int(config.ADMIN_ID))
+        # [CC-3] Получатели: создатель + назначенные лидеры
+        organizer_ids = set(event["leads"])
         if event["creator_id"]:
-            admin_ids.add(int(event["creator_id"]))
+            organizer_ids.add(int(event["creator_id"]))
             
         text = (
             f"✅ <b>Новый участник!</b>\n\n"
@@ -171,8 +168,8 @@ class EventService:
             f"Запись прошла автоматически через анонс."
         )
         
-        for adm_id in admin_ids:
+        for org_id in organizer_ids:
             try:
-                await bot.send_message(adm_id, text, parse_mode="HTML")
+                await bot.send_message(org_id, text, parse_mode="HTML")
             except Exception as e:
-                logger.warning(f"Не удалось отправить уведомление о вступлении админу {adm_id}: {e}")
+                logger.warning(f"Не удалось отправить уведомление о вступлении организатору {org_id}: {e}")

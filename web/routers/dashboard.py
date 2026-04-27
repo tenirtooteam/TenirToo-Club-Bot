@@ -1,7 +1,8 @@
 # Файл: web/routers/dashboard.py
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from services.permission_service import PermissionService
+from services.management_service import ManagementService
 from database import db
 from ..auth import get_current_user_id
 
@@ -89,3 +90,30 @@ async def toggle_event_participation_direct(event_id: int, user_id: int = Depend
         await EventService.notify_organizers_of_direct_join(bot, event_id, user_id)
         
     return {"success": success, "message": message}
+
+# --- Admin Section (Mirroring Bot Start Menu) ---
+
+@router.get("/admin/topics")
+async def get_all_topics_admin(user_id: int = Depends(get_current_user_id)):
+    """Возвращает список ВСЕХ топиков для админа."""
+    if not PermissionService.is_global_admin(user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    topic_ids = db.get_all_unique_topics()
+    names_map = db.get_topic_names_by_ids(topic_ids)
+    return [{"id": tid, "name": names_map.get(tid, f"ID: {tid}")} for tid in topic_ids]
+
+@router.get("/admin/groups")
+async def get_all_groups_admin(user_id: int = Depends(get_current_user_id)):
+    """Возвращает список всех шаблонов доступа (групп)."""
+    if not PermissionService.is_global_admin(user_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    groups = db.get_all_groups()
+    return [{"id": g[0], "name": g[1]} for g in groups]
+
+@router.get("/roles/faq")
+async def get_roles_faq(user_id: int = Depends(get_current_user_id)):
+    """Возвращает текст FAQ по ролям из HelpService."""
+    from services.help_service import HelpService
+    return {"text": HelpService.get_help("roles")}

@@ -40,6 +40,12 @@ class ForumUtilityMiddleware(BaseMiddleware):
                 pass
             return
 
+        # [CC-3] Синхронизация при ручном удалении топика в Telegram
+        if event.forum_topic_deleted:
+            topic_id = event.message_thread_id
+            ManagementService.handle_external_topic_deletion(topic_id)
+            return
+
         # Удаление сервисных сообщений о создании топиков
         if event.forum_topic_created:
             try:
