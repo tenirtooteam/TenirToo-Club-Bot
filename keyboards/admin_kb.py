@@ -6,7 +6,10 @@ from keyboards.pagination_util import add_nav_footer
 
 
 def main_admin_kb():
+    from aiogram.types import WebAppInfo
+    import config
     builder = InlineKeyboardBuilder()
+    builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
     builder.button(text="[ 📂 ШАБЛОНЫ ДОСТУПА ]", callback_data="manage_groups")
     builder.button(text="[ 📍 ВСЕ ТОПИКИ ]", callback_data="all_topics_list")
     builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")

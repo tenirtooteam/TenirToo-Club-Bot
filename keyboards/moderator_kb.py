@@ -26,7 +26,10 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
             callback_data=f"mod_topic_select_{topic_id}"
         ))
         
+    from aiogram.types import WebAppInfo
+    import config
     static_buttons = [
+        InlineKeyboardButton(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL)),
         InlineKeyboardButton(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
