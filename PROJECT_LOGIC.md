@@ -36,13 +36,13 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.7] **database/members.py** — User entity management: `add_user`, `user_exists`, `get_all_users`, `get_user_name`, `get_user_names_by_ids` (Batch-Fetch, N+1 fix), `update_user_name`, `delete_user`, `find_users_by_query`.
 - [PL-2.2.8] **database/topics.py** — Forum topic management: `add_topic`, `rename_topic`, `get_topic_name`, `get_all_unique_topics`, `get_topic_names_by_ids` (Batch-Fetch), `delete_topic`.
 - [PL-2.2.9] **database/groups.py** — Global templates management: `create_group`, `delete_group`, `get_all_groups`, `get_group_name`, `add_topic_to_group`, `remove_topic_from_group`, `get_topics_of_group`, `get_group_ids_by_topic`, `get_group_template_members`, `add_to_group_template`, `remove_from_group_template`.
-- [PL-2.2.10] **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`.
+- [PL-2.2.10] **database/roles.py** — Roles definitions and scoping: `get_role_id`, `grant_role`, `revoke_role`, `get_user_roles`, `get_moderators_of_topic`, `is_global_admin`, `is_moderator_of_topic`, `get_all_roles`, `get_role_name_by_id`, `get_global_admin_ids`.
 - [PL-2.2.11] **database/permissions.py** — Direct access management: `grant_direct_access`, `grant_direct_access_bulk`, `revoke_direct_access`, `revoke_all_direct_access`, `get_direct_access_users`, `has_direct_access`, `can_write`, `get_topic_authorized_users`, `get_user_available_topics`, `get_direct_access_user_ids`, `get_topic_authorized_user_ids`.
-- [PL-2.2.12] **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`.
+- [PL-2.2.12] **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`. (Supports ISO-8601 storage with contract validation).
 - [PL-2.2.13] **database/db.py** — Single facade re-exporting all database functions (including audit.py). **The only permitted import point for data operations.**
 - [PL-2.2.14] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data(user_id, role_override)` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - [PL-2.2.15] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
-- [PL-2.2.16] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `import_users`, `import_groups`.
+- [PL-2.2.16] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `export_events`, `export_event_participants`, `import_users`, `import_groups`.
 - [PL-2.2.17] **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
 - [PL-2.2.18] **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action` (Internal Sanitization [PL-6.7]), `toggle_event_participation`, `approve_event_action`, `submit_request`, `resolve_request` (Atomic Audit), `get_pending_request_id`, `get_user_pending_request_id`, `get_entity_name`, `search_entities`.
 - [PL-2.2.19] **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`, `get_user_display_name`, `get_role_name`, `get_role_id`, `get_access_sets`.
@@ -51,23 +51,31 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.22] **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`. **Decoupled**: Uses `ManagementService.search_entities`.
 - [PL-2.2.23] **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
 - [PL-2.2.24] **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
-- [PL-2.2.25] **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`. Functions: `show_events_list`, `show_pending_events`, `start_event_creation`, `process_event_title`, `process_event_dates`, `view_event`, `join_event`, `leave_event`, `delete_event_init`, `approve_event_handler`, `reject_event_handler`.
+- [PL-2.2.25] **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`, `confirm_date`, `waiting_for_end_date`. Functions: `show_events_list`, `show_pending_events`, `start_event_creation`, `process_event_title`, `process_event_dates`, `process_date_preset`, `process_date_retry`, `process_date_confirm`, `process_date_add_end_start`, `process_event_end_date`, `view_event`, `join_event`, `leave_event`, `delete_event_init`, `approve_event_handler`, `reject_event_handler`, `show_event_card`.
 - [PL-2.2.26] **handlers/user.py** — User flows: Unified `/start` (Traffic Controller), profile, topics.
 - [PL-2.2.27] **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
-- [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
-- [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards.
+- [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `get_admin_cancel_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
+- [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards: `get_mod_cancel_kb`, `moderator_topics_list_kb`, `moderator_topic_menu_kb`, `topic_moderators_kb`, `moderator_search_kb`, `moderator_topic_groups_kb`, `moderator_unattached_groups_kb`.
 - [PL-2.2.30] **keyboards/pagination_util.py** — Universal keyboard utilities: `build_paginated_menu` (Paginated lists with search support), `add_nav_footer(builder, back_data=None, include_close=True, help_key=None)` (Split footer protocol [PL-5.1.14]).
 - [PL-2.2.31] **database/announcements.py** — Dispatcher registry for broadcasted interactions (Events, Gear, Fees). Methods: `create_announcement`, `get_announcement`, `delete_announcements_by_target`.
 - [PL-2.2.32] **services/announcement_service.py** — Logic for quick announcements and unified dispatcher processing. Methods: `create_quick_event`.
 - [PL-2.2.33] **handlers/announcements.py** — Command-level entry for `/an` and unified callback `ann_join`.
-- [PL-2.2.34] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_audit_log_kb`.
+- [PL-2.2.34] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_date_picker_kb`, `get_date_confirm_kb`, `get_audit_log_kb`.
 - [PL-2.2.35] **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
 - [PL-2.2.36] **local_scripts/dev_run.py** — Developer-only hot-reload runner.
 - [PL-2.2.37] **local_scripts/Gemini_maker.py** — Developer-only AI context packager. Regenerates `local_scripts/full_project_code.txt`.
-- [PL-2.2.38] **tests/test_smoke.py** — Smoke testing suite for import integrity and basic signatures.
-- [PL-2.2.39] **tests/test_database/test_cascades.py** — Integrity tests for DB relations (FK Cascade and manual cleanup).
-- [PL-2.2.40] **tests/test_services/test_announcements.py** — Integration tests for Announcement parsing and dispatching logic.
-- [PL-2.2.41] **tests/test_handlers/test_event_fsm.py** — Asynchronous FSM journey tests simulating user transitions.
+- [PL-2.2.38] **tests/conftest.py** — Global test infrastructure: isolated DB (`db_setup`), mock bot, and context factories (`create_context`, `create_callback`). [PL-HI]
+- [PL-2.2.39] **tests/test_database/test_event_contracts.py** — Contract tests ensuring DB-to-Dict mapping consistency.
+- [PL-2.2.40] **tests/test_database/test_integrity_suite.py** — Integrity tests for DB relations (FK Cascade and manual cleanup).
+- [PL-2.2.41] **tests/test_handlers/test_event_edit_collision.py** — Regression suite for FSM bypass and collision prevention.
+- [PL-2.2.42] **tests/test_handlers/test_permission_scenarios.py** — Declarative security boundary tests (Admin/Moderator).
+- [PL-2.2.43] **tests/test_handlers/test_admin_flow.py** — Integration tests for Admin CRUD operations (Groups/Topics).
+- [PL-2.2.44] **tests/test_handlers/test_announcement_logic.py** — Logic tests for quick announcements and dispatching.
+- [PL-2.2.45] **tests/test_services/test_date_logic.py** — Deep unit tests for DateService parsing edge cases.
+- [PL-2.2.46] **tests/test_services/test_sheets_sync.py** — Resilience tests for Google Sheets API error handling.
+- [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
+- [PL-2.2.48] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
+- [PL-2.2.49] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
 
 ### [PL-2.3] Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -154,6 +162,8 @@ CREATE TABLE IF NOT EXISTS events (
     title TEXT NOT NULL,
     start_date TEXT NOT NULL,
     end_date TEXT,
+    start_iso TEXT,
+    end_iso TEXT,
     creator_id INTEGER,
     is_approved INTEGER DEFAULT 0,
     sheet_url TEXT,
@@ -206,7 +216,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 
 ### [PL-3.5] Background Sync Pattern
 - [PL-3.5.1] To ensure the bot remains responsive during network I/O with Google Sheets, all synchronization tasks are executed in the background using `asyncio.create_task`.
-- [PL-3.5.2] **Trigger**: Any data mutation in `ManagementService`. Specifically, the call is placed inside each relevant deletion branch of `execute_deletion`, before its `return` statement, and within mutation methods like `create_event_action`.
+- [PL-3.5.2] **Trigger**: Any data mutation in `ManagementService`. Specifically, the call is placed inside deletion branches, mutation methods like `create_event_action`, `toggle_event_participation`, and `resolve_request` (upon approval).
 - [PL-3.5.3] **Mechanism**: `_trigger_sheets_sync(mode)` calls `GoogleSheetsService` asynchronously.
 - [PL-3.5.4] **Error Handling**: Failures in background tasks are logged but do not interrupt the main execution flow.
 
@@ -257,7 +267,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
     - **Help Logic**: The `❓` button uses format `help:{key}:{back_data}`.
     - **Navigation Safety**: `back_data` (for the help button) must point to the CURRENT screen to ensure the user returns to where they were. If not provided, defaults to `landing`.
 - [PL-5.1.15] **Systemic Landing Entry**: The `landing` callback is a mandatory system-wide entry point that triggers the `UIService.get_landing_data` controller. It serves as the ultimate fallback for navigation returns.
-- [PL-5.1.16] **Heartfelt UI Principle**: All user-facing strings must use welcoming, community-oriented language. Avoid technical jargon ("Management System", "Entities") in the interface. Use "Assistant", "Gid", "Rights". [RA-1]
+- [PL-5.1.16] **Heartfelt UI Principle**: All user-facing strings must use welcoming, community-oriented language. Includes the **Smart Hybrid Date Flow**: preset buttons (Today, Sat) + natural language parsing with confirmation. [RA-7.1/2]
 - [PL-5.1.17] **Universal Announcement Dispatcher**: A systemic pattern where interactive buttons in broadcast messages do not link directly to entities, but to an `announcements` registry. This allows a single callback handler to manage diverse interaction types (Participation, Payments, Gear) and enforces context-aware access control.
 - [PL-5.1.18] **Quick Announcement Protocol**: Support for `/an` command in forum topics. Automatically creates a "Rapid Event" (date set to 'Оперативно') and posts a rich announcement. Original command message is deleted to maintain thread sterility.
 - [PL-5.1.19] **Polymorphic Cascade Cleanup**: Since the `announcements` table uses polymorphic links (linking to various entity types by ID without native FKs), any service responsible for deleting a target entity (Events, etc.) MUST manually invoke `delete_announcements_by_target` to prevent data rot.

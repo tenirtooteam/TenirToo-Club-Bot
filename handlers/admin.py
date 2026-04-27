@@ -92,7 +92,13 @@ async def group_detail(callback: types.CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "add_group_start")
 @safe_callback()
 async def add_group_init(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.sterile_ask(state, callback, "✍️ Введи название для новой группы:", AdminStates.waiting_for_group_name)
+    await UIService.sterile_ask(
+        state, 
+        callback, 
+        "✍️ Введи название для новой группы:", 
+        AdminStates.waiting_for_group_name,
+        reply_markup=kb.get_admin_cancel_kb("manage_groups")
+    )
 
 
 @router.message(AdminStates.waiting_for_group_name)

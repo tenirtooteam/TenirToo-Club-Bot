@@ -97,3 +97,46 @@ async def test_help_return_path_logic():
         parts = cd.split(":")
         assert parts[1] == expected_key, f"Wrong help key: {parts[1]}"
         assert parts[2] == expected_back, f"Help back-link '{parts[2]}' might cause a hang if not handled"
+
+@pytest.mark.asyncio
+async def test_registry_to_code_integrity():
+    """
+    [CP-3.13] Registry Integrity Scanner.
+    Проверяет, что все функции клавиатур, описанные в PROJECT_LOGIC.md, 
+    физически существуют в модуле keyboards.
+    """
+    import os
+    import re
+
+    # 1. Путь к реестру
+    logic_path = os.path.join(os.getcwd(), "PROJECT_LOGIC.md")
+    if not os.path.exists(logic_path):
+        pytest.skip("PROJECT_LOGIC.md not found")
+
+    with open(logic_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # 2. Ищем раздел клавиатур [PL-2.2.28] - [PL-2.2.35]
+    # Извлекаем все названия функций из описания модулей keyboards/*.py
+    kb_pattern = r"keyboards/.*?\.py.*?—.*?`(.*?)`"
+    matches = re.findall(kb_pattern, content)
+    
+    # 3. Собираем все функции в один список
+    all_registered_functions = []
+    for match in matches:
+        # Функции разделены запятой и пробелом
+        funcs = [f.strip() for f in match.split(",")]
+        all_registered_functions.extend(funcs)
+
+    # 4. Проверяем наличие функций в модуле kb (через __init__.py фасада)
+    missing = []
+    for func_name in all_registered_functions:
+        if not hasattr(kb, func_name):
+            missing.append(func_name)
+
+    assert not missing, (
+        f"❌ Registry Drift detected!\n"
+        f"The following functions are listed in PROJECT_LOGIC.md but MISSING in keyboards/__init__.py:\n"
+        f"{', '.join(missing)}\n"
+        f"Please update the registry or implement the missing builders."
+    )

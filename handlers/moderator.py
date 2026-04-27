@@ -83,7 +83,13 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
         return
 
     await state.update_data(moderator_edit_topic_id=topic_id)
-    await UIService.sterile_ask(state, callback, "✍️ Введите новое название топика:", ModeratorStates.waiting_for_topic_name)
+    await UIService.sterile_ask(
+        state, 
+        callback, 
+        "✍️ Введите новое название топика:", 
+        ModeratorStates.waiting_for_topic_name,
+        reply_markup=kb.get_mod_cancel_kb(f"mod_topic_select_{topic_id}")
+    )
 
 
 @router.message(ModeratorStates.waiting_for_topic_name)

@@ -30,12 +30,16 @@ class ManagementService:
         Создает 'быстрое' мероприятие (без даты, авто-одобрение).
         Централизует создание для анонсов. [PL-2.2.18]
         """
+        import datetime
+        now_iso = datetime.datetime.now().strftime("%Y-%m-%d")
         event_id = db.create_event(
             title=title,
             start_date="Оперативно",
             end_date=None,
             creator_id=user_id,
-            is_approved=1
+            is_approved=1,
+            start_iso=now_iso,
+            end_iso=now_iso
         )
         if event_id > 0:
             db.add_event_lead(event_id, user_id)
@@ -328,10 +332,11 @@ class ManagementService:
         return True, status
 
     @staticmethod
-    def _trigger_sheets_sync(mode: str = "all"):
+    def _trigger_sheets_sync(mode: str = "all", entity_id: int = None):
         """Запускает синхронизацию с Google Sheets в фоновом режиме."""
         import asyncio
         from services.google_sheets_service import GoogleSheetsService
+        from services.event_service import EventService
         
         async def _task():
             try:
@@ -340,7 +345,6 @@ class ManagementService:
                     users_with_roles = []
                     for u in users:
                         roles = db.get_user_roles(u[0])
-                        # Форматируем роли: 'admin' или 'moderator(123)'
                         roles_str = ", ".join([f"{r[0]}({r[1]})" if r[1] else r[0] for r in roles])
                         users_with_roles.append((u[0], u[1], u[2], roles_str))
                     await GoogleSheetsService.export_users(users_with_roles)
@@ -350,12 +354,27 @@ class ManagementService:
                     groups_data = []
                     for g_id, g_name in groups:
                         topics = db.get_topics_of_group(g_id)
-                        # Преобразуем ID топиков в строки для join
                         topics_str_list = [str(t) for t in topics]
                         groups_data.append({'id': g_id, 'name': g_name, 'topics': topics_str_list})
                     await GoogleSheetsService.export_groups(groups_data)
+
+                if mode in ["all", "events"]:
+                    events = db.get_active_events()
+                    events_data = []
+                    for e in events:
+                        # Получаем детали с участниками [PL-HI]
+                        details = EventService.get_event_details(e['event_id'])
+                        events_data.append(details)
+                    await GoogleSheetsService.export_events(events_data)
+
+                if mode == "event_participants" and entity_id:
+                    details = EventService.get_event_details(entity_id)
+                    if details:
+                        await GoogleSheetsService.export_event_participants(
+                            entity_id, details['title'], details['participants']
+                        )
             except Exception as e:
-                logger.error(f"Фоновая синхронизация Google Sheets провалилась: {e}")
+                logger.error(f"Фоновая синхронизация Google Sheets провалилась ({mode}): {e}")
 
         asyncio.create_task(_task())
 
@@ -431,9 +450,11 @@ class ManagementService:
         """Логика записи/отписки от мероприятия."""
         if db.is_event_participant(event_id, user_id):
             db.remove_event_participant(event_id, user_id)
+            ManagementService._trigger_sheets_sync("event_participants", event_id)
             return True, "❌ Вы больше не участвуете."
         else:
             db.add_event_participant(event_id, user_id)
+            ManagementService._trigger_sheets_sync("event_participants", event_id)
             return True, "✅ Вы записаны!"
 
     @staticmethod
@@ -486,8 +507,10 @@ class ManagementService:
         if status == "approved":
             if request["entity_type"] == "event_approval":
                 db.approve_event(request["entity_id"])
+                ManagementService._trigger_sheets_sync("events")
             elif request["entity_type"] == "event_participation":
                 db.add_event_participant(request["entity_id"], request["user_id"])
+                ManagementService._trigger_sheets_sync("event_participants", request["entity_id"])
         
         elif status == "rejected":
             if request["entity_type"] == "event_approval":

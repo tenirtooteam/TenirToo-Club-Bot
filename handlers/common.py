@@ -126,7 +126,14 @@ async def search_start_handler(callback: types.CallbackQuery, state: FSMContext)
         search_context=search_context
     )
     
-    await UIService.sterile_ask(state, callback, f"🔎 {prompts.get(search_type, 'Введите запрос:')}", SearchStates.waiting_for_query)
+    # [CP-3.11] Sterile FSM entry with back button
+    await UIService.sterile_ask(
+        state, 
+        callback, 
+        f"🔎 {prompts.get(search_type, 'Введите запрос:')}", 
+        SearchStates.waiting_for_query,
+        reply_markup=kb.get_admin_cancel_kb("landing")
+    )
 
 
 @router.message(SearchStates.waiting_for_query)

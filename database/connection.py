@@ -6,7 +6,8 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "bot.db")
+# Путь к БД можно переопределить через переменную окружения для тестов
+DB_PATH = os.environ.get("BOT_DB_PATH", os.path.join(os.path.dirname(__file__), "bot.db"))
 
 
 @contextmanager
@@ -96,11 +97,20 @@ def init_db():
                     title TEXT NOT NULL,
                     start_date TEXT NOT NULL,
                     end_date TEXT,
+                    start_iso TEXT,
+                    end_iso TEXT,
                     creator_id INTEGER,
                     is_approved INTEGER DEFAULT 0,
                     sheet_url TEXT,
                     FOREIGN KEY (creator_id) REFERENCES users(user_id) ON DELETE SET NULL
                 )""")
+                
+                # Миграция: Проверяем наличие новых колонок для старых баз
+                columns = [col[1] for col in c.execute("PRAGMA table_info(events)").fetchall()]
+                if 'start_iso' not in columns:
+                    c.execute("ALTER TABLE events ADD COLUMN start_iso TEXT")
+                if 'end_iso' not in columns:
+                    c.execute("ALTER TABLE events ADD COLUMN end_iso TEXT")
 
                 c.execute("""CREATE TABLE IF NOT EXISTS event_leads (
                     event_id INTEGER NOT NULL,

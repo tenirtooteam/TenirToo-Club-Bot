@@ -7,15 +7,21 @@ from keyboards.pagination_util import add_nav_footer
 
 def main_admin_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="📂 Шаблоны доступа (Группы)", callback_data="manage_groups")
-    builder.button(text="📍 Все топики (Имена/Доступ)", callback_data="all_topics_list")
-    builder.button(text="🏔 Мероприятия", callback_data="event_list")
-    builder.button(text="👥 Пользователи", callback_data="manage_users")
-    builder.button(text="🛡 Роли", callback_data="roles_dashboard")
-    builder.button(text="📊 Выгрузка в Google", callback_data="sheets_export_all")
-    builder.button(text="📥 Импорт из Google", callback_data="sheets_import_all")
+    builder.button(text="[ 📂 ШАБЛОНЫ ДОСТУПА ]", callback_data="manage_groups")
+    builder.button(text="[ 📍 ВСЕ ТОПИКИ ]", callback_data="all_topics_list")
+    builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
+    builder.button(text="[ 👥 ПОЛЬЗОВАТЕЛИ ]", callback_data="manage_users")
+    builder.button(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard")
+    builder.button(text="[ 📊 ЭКСПОРТ В GOOGLE ]", callback_data="sheets_export_all")
+    builder.button(text="[ 📥 ИМПОРТ ИЗ GOOGLE ]", callback_data="sheets_import_all")
     builder.adjust(1)
     add_nav_footer(builder, help_key="admin_menu", help_back_data="landing")
+    return builder.as_markup()
+
+def get_admin_cancel_kb(back_data: str):
+    """Универсальная клавиатура отмены для административных сценариев."""
+    builder = InlineKeyboardBuilder()
+    add_nav_footer(builder, back_data=back_data)
     return builder.as_markup()
 
 def back_to_main_kb():
@@ -35,8 +41,8 @@ def all_topics_kb(page: int = 1, limit: int = 7):
         t_name = names_map.get(t_id, f"ID: {t_id}")
         item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_global_view_{t_id}"))
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(
         item_buttons, static_buttons, page, limit, "all_topics_list",
@@ -100,13 +106,13 @@ def groups_list_kb(page: int = 1, limit: int = 7):
     groups = db.get_all_groups()
     item_buttons = []
     for g_id, g_name in groups:
-        item_buttons.append(InlineKeyboardButton(text=f"🔹 {g_name}", callback_data=f"group_info_{g_id}"))
+        item_buttons.append(InlineKeyboardButton(text=f"📂 {g_name}", callback_data=f"group_info_{g_id}"))
         
     static_buttons = [
         InlineKeyboardButton(text="➕ Создать шаблон", callback_data="add_group_start"),
         InlineKeyboardButton(text="❓ О шаблонах", callback_data="help:templates:manage_groups"),
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     from keyboards.pagination_util import build_paginated_menu
     return build_paginated_menu(
@@ -152,8 +158,8 @@ def users_list_kb(page: int = 1, limit: int = 7):
     ]
     static_buttons = [
         InlineKeyboardButton(text="➕ Добавить пользователя", callback_data="add_user_start"),
-        InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_main"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="admin_main"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     from keyboards.pagination_util import build_paginated_menu
     return build_paginated_menu(
@@ -187,8 +193,8 @@ def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
         item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_template_toggle_{user_id}_{g_id}"))
         
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"user_info_{user_id}"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=f"user_info_{user_id}"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_templates_manage_{user_id}")
 
@@ -263,8 +269,8 @@ def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
         item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"role_assign_topic_{user_id}_{t_id}"))
         
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"role_assign_user_{user_id}"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=f"role_assign_user_{user_id}"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"topic_assign_pg_{user_id}")
 

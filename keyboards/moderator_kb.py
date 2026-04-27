@@ -1,7 +1,13 @@
-# Файл: keyboards/moderator_kb.py
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup
 from database import db
 from keyboards.pagination_util import add_nav_footer
+
+def get_mod_cancel_kb(back_data: str) -> InlineKeyboardMarkup:
+    """Универсальная клавиатура отмены для сценариев модерации."""
+    builder = InlineKeyboardBuilder()
+    add_nav_footer(builder, back_data=back_data)
+    return builder.as_markup()
 
 
 def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
@@ -21,8 +27,8 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
         ))
         
     static_buttons = [
-        InlineKeyboardButton(text="🛡 Роли", callback_data="roles_dashboard"),
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard"),
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(
         item_buttons, static_buttons, page, limit, "moderator",

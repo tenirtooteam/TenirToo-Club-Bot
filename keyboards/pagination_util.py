@@ -9,10 +9,10 @@ def add_nav_footer(builder: InlineKeyboardBuilder, back_data: str = None, includ
     """
     nav_buttons = []
     if back_data:
-        nav_buttons.append(InlineKeyboardButton(text="⬅️ Назад", callback_data=back_data))
+        nav_buttons.append(InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=back_data))
     
     if include_close:
-        nav_buttons.append(InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu"))
+        nav_buttons.append(InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu"))
     
     if help_key:
         # Логика возврата из справки:
@@ -79,7 +79,7 @@ def build_paginated_menu(
         # Если в статичных кнопках есть "Назад" или "Закрыть", мы их обработаем в футере
         if s_btn.callback_data == "close_menu":
             continue
-        if s_btn.text == "⬅️ Назад" or s_btn.callback_data == callback_prefix:
+        if s_btn.text == "⬅️ НАЗАД" or s_btn.callback_data == callback_prefix:
             footer_back_data = s_btn.callback_data
             continue
         # Если в статичных кнопках есть справка (help:key:back)

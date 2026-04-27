@@ -58,9 +58,42 @@ def get_event_moderation_kb(event_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 def get_event_cancel_kb() -> InlineKeyboardMarkup:
-    """Кнопка отмены при создании мероприятия."""
+    """Клавиатура отмены создания мероприятия (только кнопка Назад)."""
     builder = InlineKeyboardBuilder()
     add_nav_footer(builder, back_data="event_list")
+    return builder.as_markup()
+
+def get_date_picker_kb() -> InlineKeyboardMarkup:
+    """Клавиатура с быстрыми датами."""
+    from services.date_service import DateService
+    builder = InlineKeyboardBuilder()
+    
+    # Добавляем 4 быстрые кнопки (2х2)
+    quick_btns = DateService.get_quick_date_buttons()
+    for btn in quick_btns:
+        builder.add(btn)
+    builder.adjust(2)
+    
+    # Кнопка ручного ввода [CC-3]
+    builder.row(InlineKeyboardButton(text="✍️ Ввести свою дату", callback_data="date_retry"))
+    
+    # Кнопка отмены/назад в футере
+    add_nav_footer(builder, back_data="event_list")
+    return builder.as_markup()
+
+def get_date_confirm_kb(iso_start: str, iso_end: str = None) -> InlineKeyboardMarkup:
+    """Клавиатура подтверждения после текстового ввода."""
+    builder = InlineKeyboardBuilder()
+    
+    # Если введена одна дата, предлагаем варианты
+    if not iso_end:
+        builder.button(text="✅ Один день", callback_data=f"date_confirm:{iso_start}:one")
+        builder.button(text="🗓 Добавить дату конца", callback_data=f"date_add_end:{iso_start}")
+    else:
+        builder.button(text="✅ Подтвердить диапазон", callback_data=f"date_confirm:{iso_start}:{iso_end}")
+        
+    builder.button(text="🔄 Ввести заново", callback_data="date_retry")
+    builder.adjust(1)
     return builder.as_markup()
 
 def get_audit_log_kb() -> InlineKeyboardMarkup:

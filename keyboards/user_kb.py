@@ -6,9 +6,9 @@ from keyboards.pagination_util import add_nav_footer, build_paginated_menu
 
 def user_main_kb():
     builder = InlineKeyboardBuilder()
-    builder.button(text="📍 Мои топики", callback_data="user_topics")
-    builder.button(text="🏔 Мероприятия", callback_data="event_list")
-    builder.button(text="👤 Мой профиль", callback_data="user_profile_view")
+    builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data="user_topics")
+    builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
+    builder.button(text="[ 👤 МОЙ ПРОФИЛЬ ]", callback_data="user_profile_view")
     builder.adjust(1)
     add_nav_footer(builder, help_key="main_menu", help_back_data="landing")
     return builder.as_markup()
@@ -31,7 +31,7 @@ def user_topics_list_kb(user_id: int, page: int = 1, limit: int = 7):
         ))
 
     static_buttons = [
-        InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
+        InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, "user_topics", help_key="topics", help_back_data="user_topics")
 

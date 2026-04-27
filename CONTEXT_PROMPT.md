@@ -31,12 +31,13 @@
 - [CP-2.17] **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and a unified router in `handlers/common.py`. Disambiguation is fully automated via the `"SEARCH_REQUIRED"` protocol.
 - [CP-2.18] **Performance Optimization**: Zero N+1 queries in the UI layer. All keyboard builders iterating over entity lists use batch-fetching helpers (`get_topic_names_by_ids`, etc.) to ensure high responsiveness. [PL-HI]
 - [CP-2.19] **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. Consolidation includes template-based operations and **flexible name parsing** for users (supporting spaces and patronymics).
-- [CP-2.20] **Automated Testing Suite**: Full coverage for Database, Service, and Handler layers using `pytest`. Tests utilize an ephemeral in-memory SQLite database to ensure zero side effects on production data.
+- [CP-2.20] **Declarative Testing Infrastructure**: Full coverage for Database, Service, and Handler layers using `pytest` with a unified fixture-based architecture (`conftest.py`). Includes isolated temporary databases for every test run, automated **Registry Integrity Scanners**, and **FSM Journey Validation**.
 - [CP-2.21] **Sterile Handler Architecture**: Handlers are 100% decoupled from the database facade. All data interaction (both reads and mutations) is mediated by the appropriate service layer (`PermissionService`, `ManagementService`, `EventService`).
-- [CP-2.22] **Expedition Protocol (Events)**: A complete lifecycle for club events (hikes, meetups). Includes multi-step creation (Title -> Dates), admin moderation queue (`is_approved` flag), participant tracking, and lead assignment. Standardized UI via `event_kb` and business logic via `EventService`. Includes internal sanitization of input data [PL-6.7].
+- [CP-2.22] **Expedition Protocol (Events)**: A complete lifecycle for club events (hikes, meetups). Includes the **Smart Hybrid Date Flow**: preset buttons (Today, Sat) + natural language parsing (via `DateService`). Supports ISO-8601 normalization for future calendar sync. Includes admin moderation queue, participant tracking, and lead assignment. Standardized UI via `event_kb` and business logic via `EventService`.
 - [CP-2.23] **Audit & Notification Layer**: Asynchronous approval workflow for critical actions (event creation, registration). Uses an atomic, idempotent resolution protocol in `ManagementService`. Statuses: `pending`, `approved`, `rejected`. Includes targeted notifications to users when their requests are processed.
 - [CP-2.24] **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `audit_requests` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
 - [CP-2.25] **Unified Role-Based Landing**: The bot uses a single public entry point (`/start`) and a "Traffic Controller" logic in `UIService.get_landing_data` to automatically route users to their respective dashboards. Supports a `role_override` parameter allowing debug aliases (`/admin`, `/mod`) to force specific interface generation while maintaining the central logic.
+- [CP-2.26] **Automated Reporting (Sheets)**: Background synchronization of club data to Google Sheets. Includes Master User List, Group Templates, and **Expedition Export** (Master Event List + individual participant rosters for every hike). Triggered automatically by data mutations in `ManagementService`. [RA-7.3]
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJ## [CP-3] CODING RULES AND CONSTRAINTS
 
@@ -73,7 +74,7 @@
 9. [CP-3.10] **TOPIC RENAME SYNC**: When renaming a topic via the admin panel, the change must be applied to both the local DB (`db.update_topic_name`) **and** the Telegram API (`bot.edit_forum_topic`).
    > Rationale: A DB-only rename creates a divergence causing user-visible inconsistency.
 
-10. [CP-3.11] **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.terminate_input(state, message)`. For command-level handlers (`@router.message(Command(...))`), use the `@UIService.sterile_command(redirect=True/False, error_prefix="...")` decorator instead of calling `UIService.sterile_redirect` directly. The decorated handler must return a `(text, reply_markup)` tuple or just `text`.
+10. [CP-3.11] **STERILE UI ENFORCEMENT**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.terminate_input(state, message)`. Every FSM entry point (where text input is required) MUST use an isolated cancel keyboard (e.g., `get_event_cancel_kb`, `get_admin_cancel_kb`) to prevent bypasses via functional buttons. [PL-HI] For command-level handlers, use the `@UIService.sterile_command` decorator.
     > Rationale: The decorator centralizes redirect logic, PM error fallback, trigger cleanup, and `last_menu_id` tracking into a single declarative line. Bypassing the decorator and calling `sterile_redirect` manually is redundant and error-prone.
 
 11. [CP-3.12] **Standardized UI Footer**: Every menu must have a navigation row created via `add_nav_footer` or `build_paginated_menu`.
@@ -81,98 +82,110 @@
     - Help Button: Must provide a unique key from `HelpService` and an explicit `help_back_data` for complex screens.
     > Rationale: Separating navigation from functional buttons improves ergonomics and ensures a consistent UI across the entire bot.
 
-12. [CP-3.13] **UI Integrity Testing**: All new keyboards must be added to `tests/test_services/test_ui_integrity.py` to verify callback reachability and prevent navigation "hangs".
+12. [CP-3.13] **UI Integrity & Durability**: All keyboards and FSM transitions are verified by `test_ui_integrity.py` (Registry sync), `test_fsm_isolation.py` (Bypass prevention), and the **Deep-UI Fuzzer** (`test_ui_fuzzer.py`), which uses global Bot-method interception to detect all interactive elements. All tests MUST follow the **Declarative Testing Standard [PL-HI]** using shared fixtures from `conftest.py`.
 
 13. [CP-3.14] **Heartfelt UI**: User-facing text must be community-oriented. Avoid technical jargon like "management system", "entities", "permissions" in the interface. Use "Assistant", "Gid", "Rights".
 
-14. [CP-3.15] **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
+15. [CP-3.15] **GLOBAL HANDLER UNIQUENESS**: Do not duplicate global callback handlers (such as `@router.callback_query(F.data == "close_menu")`) across multiple handler files. Place global handlers strictly in `handlers/common.py`.
     > Rationale: Duplicated handlers cause router dispatch conflicts, leading to unpredictable double-executions or arbitrary routing based on aiogram load order.
 
-15. [CP-3.16] **ROLE ENCAPSULATION**: Never manually inject system privileges (e.g., `superadmin` checks against `config.ADMIN_ID`) within UI handlers or keyboard builders. Use the database facade (e.g. `db.get_user_roles(user_id)`) which is designed to internally resolve and append virtual roles.
+16. [CP-3.16] **ROLE ENCAPSULATION**: Never manually inject system privileges (e.g., `superadmin` checks against `config.ADMIN_ID`) within UI handlers or keyboard builders. Use the database facade (e.g. `db.get_user_roles(user_id)`) which is designed to internally resolve and append virtual roles.
     > Rationale: Hardcoding admin IDs into the UI/presentation layer violates encapsulation. If the rules for admin detection change, all UI files would require auditing, leading to hard-to-trace bugs.
 
-14. [CP-3.15] **USER CARD CONSISTENCY**: All handlers displaying user profile details (Admin view, User view, Search results) MUST use `UIService.format_user_card` to ensure consistent visual styling and information architecture.
+17. [CP-3.17] **USER CARD CONSISTENCY**: All handlers displaying user profile details (Admin view, User view, Search results) MUST use `UIService.format_user_card` to ensure consistent visual styling and information architecture.
     > Rationale: Fragmented profile formatting leads to UI drift. Standardizing through a service method guarantees that role decorations and topic lists are always rendered identically.
 
-14. [CP-3.15] **STRICT DATABASE FUSE**: Do not attempt to bypass or weaken the Foreign Key check in `init_db()`.
+18. [CP-3.18] **STRICT DATABASE FUSE**: Do not attempt to bypass or weaken the Foreign Key check in `init_db()`.
     > Rationale: Native `ON DELETE CASCADE` is critical for data integrity. Running on a system without FK support will result in orphaned records and silent database corruption.
 
-15. [CP-3.16] **UIService.sterile_show AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.sterile_show(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `bot.edit_message_reply_markup(...)` are prohibited in handlers. When initiating FSM text input that requires a cancel button or other controls, pass `reply_markup` directly to `UIService.sterile_ask(..., reply_markup=...)`.
+19. [CP-3.19] **UIService.sterile_show AS SINGLE UI GATEWAY**: All menu transitions in handlers MUST use `UIService.sterile_show(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `bot.edit_message_reply_markup(...)` are prohibited in handlers. When initiating FSM text input that requires a cancel button or other controls, pass `reply_markup` directly to `UIService.sterile_ask(..., reply_markup=...)`.
     > Rationale: `UIService` methods are the single source of truth for UI lifecycle management. They handle `last_menu_id` tracking, cleanup, and state protection automatically. Manual Bot API calls bypass this infrastructure, leading to "dirty chat" and UI inconsistency.
 
-16. [CP-3.17] **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
+20. [CP-3.20] **STATE SIGNATURE RULE**: Every handler that invokes any `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
     > Rationale: aiogram's DI injects `state` only if explicitly declared. Silent failure without it crashes the handler at the first `UIService` call.
 
-17. [CP-3.18] **MANAGEMENT SERVICE MUTATION & QUERY PROTOCOL**: All entity mutations and data queries in handlers MUST traverse a service layer. Handlers are strictly prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` calls of any kind.
+21. [CP-3.21] **MANAGEMENT SERVICE MUTATION & QUERY PROTOCOL**: All entity mutations and data queries in handlers MUST traverse a service layer. Handlers are strictly prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` calls of any kind.
     > Rationale: The service layer (ManagementService, PermissionService, EventService) sanitizes intent and provides proxy methods for reads. Centralizing this logic prevents code duplication and ensures that business rules are applied consistently across all UI flows.
 
-18. [CP-3.19] **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
+22. [CP-3.22] **SEARCH DELEGATION RULE**: Handlers must respect the `"SEARCH_REQUIRED"` signal from `ManagementService`. When received, the handler should trigger the shared search/disambiguation logic from `handlers/common.py`.
     > Rationale: This ensures that complex search logic is shared rather than duplicated across multiple management flows.
 
-19. [CP-3.20] **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)`. The navigator MUST implement a **Defensive Routing** protocol: before calling any keyboard builder or transition, it must verify the route exists and is valid (e.g., via callable checks or explicit key matching).
+23. [CP-3.23] **UNIFIED NAVIGATION RULE**: All standard UI returns, menu transitions, and dashboard entries SHOULD use `UIService.generic_navigator(state, event, callback_data)`. The navigator MUST implement a **Defensive Routing** protocol: before calling any keyboard builder or transition, it must verify the route exists and is valid (e.g., via callable checks or explicit key matching).
     > Rationale: Centralizing routing logic prevents "UI logic leak". Defensive checks prevent `TypeError` or `NoneType` crashes in the router if a route mapping is incomplete or misconfigured.
 
-20. [CP-3.21] **VERIFY BEFORE AND AFTER CHANGE**: BEFORE making any code changes, view the target file and signatures. AFTER any modification to a strategic file (`.md`, `db.py`, `UIService`), it is mandatory to `view_file` the entire modified section to ensure no structural truncation or logic drift occurred.
+24. [CP-3.24] **VERIFY BEFORE AND AFTER CHANGE**: BEFORE making any code changes, view the target file and signatures. AFTER any modification to a strategic file (`.md`, `db.py`, `UIService`), it is mandatory to `view_file` the entire modified section to ensure no structural truncation or logic drift occurred.
     > Rationale: Relying on memory leads to bugs. Post-edit verification is the only way to catch "greedy match" errors that silently delete surrounding structural logic.
 
-21. [CP-3.22] **AUTOMATED TESTING**: All modifications to core logic (Database, Services, Handlers) MUST be verified against the existing test suite using `pytest`. New features or critical bug fixes MUST include corresponding tests in the `tests/` directory.
+25. [CP-3.25] **AUTOMATED TESTING**: All modifications to core logic (Database, Services, Handlers) MUST be verified against the existing test suite using `pytest`. New features or critical bug fixes MUST include corresponding tests in the `tests/` directory.
     > Rationale: The test suite is the single source of functional truth and the only way to prevent regressions in a complex, multi-layered bot architecture.
 
-22. [CP-3.23] **VENV ISOLATION**: All development, testing, and execution MUST occur within a virtual environment (`venv`). Commands provided to the user must assume an active environment or include activation steps.
+26. [CP-3.26] **VENV ISOLATION**: All development, testing, and execution MUST occur within a virtual environment (`venv`). Commands provided to the user must assume an active environment or include activation steps.
     > Rationale: Global package installations lead to version conflicts and unpredictable behavior. Mandatory `venv` ensures environment parity between development and production.
 
-23. [CP-3.24] **NON-BLOCKING I/O RULE**: All network operations (e.g., Google Sheets API, external webhooks) MUST be executed asynchronously and SHOULD use background tasks (`asyncio.create_task`) if they are triggered by user actions but don't require immediate UI feedback.
+27. [CP-3.27] **NON-BLOCKING I/O RULE**: All network operations (e.g., Google Sheets API, external webhooks) MUST be executed asynchronously and SHOULD use background tasks (`asyncio.create_task`) if they are triggered by user actions but don't require immediate UI feedback.
     > Rationale: Blocking the main event loop during network latency causes the bot to "freeze" for all users. Background execution ensures a fluid user experience.
 
-24. [CP-3.25] **STRATEGIC PLANNING (RNA-BLUEPRINT)**: For any non-trivial logical change (features, refactoring, audit), an implementation plan using the **RNA-Blueprint** format must be established.
-    - [CP-3.25.1] **Header Logic**: The header must include **Base DNA** (standards), **Task RNA** (logic, risks), and **Contextual Constraints (CC)**. CC are critical principles and nuances extracted from `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` specifically for the current task, indexed (e.g., `[CC-1]`). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
-    - [CP-3.25.2] **Incremental Principle**: Do not rewrite the entire plan for every correction; update only the affected parts.
-    - [CP-3.25.3] **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[CC-x]`) referring to the header logic. Every task must be verified against the CC list for compliance.
-    - [CP-3.25.4] **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
-    - [CP-3.25.5] **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
+28. [CP-3.28] **STRATEGIC PLANNING (RNA-BLUEPRINT)**: For any non-trivial logical change (features, refactoring, audit), an implementation plan using the **RNA-Blueprint** format must be established.
+    - [CP-3.28.1] **Header Logic**: The header must include **Base DNA** (standards), **Task RNA** (logic, risks), and **Contextual Constraints (CC)**. CC are critical principles and nuances extracted from `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` specifically for the current task, indexed (e.g., `[CC-1]`). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
+    - [CP-3.28.2] **Incremental Principle**: Do not rewrite the entire plan for every correction; update only the affected parts.
+    - [CP-3.28.3] **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[CC-x]`) referring to the header logic. Every task must be verified against the CC list for compliance.
+    - [CP-3.28.4] **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
+    - [CP-3.28.5] **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
 
-25. [CP-3.26] **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
+29. [CP-3.29] **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
      > Rationale: Standardizing the synchronization process prevents accidental data loss, ensures clear history, and maintains environment parity across distributed workspaces.
 
-26. [CP-3.27] **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
+30. [CP-3.30] **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
      > Rationale: Prevents architectural decay and ensures the codebase remains lean and aligned with project-specific constraints without introducing unnecessary churn.
 
-27. [CP-3.28] **BATCH-FETCH RULE**: Keyboard builders iterating over entity lists (users, topics, groups) MUST use batch-fetching helpers (e.g., `db.get_topic_names_by_ids`) to avoid N+1 database queries. direct `db.*` calls inside loops are strictly prohibited. [PL-HI]
+31. [CP-3.31] **BATCH-FETCH RULE**: Keyboard builders iterating over entity lists (users, topics, groups) MUST use batch-fetching helpers (e.g., `db.get_topic_names_by_ids`) to avoid N+1 database queries. direct `db.*` calls inside loops are strictly prohibited. [PL-HI]
     > Rationale: Minimizes I/O overhead and database lock contention, ensuring the UI remains responsive even as the number of entities grows.
 
-28. [CP-3.29] **STRATEGIC ANCHORING**: When modifying strategic files (`🔒 Private` or `🌐 Public` prompts and technical docs), `TargetContent` MUST include the section header and at least 2 lines of surrounding context. Simplification of match targets that sacrifices structural anchors is strictly prohibited.
+32. [CP-3.32] **STRATEGIC ANCHORING**: When modifying strategic files (`🔒 Private` or `🌐 Public` prompts and technical docs), `TargetContent` MUST include the section header and at least 2 lines of surrounding context. Simplification of match targets that sacrifices structural anchors is strictly prohibited.
      > Rationale: High-fidelity anchoring prevents accidental deletion of "structural" bullet points or constraints that reside near the modification area.
 
-29. [CP-3.30] **BY-ID PREFERENCE**: When an entity ID (user_id, topic_id, group_id) is already known as an integer, handlers MUST use `*_by_id` service methods (e.g., `ManagementService.assign_moderator_role_by_id`) instead of string-parsing equivalents.
+33. [CP-3.33] **BY-ID PREFERENCE**: When an entity ID (user_id, topic_id, group_id) is already known as an integer, handlers MUST use `*_by_id` service methods (e.g., `ManagementService.assign_moderator_role_by_id`) instead of string-parsing equivalents.
      > Rationale: Eliminates redundant type conversions and string validation logic, reducing CPU cycles and improving code readability in high-frequency routing paths.
 
-30. [CP-3.31] **ZERO CREATIVITY**: Architectural or logic proposals regarding bot functionality MUST NEVER be answered conversationally. They MUST trigger Route B (**PA-1** / **APA-1**). Any technical advice outside verified patterns must be flagged as "Speculative" and require an explicit audit. Implementation planning (RNA-Blueprint) MUST start only after an explicit **RNA-1** command following an approved audit.
+34. [CP-3.34] **ZERO CREATIVITY**: Architectural or logic proposals regarding bot functionality MUST NEVER be answered conversationally. They MUST trigger Route B (**PA-1** / **APA-1**). Any technical advice outside verified patterns must be flagged as "Speculative" and require an explicit audit. Implementation planning (RNA-Blueprint) MUST start only after an explicit **RNA-1** command following an approved audit.
      > Rationale: Prevents protocol drift and ensures all changes are vetted against the Optimality Standard and project constraints before a single line of plan or code is written.
 
-31. [CP-3.32] **CONTENT ISOLATION**: All user-facing documentation, help tooltips, and long static messages MUST reside in `services/help_service.py`. Handlers MUST NOT contain hardcoded help strings. [CC-2]
+35. [CP-3.35] **CONTENT ISOLATION**: All user-facing documentation, help tooltips, and long static messages MUST reside in `services/help_service.py`. Handlers MUST NOT contain hardcoded help strings. [CC-2]
     > Rationale: Ensures a clean separation of concerns, simplifies localization, and prevents code bloat in UI handlers.
 
-32. [CP-3.33] **delete_msg AS ORPHAN TERMINATOR**: Notifications and push-messages sent via direct `bot.send_message` (outside FSM tracking) MUST be finalized using `UIService.delete_msg(callback.message)`. Using `UIService.sterile_show` for these "orphan" messages is an architectural violation.
+36. [CP-3.36] **delete_msg AS ORPHAN TERMINATOR**: Notifications and push-messages sent via direct `bot.send_message` (outside FSM tracking) MUST be finalized using `UIService.delete_msg(callback.message)`. Using `UIService.sterile_show` for these "orphan" messages is an architectural violation.
     > Rationale: Orphan messages have no FSM `last_menu_id` entry. `sterile_show` attempts to track state, which fails for orphan messages, potentially leaving active buttons in the chat history. `delete_msg` ensures the UI is cleaned and the callback is answered without state side-effects.
 
-33. [CP-3.34] **UI TRACE ENFORCEMENT**: When analyzing or proposing changes to UI transitions, the AI MUST perform a step-by-step trace of `last_menu_ids` state. It must explicitly identify which method (e.g., `sterile_ask`, `terminate_input`, or `sterile_show`) is responsible for deleting specific message IDs at each stage of the interaction.
+37. [CP-3.37] **UI TRACE ENFORCEMENT**: When analyzing or proposing changes to UI transitions, the AI MUST perform a step-by-step trace of `last_menu_ids` state. It must explicitly identify which method (e.g., `sterile_ask`, `terminate_input`, or `sterile_show`) is responsible for deleting specific message IDs at each stage of the interaction.
     > Rationale: Prevents shallow trace errors where the AI assumes cleanup happens by "magic", which leads to logic regressions and double-deletion attempts.
 
-34. [CP-3.35] **UNIVERSAL INDEXING PROTOCOL**: Every logic block, rule, and pattern in strategic files MUST be assigned a unique Index ID (`CP-x` for context, `PL-x` for logic). These IDs MUST be used in `implementation_plan.md` [CP-3.25] and as in-code markers to ensure 100% traceability.
+38. [CP-3.38] **STRICT ID HARDENING**: All user IDs retrieved from DB or config MUST be explicitly cast to `int` before being used in `set()` operations or collection-based logic.
+    > Rationale: Prevents duplication of notifications and logic bypasses caused by Python's type-sensitivity when handling potential mixed string/int data from SQLite.
+
+39. [CP-3.39] **UNIVERSAL INDEXING PROTOCOL**: Every logic block, rule, and pattern in strategic files MUST be assigned a unique Index ID (`CP-x` for context, `PL-x` for logic). These IDs MUST be used in `implementation_plan.md` [CP-3.25] and as in-code markers to ensure 100% traceability.
     > Rationale: Indexing eliminates the need to copy full rule text into plans, saving context window while maintaining strict architectural alignment and facilitating rapid lookups.
 
-35. [CP-3.36] **UNIVERSAL DISPATCHING**: All interactive buttons posted in broadcast messages (Announcements) MUST use the `announcements` database registry as a dispatcher. Do not link buttons directly to entity IDs (e.g. `event_join:42`). Use `ann_join:{announcement_id}` to ensure context-aware permission checks.
+40. [CP-3.40] **UNIVERSAL DISPATCHING**: All interactive buttons posted in broadcast messages (Announcements) MUST use the `announcements` database registry as a dispatcher. Do not link buttons directly to entity IDs (e.g. `event_join:42`). Use `ann_join:{announcement_id}` to ensure context-aware permission checks.
     > Rationale: Dispatching abstracts the interaction from the entity, allowing unified handling and strict adherence to the "Only topic members" engagement rule.
 
-36. [CP-3.37] **QUICK ANNOUNCEMENT FORMAT**: The `/an` command MUST support the format `Title\nDescription`. The handler is responsible for creating a "Rapid Event" and cleaning up the trigger message to maintain thread sterility.
+41. [CP-3.41] **QUICK ANNOUNCEMENT FORMAT**: The `/an` command MUST support the format `Title\nDescription`. The handler is responsible for creating a "Rapid Event" and cleaning up the trigger message to maintain thread sterility.
     > Rationale: Standardization of command input ensures data integrity while maintaining the "Quick" nature of operational announcements.
 
-37. [CP-3.38] **CASCADE COMPLIANCE**: When implementing deletion of any entity (User, Topic, Event), the developer MUST verify both native DB cascades (FK) and polymorphic cleanups (e.g. removing entries from `announcements`). Failure to clean up dispatcher-based links is an architectural violation.
+42. [CP-3.42] **CASCADE COMPLIANCE**: When implementing deletion of any entity (User, Topic, Event), the developer MUST verify both native DB cascades (FK) and polymorphic cleanups (e.g. removing entries from `announcements`). Failure to clean up dispatcher-based links is an architectural violation.
     > Rationale: Polymorphic links bypass native FK protection. Explicit cleanup is the only way to prevent data rot and orphaned interaction buttons in the chat history.
 
-38. [CP-3.39] **FSM JOURNEY VALIDATION**: For any multi-step FSM scenario (Editing, Creation), the developer MUST provide or update an asynchronous journey test (e.g. `test_event_fsm.py`) to verify that the state machine doesn't hang and clears properly.
+43. [CP-3.43] **FSM JOURNEY VALIDATION**: For any multi-step FSM scenario (Editing, Creation), the developer MUST provide or update an asynchronous journey test (e.g. `test_event_fsm.py`) to verify that the state machine doesn't hang and clears properly.
     > Rationale: FSM is the most fragile part of the UI; automated journey tests prevent "frozen" interfaces for end-users.
+
+44. [CP-3.44] **SMART DATE PROTOCOL**: All date-related inputs MUST be processed via `DateService.parse_smart_date`. Never implement ad-hoc regex or string splitting for dates in handlers.
+    > Rationale: Centralizing date parsing ensures that natural language support ("Завтра", "Сб") and normalization to ISO-8601 remain consistent across the system.
+
+45. [CP-3.45] **PRESENTATION/DATA SEPARATION**: Strings stored in the database (e.g., `start_date`, `end_date`) MUST remain in their raw human-entered format without UI decorations like weekday suffixes (e.g., "(Пн)"). All decorations MUST be applied at the presentation layer (e.g., `EventService.format_event_card`).
+    > Rationale: Prevents "data pollution" and cumulative duplication of UI elements when records are edited or displayed multiple times.
+
+46. [CP-3.46] **ADMIN CREATION UX BRANCHING**: In workflows where an entity creation triggers an automatic audit notification (to admins), the creation handler MUST NOT immediately show the final entity card to the creator if they are an admin. Show a clean success message instead.
+    > Rationale: Prevents UI clutter and notification fatigue for administrators who would otherwise receive both a state-update message and a new notification for the same action.
 
 ---
 

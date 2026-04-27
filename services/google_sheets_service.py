@@ -126,3 +126,80 @@ class GoogleSheetsService:
         except Exception as e:
             logger.error(f"Ошибка импорта групп из Google Sheets: {e}")
             return []
+    @staticmethod
+    async def export_events(events: List[Dict[str, Any]]):
+        """
+        Выгружает сводный список мероприятий в лист 'Events'.
+        events: список словарей с данными из БД.
+        """
+        if not config.SPREADSHEET_ID:
+            return False
+            
+        try:
+            client = await GoogleSheetsService.get_client()
+            sh = await client.open_by_key(config.SPREADSHEET_ID)
+            
+            try:
+                worksheet = await sh.worksheet("Events")
+            except Exception:
+                worksheet = await sh.add_worksheet(title="Events", rows="1000", cols="10")
+                
+            headers = ["ID", "Title", "Date (Text)", "Start ISO", "End ISO", "Status", "Participants Count"]
+            data = [headers]
+            for e in events:
+                data.append([
+                    str(e['event_id']), 
+                    e['title'], 
+                    e['start_date'], 
+                    e.get('start_iso', ""), 
+                    e.get('end_iso', ""),
+                    "Approved" if e['is_approved'] else "Pending",
+                    str(len(e.get('participants', [])))
+                ])
+                
+            await worksheet.clear()
+            await worksheet.update(range_name="A1", values=data)
+            logger.info(f"Экспортировано {len(events)} мероприятий в Google Sheets.")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка экспорта мероприятий в Google Sheets: {e}")
+            return False
+
+    @staticmethod
+    async def export_event_participants(event_id: int, title: str, participants: List[Dict[str, Any]]):
+        """
+        Выгружает список участников конкретного похода в отдельный лист.
+        title: Название похода (используется для имени листа).
+        """
+        if not config.SPREADSHEET_ID:
+            return False
+            
+        try:
+            client = await GoogleSheetsService.get_client()
+            sh = await client.open_by_key(config.SPREADSHEET_ID)
+            
+            # Имя листа: "E_ID_Title" (ограничение длины 31 символ в Google Sheets)
+            sheet_title = f"E_{event_id}_{title}"[:30]
+            
+            try:
+                worksheet = await sh.worksheet(sheet_title)
+            except Exception:
+                worksheet = await sh.add_worksheet(title=sheet_title, rows="500", cols="5")
+                
+            headers = ["User ID", "Name", "Role", "Join Date"]
+            data = [headers]
+            for p in participants:
+                data.append([
+                    str(p['user_id']), 
+                    p['name'], 
+                    p['role'], 
+                    p.get('join_date', "")
+                ])
+                
+            await worksheet.clear()
+            await worksheet.update(range_name="A1", values=data)
+            logger.info(f"Экспортировано {len(participants)} участников ивента {event_id} в Google Sheets.")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка экспорта участников ивента {event_id} в Google Sheets: {e}")
+            return False

@@ -108,3 +108,20 @@ def test_update_user_name_validation():
     assert ok is True
     assert db.get_user_name(u_id) == "Ivan Ivanov"
 
+@pytest.mark.asyncio
+async def test_sheets_sync_triggers(mock_bot):
+    from unittest.mock import patch
+    # Сначала создаем юзера, чтобы избежать FK error
+    db.add_user(123, "Sync", "Tester")
+    
+    with patch.object(ManagementService, '_trigger_sheets_sync') as mock_sync:
+        # 1. Тест триггера при смене участия в мероприятии
+        event_id = db.create_event("Sync Test", "today", "", 123)
+        ManagementService.toggle_event_participation(event_id, 123)
+        mock_sync.assert_called_with("event_participants", event_id)
+        
+        # 2. Тест триггера при одобрении мероприятия
+        req_id = db.create_audit_request(123, "event_approval", event_id)
+        await ManagementService.resolve_request(mock_bot, req_id, "approved")
+        # Должен вызвать синк общего списка ивентов
+        mock_sync.assert_any_call("events")

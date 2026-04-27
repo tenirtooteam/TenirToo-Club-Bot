@@ -132,4 +132,4 @@ def get_global_admin_ids() -> list:
             JOIN roles r ON ur.role_id = r.id
             WHERE r.name IN ('admin', 'superadmin')
         """)
-        return [row[0] for row in c.fetchall()]
+        return [int(row[0]) for row in c.fetchall()]

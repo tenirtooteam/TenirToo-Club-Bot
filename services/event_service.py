@@ -33,9 +33,22 @@ class EventService:
         leads_str = ", ".join(lead_names) if lead_names else "Не назначен"
         participants_str = "\n".join(participant_names) if participant_names else "Пока никого нет"
 
+        from services.date_service import DateService
+        
+        # Динамически добавляем дни недели для красоты UI [CC-2]
+        d_start = event['start_date']
+        if event['start_iso']:
+            d_start += DateService.get_weekday_suffix(event['start_iso'])
+            
+        d_end = event['end_date']
+        if d_end and event['end_iso']:
+            d_end += DateService.get_weekday_suffix(event['end_iso'])
+        elif not d_end:
+            d_end = "?"
+
         return (
             f"🏔 <b>{event['title']}</b>\n"
-            f"📅 Даты: {event['start_date']} — {event['end_date'] or '?'}\n"
+            f"📅 Даты: {d_start} — {d_end}\n"
             f"👑 Организатор: {creator_name}\n"
             f"👨‍✈️ Ответственные: {leads_str}\n"
             f"📊 Статус: {status}\n\n"
@@ -48,10 +61,10 @@ class EventService:
         """Отправляет карточку на модерацию всем администраторам."""
         import config
         
-        # Получаем всех глобальных админов из БД
-        admin_ids = set(db.get_global_admin_ids())
-        # Обязательно добавляем системного админа из конфига
-        admin_ids.add(config.ADMIN_ID)
+        # Получаем всех глобальных админов из БД и гарантируем тип int [PL-HI]
+        admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
+        # Обязательно добавляем системного админа из конфига (кастуем для верности)
+        admin_ids.add(int(config.ADMIN_ID))
         
         card_text = f"🚨 <b>Новое Мероприятие на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
         kb_markup = kb.get_event_moderation_kb(event_id)

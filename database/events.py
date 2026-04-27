@@ -5,27 +5,27 @@ from database.connection import get_conn
 
 logger = logging.getLogger(__name__)
 
-def create_event(title: str, start_date: str, end_date: str, creator_id: int, is_approved: int = 0) -> int:
+def create_event(title: str, start_date: str, end_date: str, creator_id: int, is_approved: int = 0, start_iso: str = None, end_iso: str = None) -> int:
     try:
         with get_conn() as conn:
             with conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO events (title, start_date, end_date, creator_id, is_approved) VALUES (?, ?, ?, ?, ?)",
-                    (title, start_date, end_date, creator_id, is_approved)
+                    "INSERT INTO events (title, start_date, end_date, creator_id, is_approved, start_iso, end_iso) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (title, start_date, end_date, creator_id, is_approved, start_iso, end_iso)
                 )
                 return cursor.lastrowid
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка создания мероприятия: {e}")
         return -1
 
-def update_event_details(event_id: int, title: str, start_date: str, end_date: str) -> bool:
+def update_event_details(event_id: int, title: str, start_date: str, end_date: str, start_iso: str = None, end_iso: str = None) -> bool:
     try:
         with get_conn() as conn:
             with conn:
                 conn.execute(
-                    "UPDATE events SET title = ?, start_date = ?, end_date = ? WHERE event_id = ?",
-                    (title, start_date, end_date, event_id)
+                    "UPDATE events SET title = ?, start_date = ?, end_date = ?, start_iso = ?, end_iso = ? WHERE event_id = ?",
+                    (title, start_date, end_date, start_iso, end_iso, event_id)
                 )
         return True
     except sqlite3.Error as e:
@@ -110,7 +110,7 @@ def get_event_details(event_id: int) -> Optional[Dict[str, Any]]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url FROM events WHERE event_id = ?", (event_id,))
+            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url, start_iso, end_iso FROM events WHERE event_id = ?", (event_id,))
             row = cursor.fetchone()
             if not row:
                 return None
@@ -129,6 +129,8 @@ def get_event_details(event_id: int) -> Optional[Dict[str, Any]]:
                 "creator_id": row[4],
                 "is_approved": bool(row[5]),
                 "sheet_url": row[6],
+                "start_iso": row[7],
+                "end_iso": row[8],
                 "leads": leads,
                 "participants": participants
             }
@@ -140,8 +142,8 @@ def get_active_events() -> List[Dict[str, Any]]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date FROM events WHERE is_approved = 1 ORDER BY start_date ASC")
-            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3]} for r in cursor.fetchall()]
+            cursor.execute("SELECT event_id, title, start_date, end_date, start_iso, end_iso FROM events WHERE is_approved = 1 ORDER BY start_date ASC")
+            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3], "start_iso": r[4], "end_iso": r[5]} for r in cursor.fetchall()]
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения списка активных мероприятий: {e}")
         return []
@@ -150,8 +152,8 @@ def get_pending_events() -> List[Dict[str, Any]]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id FROM events WHERE is_approved = 0 ORDER BY event_id ASC")
-            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3], "creator_id": r[4]} for r in cursor.fetchall()]
+            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, start_iso, end_iso FROM events WHERE is_approved = 0 ORDER BY event_id ASC")
+            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3], "creator_id": r[4], "start_iso": r[5], "end_iso": r[6]} for r in cursor.fetchall()]
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения списка ожидающих мероприятий: {e}")
         return []

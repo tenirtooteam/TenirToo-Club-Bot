@@ -3,7 +3,8 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
-from handlers.events import edit_event_init, process_editing_title, process_editing_dates, EventCreation
+from handlers.events import edit_event_init, process_editing_title, process_editing_dates, start_event_creation, EventCreation
+import keyboards as kb
 from database import db
 
 @pytest.mark.asyncio
@@ -61,4 +62,32 @@ async def test_event_edit_full_flow():
     # Проверяем финальный результат в БД
     updated_event = db.get_event_details(event_id)
     assert updated_event['title'] == "New Shiny Title"
-    assert updated_event['start_date'] == "25-30 декабря"
+    # Теперь дата содержит суффикс дня недели, проверяем начало строки
+    assert updated_event['start_date'].startswith("25-30 дек")
+
+@pytest.mark.asyncio
+async def test_event_creation_ux_isolation():
+    """
+    Тест защиты UX: Первый шаг создания ивента НЕ должен давать выбор даты.
+    """
+    storage = MemoryStorage()
+    key = MagicMock()
+    state = FSMContext(storage, key)
+    
+    callback = AsyncMock()
+    callback.data = "event_create"
+    
+    # Патчим UIService.sterile_ask, чтобы проверить reply_markup
+    from unittest.mock import patch
+    with patch("services.ui_service.UIService.sterile_ask", new_callable=AsyncMock) as mock_ask:
+        await start_event_creation(callback, state)
+        
+        # Получаем переданную клавиатуру
+        args, kwargs = mock_ask.call_args
+        reply_markup = kwargs.get('reply_markup')
+        
+        # Проверяем, что в клавиатуре НЕТ кнопок с date_preset (защита от байпаса)
+        for row in reply_markup.inline_keyboard:
+            for btn in row:
+                assert not btn.callback_data.startswith("date_preset:"), \
+                    "🚨 UX Violation: Date buttons found on Title input step!"

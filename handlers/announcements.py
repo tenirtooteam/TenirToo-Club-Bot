@@ -82,6 +82,8 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     else:
         await callback.answer("🛠 Этот тип анонса пока в разработке.")
 
+from services.event_service import EventService
+
 @router.callback_query(F.data.startswith("event_announce_init:"))
 @safe_callback()
 async def event_announce_init_handler(callback: types.CallbackQuery, state: FSMContext):
@@ -89,8 +91,8 @@ async def event_announce_init_handler(callback: types.CallbackQuery, state: FSMC
     user_id = callback.from_user.id
     event_id = int(callback.data.split(":")[1])
     
-    # 1. Проверка прав
-    if not PermissionService.can_edit_event(user_id, event_id):
+    # 1. Проверка прав [PL-2.2.15]
+    if not EventService.can_edit_event(user_id, event_id):
         return await callback.answer("❌ У вас нет прав на анонсирование этого мероприятия.", show_alert=True)
         
     # 2. Для MVP: анонсируем в тот же топик, где находится пользователь
