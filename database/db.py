@@ -38,5 +38,6 @@ from .audit import (
     get_pending_requests_by_type, get_user_pending_request
 )
 from .announcements import (
-    create_announcement, get_announcement, delete_announcements_by_target
+    create_announcement, get_announcement, delete_announcements_by_target,
+    update_announcement_metadata
 )

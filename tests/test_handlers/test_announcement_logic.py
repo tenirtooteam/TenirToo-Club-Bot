@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from handlers.announcements import cmd_quick_announcement, announcement_join_handler
 from database import db
 
@@ -24,6 +24,9 @@ async def test_quick_announcement_success(create_context, db_setup):
     # 3. Мокаем удаление сообщения и ответ
     with patch("services.ui_service.UIService.delete_msg", new_callable=AsyncMock) as mock_del, \
          patch("aiogram.types.Message.answer", new_callable=AsyncMock) as mock_answer:
+        
+        # Настраиваем mock_answer, чтобы он возвращал объект с message_id
+        mock_answer.return_value = MagicMock(message_id=999, chat=MagicMock(id=123))
         
         await cmd_quick_announcement(message, state)
         

@@ -39,11 +39,11 @@ async def cmd_quick_announcement(message: types.Message, state: FSMContext):
 
     # 3. Публикуем анонс с кнопкой
     from keyboards.announcements_kb import get_announcement_kb
-    sent = await message.answer(text, reply_markup=get_announcement_kb(ann_id))
+    is_group = (message.chat.type != "private")
+    sent = await message.answer(text, reply_markup=get_announcement_kb(ann_id, is_group=is_group))
     
     # 4. Сохраняем ID сообщения в БД для будущего контроля
-    # (Опционально, но полезно для редактирования)
-    # db.update_announcement_msg(ann_id, message.chat.id, sent.message_id)
+    db.update_announcement_metadata(ann_id, message.chat.id, sent.message_id)
 
     # 5. Стерильность: Удаляем сообщение с командой
     await UIService.delete_msg(message)
@@ -75,15 +75,35 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     if ann_type == "event":
         from services.management_service import ManagementService
         from services.event_service import EventService
-        success, msg = ManagementService.toggle_event_participation(target_id, user_id)
         
-        if success and "записаны" in msg:
-            await EventService.notify_organizers_of_direct_join(callback.message.bot, target_id, user_id)
+        # Получаем код действия (1 - иду, 0 - не иду)
+        action_code = callback.data.split(":")[-1]
+        
+        if action_code == "1":
+            msg = ManagementService.add_event_participation_action(target_id, user_id)
+            if "записаны" in msg:
+                await EventService.notify_organizers_of_direct_join(callback.message.bot, target_id, user_id)
+        elif action_code == "0":
+            msg = ManagementService.remove_event_participation_action(target_id, user_id)
+        else:
+            # Старый формат (тоггл) - на всякий случай
+            _, msg = ManagementService.toggle_event_participation(target_id, user_id)
             
-        await callback.answer(msg)
+        await callback.answer(msg, show_alert=True)
         
-        # Обновляем текст анонса (опционально, можно добавить список участников)
-        # await update_announcement_view(callback.message, ann_id)
+        # Обновляем текст анонса с актуальным списком участников [PL-5.1.18]
+        new_text = AnnouncementService.format_announcement_text(ann_id)
+        from keyboards.announcements_kb import get_announcement_kb
+        
+        try:
+            await callback.message.edit_text(
+                text=new_text,
+                reply_markup=get_announcement_kb(ann_id, is_group=True)
+            )
+        except Exception as e:
+            # Игнорируем ошибку, если текст не изменился (message is not modified)
+            if "message is not modified" not in str(e).lower():
+                logger.error(f"Ошибка обновления анонса: {e}")
     else:
         await callback.answer("🛠 Этот тип анонса пока в разработке.")
 
@@ -108,8 +128,10 @@ async def event_announce_init_handler(callback: types.CallbackQuery, state: FSMC
     if target_topic_id == 0:
         return await callback.answer("⚠️ Анонсирование доступно только внутри топиков клуба.", show_alert=True)
 
-    success, msg = await AnnouncementService.broadcast_event_announcement(
+    success, msg, ann_id = await AnnouncementService.broadcast_event_announcement(
         callback.bot, event_id, target_topic_id, user_id
     )
     
     await callback.answer(msg, show_alert=True)
+
+

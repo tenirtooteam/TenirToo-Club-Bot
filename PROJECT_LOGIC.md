@@ -8,6 +8,7 @@
 - [PL-1.5] **Testing Suite**: pytest 8.1.1 with pytest-asyncio, pytest-mock and pytest-cov.
 - [PL-1.6] **Database Engine**: SQLite 3 with Write-Ahead Logging (WAL).
 - [PL-1.7] **Core Purpose**: Granular access control and stealth moderation for Telegram Forum Topics within a Supergroup.
+- [PL-1.8] **Web Bridge**: FastAPI with uvicorn for Telegram Mini Apps (TMA) integration.
 
 ---
 
@@ -22,14 +23,15 @@ Decoupled concerns across five layers:
 - [PL-2.1.5] **Database** — Persistence via Facade pattern.
 - [PL-2.1.6] **Tests** — Automated test suite using in-memory database and mocks.
 - [PL-2.1.7] **Indexing Protocol** — Universal addressing system (`CP-x`, `PL-x`) for all rules and patterns. Used to minimize context bloat and ensure precise execution via Main AI.
+- [PL-2.1.8] **Web Bridge** — FastAPI backend for Telegram Mini Apps. Shared service layer access with the bot.
 
 ### [PL-2.2] Module Registry
 Complete file list with individual responsibilities and full function inventory:
 
-- [PL-2.2.1] **main.py** — Entry point: `setup_logging` (RotatingFileHandler, 5MB limit, 5 backup files, dual console+file output to `logs/bot.log`), DB initialization via `db.init_db()`, router registration (common → user → admin → moderator), outer middleware chaining (UserManager → ForumUtility → AccessGuard), bot polling with `drop_pending_updates=True`.
+- [PL-2.2.1] **main.py** — Entry point: `setup_logging`, DB initialization, router registration, outer middleware chaining, and concurrent execution of WebApp (uvicorn) and Bot polling via `asyncio.gather`. [CC-3]
 
 - [PL-2.2.2] **loader.py** — Initializes `Bot` and `Dispatcher` with `MemoryStorage`.
-- [PL-2.2.3] **config.py** — Environment variable loader and global constants definition.
+- [PL-2.2.3] **config.py** — Environment variable loader and global constants definition. Centralizes all magic numbers, logging parameters, and WebApp configurations.
 - [PL-2.2.4] **database/__init__.py** — Package initializer for DB facade pattern.
 - [PL-2.2.5] **database/connection.py** — Connection context manager, WAL activation, and Foreign Key enforcement.
 - [PL-2.2.6] **database/audit.py** — Audit requests management: `create_audit_request`, `get_audit_request`, `resolve_audit_request`, `get_pending_requests_by_type`, `get_user_pending_request`.
@@ -57,8 +59,8 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `get_admin_cancel_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards: `get_mod_cancel_kb`, `moderator_topics_list_kb`, `moderator_topic_menu_kb`, `topic_moderators_kb`, `moderator_search_kb`, `moderator_topic_groups_kb`, `moderator_unattached_groups_kb`.
 - [PL-2.2.30] **keyboards/pagination_util.py** — Universal keyboard utilities: `build_paginated_menu` (Paginated lists with search support), `add_nav_footer(builder, back_data=None, include_close=True, help_key=None)` (Split footer protocol [PL-5.1.14]).
-- [PL-2.2.31] **database/announcements.py** — Dispatcher registry for broadcasted interactions (Events, Gear, Fees). Methods: `create_announcement`, `get_announcement`, `delete_announcements_by_target`.
-- [PL-2.2.32] **services/announcement_service.py** — Logic for quick announcements and unified dispatcher processing. Methods: `create_quick_event`.
+- [PL-2.2.31] **database/announcements.py** — Dispatcher registry for broadcasted interactions (Events, Gear, Fees). Methods: `create_announcement`, `get_announcement`, `delete_announcements_by_target`, `update_announcement_metadata` (Linking record to physical Telegram message).
+- [PL-2.2.32] **services/announcement_service.py** — Logic for quick announcements and unified dispatcher processing. Methods: `create_quick_event`, `format_announcement_text` (Dynamic UI builder), `broadcast_event_announcement`.
 - [PL-2.2.33] **handlers/announcements.py** — Command-level entry for `/an` and unified callback `ann_join`.
 - [PL-2.2.34] **keyboards/event_kb.py** — Expedition keyboards: `get_events_list_kb`, `get_event_card_kb`, `get_event_moderation_kb`, `get_event_cancel_kb`, `get_date_picker_kb`, `get_date_confirm_kb`, `get_audit_log_kb`.
 - [PL-2.2.35] **keyboards/user_kb.py** — User keyboards: `user_main_kb`, `user_topics_list_kb`, `user_profile_kb`, `user_topic_detail_kb`.
@@ -77,6 +79,11 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
 - [PL-2.2.48] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
 - [PL-2.2.49] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
+- [PL-2.2.50] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation of Telegram WebApp data). [CC-3]
+- [PL-2.2.51] **web/main.py** — FastAPI application: Unified logging (redirected to `logs/bot.log`), global exception handling, CORS configuration, static file mounting, and router inclusion.
+- [PL-2.2.52] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation`. Includes `get_current_user_id` dependency for auth. [CC-1]
+- [PL-2.2.53] **web/frontend/** — Static assets for Mini App: `index.html` (UI), `style.css` (Glassmorphism), `app.js` (TMA Bridge logic).
+- [PL-2.2.54] **tests/test_web/** — Unit tests for the Web Bridge layer.
 
 ### [PL-2.3] Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -85,7 +92,8 @@ Permitted import direction — top consumers to bottom providers. Any arrow reve
 handlers/*              →  services/*                    →  database/db.py  →  database/(members|topics|groups|roles|permissions).py
 keyboards/__init__.py   →  keyboards/*_kb.py             →  database/db.py  →  database/(members|topics|groups|roles|permissions).py
 middlewares/*           →  services/permission_service.py →  database/db.py
-main.py                 →  handlers/*, middlewares/*, database/db.py (init_db only)
+web/routers/*           →  services/*                    →  database/db.py
+main.py                 →  handlers/*, middlewares/*, database/db.py (init_db only), web/main.py
 database/__init__.py    →  database/db.py
 database/db.py          →  database/connection.py (init_db, get_conn re-export)
                         →  database/(members|topics|groups|roles|permissions).py
@@ -271,8 +279,10 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.15] **Systemic Landing Entry**: The `landing` callback is a mandatory system-wide entry point that triggers the `UIService.get_landing_data` controller. It serves as the ultimate fallback for navigation returns.
 - [PL-5.1.16] **Heartfelt UI Principle**: All user-facing strings must use welcoming, community-oriented language. Includes the **Smart Hybrid Date Flow**: preset buttons (Today, Sat) + natural language parsing with confirmation. [RA-7.1/2]
 - [PL-5.1.17] **Universal Announcement Dispatcher**: A systemic pattern where interactive buttons in broadcast messages do not link directly to entities, but to an `announcements` registry. This allows a single callback handler to manage diverse interaction types (Participation, Payments, Gear) and enforces context-aware access control.
-- [PL-5.1.18] **Quick Announcement Protocol**: Support for `/an` command in forum topics. Automatically creates a "Rapid Event" (date set to 'Оперативно') and posts a rich announcement. Original command message is deleted to maintain thread sterility.
+- [PL-5.1.18] **Quick Announcement Protocol**: Support for `/an` command in forum topics. Automatically creates a "Rapid Event" (date set to 'Оперативно') and posts a rich announcement. **Dynamic Reactivity**: Any interaction with the announcement (joining/leaving) triggers a real-time text update with the current participant list. Original command message is deleted to maintain thread sterility.
 - [PL-5.1.19] **Polymorphic Cascade Cleanup**: Since the `announcements` table uses polymorphic links (linking to various entity types by ID without native FKs), any service responsible for deleting a target entity (Events, etc.) MUST manually invoke `delete_announcements_by_target` to prevent data rot.
+- [PL-5.1.20] **Telegram Mini App (TMA) Bridge**: Interactive personalized UI for announcements. Uses FastAPI backend and Vanilla JS/CSS frontend with Glassmorphism aesthetics. **Cross-Layer Reactivity**: Actions performed in TMA (joining/leaving) automatically trigger an update of the physical Telegram message via the stored `chat_id`/`message_id` metadata. Includes mobile-native Haptic Feedback and fallback logic. [CC-5]
+- [PL-5.1.21] **TMA Group Constraint Pattern**: Telegram strictly forbids `web_app` buttons in inline keyboards sent to group chats (raises `BUTTON_TYPE_INVALID`). **Resolution**: Group announcements use standard Telegram buttons (`✅ Иду` / `🚶 Не иду`) for quick interaction with localized alerts. The full **Mini App Dashboard** ("Личный кабинет") is centralized in the Private Messages main menu, serving as the primary hub for management and search.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:
@@ -338,6 +348,11 @@ All keys stored in FSM state across the application:
 - [PL-7.2] **ADMIN_ID** — `int`. Source: `.env` → `config.py` (cast via `int`). Used via `PermissionService.is_global_admin` to route handlers in the `IsGlobalAdmin` filter. Also enriched dynamically within `db.get_user_roles`.
 - [PL-7.3] **GROUP_ID** — `int`. Source: `.env` → `config.py`. Used exclusively in `handlers/admin.py` and `handlers/moderator.py` as the `chat_id` argument for Telegram API calls. Expected to be a negative integer (Telegram supergroup convention). **Not used as a middleware guard condition.**
 - [PL-7.4] **Topic ID `-1`** — Logical mapping for the "General" topic in a forum-enabled Telegram chat.
+- [PL-7.5] **WEBAPP_HOST** — `str`. Web server binding address (default: `0.0.0.0`).
+- [PL-7.6] **WEBAPP_PORT** — `int`. Web server port (default: `8000`).
+- [PL-7.7] **WEBAPP_URL** — `str`. Public entry point for TMA. If empty, the system falls back to Callback-based UI. [CC-5]
+- [PL-7.8] **WEBAPP_CORS_ORIGINS** — `list`. Allowed origins for WebApp requests.
+- [PL-7.9] **LOG_MAX_BYTES / LOG_BACKUP_COUNT** — `int`. Rotation parameters for unified logging.
 
 ---
 
@@ -364,6 +379,7 @@ All keys stored in FSM state across the application:
     - `test_permission_service.py` (Role resolution).
 - [PL-8.4.3] **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
 - [PL-8.4.4] **tests/test_journeys/**: End-to-End flow tests for complex user journeys (e.g., Quick Announcements, Participation Audit). Focus: Cross-service orchestration and notification delivery.
+- [PL-8.4.5] **tests/test_web/**: Unit tests for Web Bridge authentication and API logic.
 
 ### [PL-8.5] Testing Rules
 1. [PL-8.5.1] **Repository Standards**: The `tests/` directory is a permanent part of the repository.

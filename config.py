@@ -21,3 +21,13 @@ SPREADSHEET_ID = os.getenv("SPREADSHEET_ID", "")
 
 # Модерация Мероприятий
 REQUIRE_ADMIN_EVENT_AUDIT = os.getenv("REQUIRE_ADMIN_EVENT_AUDIT", "True").lower() in ("true", "1", "yes")
+
+# Logging Configuration
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUP_COUNT = 5
+
+# WebApp Configuration [PL-2.2.3]
+WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
+WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8000"))
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
+WEBAPP_CORS_ORIGINS = ["*"]

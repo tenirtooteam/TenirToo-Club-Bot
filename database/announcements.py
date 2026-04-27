@@ -29,3 +29,10 @@ def delete_announcements_by_target(a_type: str, target_id: int):
         cursor = conn.cursor()
         cursor.execute('DELETE FROM announcements WHERE type = ? AND target_id = ?', (a_type, target_id))
         conn.commit()
+
+def update_announcement_metadata(ann_id: int, chat_id: int, message_id: int):
+    """Привязывает запись анонса к конкретному сообщению в Telegram."""
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute('UPDATE announcements SET chat_id = ?, message_id = ? WHERE id = ?', (chat_id, message_id, ann_id))
+        conn.commit()

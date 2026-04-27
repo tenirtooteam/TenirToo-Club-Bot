@@ -447,6 +447,26 @@ class ManagementService:
         return event_id
 
     @staticmethod
+    def add_event_participation_action(event_id: int, user_id: int) -> str:
+        """Логика записи на мероприятие с текстовым статусом."""
+        if db.is_event_participant(event_id, user_id):
+            return "Вы уже записаны!"
+        
+        db.add_event_participant(event_id, user_id)
+        ManagementService._trigger_sheets_sync("event_participants", event_id)
+        return "Вы записаны!"
+
+    @staticmethod
+    def remove_event_participation_action(event_id: int, user_id: int) -> str:
+        """Логика отписки от мероприятия с текстовым статусом."""
+        if not db.is_event_participant(event_id, user_id):
+            return "Вы еще не записались чтобы не идти!"
+        
+        db.remove_event_participant(event_id, user_id)
+        ManagementService._trigger_sheets_sync("event_participants", event_id)
+        return "Ваша запись отменена!"
+
+    @staticmethod
     def toggle_event_participation(event_id: int, user_id: int) -> tuple[bool, str]:
         """Логика записи/отписки от мероприятия."""
         if db.is_event_participant(event_id, user_id):

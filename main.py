@@ -7,6 +7,9 @@ from loader import bot, dp
 from database import db
 from handlers import admin, user, common, moderator, events, announcements
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
+import uvicorn
+from config import WEBAPP_HOST, WEBAPP_PORT, LOG_MAX_BYTES, LOG_BACKUP_COUNT
+from web.main import app as web_app
 
 
 def setup_logging():
@@ -17,8 +20,13 @@ def setup_logging():
     log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - [%(name)s] - %(message)s')
     log_file = 'logs/bot.log'
 
-    # File handler: 5MB limit, keep 5 backup files
-    file_handler = RotatingFileHandler(log_file, maxBytes=5 * 1024 * 1024, backupCount=5, encoding='utf-8')
+    # File handler [PL-2.2.1]
+    file_handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=LOG_MAX_BYTES, 
+        backupCount=LOG_BACKUP_COUNT, 
+        encoding='utf-8'
+    )
     file_handler.setFormatter(log_formatter)
     file_handler.setLevel(logging.INFO)
 
@@ -54,10 +62,19 @@ async def main():
     dp.include_router(events.router)
     dp.include_router(announcements.router)
 
-    logging.info("🚀 Бот запущен и готов к работе!")
+    logging.info("🚀 Запуск систем...")
 
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    
+    # WebApp Server [CC-3] [PL-2.2.1]
+    web_config = uvicorn.Config(web_app, host=WEBAPP_HOST, port=WEBAPP_PORT, log_level="info")
+    web_server = uvicorn.Server(web_config)
+
+    # Запускаем параллельно: Web-сервер и Bot-polling
+    await asyncio.gather(
+        web_server.serve(),
+        dp.start_polling(bot)
+    )
 
 
 if __name__ == '__main__':

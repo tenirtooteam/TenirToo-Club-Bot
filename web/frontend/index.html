@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Tenir-Too | Mini App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Main Loading State -->
+        <div class="loader" id="main-loader">
+            <div class="spinner"></div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <div id="content" class="hidden">
+            
+            <!-- VIEW: Event Details -->
+            <div id="view-details" class="view">
+                <header>
+                    <div class="event-badge" id="event-status">Активно</div>
+                    <h1 id="event-title">Загрузка...</h1>
+                    <p class="date-range" id="event-dates">...</p>
+                </header>
+
+                <main>
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <span class="stat-label">Участники</span>
+                            <span class="stat-value" id="participants-count">0</span>
+                        </div>
+                    </div>
+
+                    <div class="description-section">
+                        <h3>Описание</h3>
+                        <p id="event-description">Это автоматический анонс мероприятия. Подробности можно уточнить в чате клуба.</p>
+                    </div>
+                </main>
+
+                <footer>
+                    <button id="toggle-btn" class="action-btn">
+                        <span id="btn-text">Загрузка...</span>
+                    </button>
+                </footer>
+            </div>
+
+            <!-- VIEW: Dashboard (Coming Soon / Brew) -->
+            <div id="view-dashboard" class="view hidden">
+                <header>
+                    <div class="event-badge">Личный кабинет</div>
+                    <h1>Меню Гида</h1>
+                    <p class="date-range">Ваше центральное варево</p>
+                </header>
+
+                <main>
+                    <div class="description-section">
+                        <h3>Скоро здесь будет:</h3>
+                        <p>• Управление всеми походами<br>
+                           • Быстрый поиск участников<br>
+                           • Статистика экспедиций<br>
+                           • Настройка профиля</p>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div id="error-screen" class="hidden">
+            <div class="error-icon">🏔</div>
+            <h2 id="error-title">Упс!</h2>
+            <p id="error-msg">Не удалось загрузить данные.</p>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
