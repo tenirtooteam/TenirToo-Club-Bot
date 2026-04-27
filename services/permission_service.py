@@ -86,11 +86,13 @@ class PermissionService:
 
     @staticmethod
     def can_user_write_in_topic(user_id: int, topic_id: int) -> bool:
-        """Проверка прав на запись в конкретный топик."""
-        # Если топик не ограничен — писать можно всем
+        """
+        Проверка прав на запись в конкретный топик.
+        Логика: Default Deny. Если топик не настроен (пустой список) или 
+        пользователя нет в списке — доступ запрещен.
+        """
         if not db.is_topic_restricted(topic_id):
-            return True
-        # Если ограничен — проверяем права
+            return False
         return db.can_write(user_id, topic_id)
 
     @staticmethod

@@ -74,7 +74,12 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     # 3. Выполняем действие в зависимости от типа
     if ann_type == "event":
         from services.management_service import ManagementService
-        success, msg = ManagementService.toggle_event_participation(user_id, target_id)
+        from services.event_service import EventService
+        success, msg = ManagementService.toggle_event_participation(target_id, user_id)
+        
+        if success and "записаны" in msg:
+            await EventService.notify_organizers_of_direct_join(callback.message.bot, target_id, user_id)
+            
         await callback.answer(msg)
         
         # Обновляем текст анонса (опционально, можно добавить список участников)

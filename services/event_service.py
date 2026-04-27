@@ -112,3 +112,67 @@ class EventService:
     def is_event_participant(event_id: int, user_id: int) -> bool:
         """Проверяет, участвует ли пользователь в мероприятии."""
         return db.is_event_participant(event_id, user_id)
+
+    @staticmethod
+    async def notify_admins_of_participation_request(bot: Bot, event_id: int, user_id: int):
+        """
+        Отправляет уведомление о новой заявке на участие админам и организатору. [PL-5.1.13]
+        """
+        import config
+        from database.db import get_user_name
+        
+        event = db.get_event_details(event_id)
+        if not event:
+            return
+            
+        user_name = get_user_name(user_id) or f"ID:{user_id}"
+        
+        # Получатели: все админы + создатель мероприятия
+        admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
+        admin_ids.add(int(config.ADMIN_ID))
+        if event["creator_id"]:
+            admin_ids.add(int(event["creator_id"]))
+            
+        text = (
+            f"🔔 <b>Новая заявка на участие!</b>\n\n"
+            f"👤 Пользователь: <b>{user_name}</b>\n"
+            f"🏔 Мероприятие: <b>{event['title']}</b>\n\n"
+            f"Рассмотрите заявку в разделе 'Аудит'."
+        )
+        
+        for adm_id in admin_ids:
+            try:
+                await bot.send_message(adm_id, text, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"Не удалось отправить уведомление о записи админу {adm_id}: {e}")
+
+    @staticmethod
+    async def notify_organizers_of_direct_join(bot: Bot, event_id: int, user_id: int):
+        """
+        Отправляет уведомление о прямой записи (без аудита) админам и организатору. [PL-5.1.13]
+        """
+        import config
+        from database.db import get_user_name
+        
+        event = db.get_event_details(event_id)
+        if not event: return
+        
+        user_name = get_user_name(user_id) or f"ID:{user_id}"
+        
+        admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
+        admin_ids.add(int(config.ADMIN_ID))
+        if event["creator_id"]:
+            admin_ids.add(int(event["creator_id"]))
+            
+        text = (
+            f"✅ <b>Новый участник!</b>\n\n"
+            f"👤 Пользователь: <b>{user_name}</b>\n"
+            f"🏔 Мероприятие: <b>{event['title']}</b>\n\n"
+            f"Запись прошла автоматически через анонс."
+        )
+        
+        for adm_id in admin_ids:
+            try:
+                await bot.send_message(adm_id, text, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"Не удалось отправить уведомление о вступлении админу {adm_id}: {e}")

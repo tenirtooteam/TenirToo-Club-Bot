@@ -88,6 +88,10 @@ def can_write(user_id: int, topic_id: int) -> bool:
         return c.fetchone() is not None
 
 def is_topic_restricted(topic_id: int) -> bool:
+    """
+    Проверяет, есть ли для топика настройки доступа.
+    Если записей нет — топик считается 'не настроенным' (Default Deny).
+    """
     with get_conn() as conn:
         c = conn.cursor()
         c.execute("""

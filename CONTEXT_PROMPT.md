@@ -147,45 +147,59 @@
 
 33. [CP-3.33] **BY-ID PREFERENCE**: When an entity ID (user_id, topic_id, group_id) is already known as an integer, handlers MUST use `*_by_id` service methods (e.g., `ManagementService.assign_moderator_role_by_id`) instead of string-parsing equivalents.
      > Rationale: Eliminates redundant type conversions and string validation logic, reducing CPU cycles and improving code readability in high-frequency routing paths.
+34. [CP-3.34] **JOURNEY TESTING ENFORCEMENT**: New features affecting cross-service logic or user-admin feedback loops (notifications) MUST be covered by journey tests in `tests/test_journeys/`. These tests must assert successful data mutation, notification delivery (checking bot call args/kwargs), and state transitions.
+    > Rationale: Unit tests often miss integration bugs (e.g., incorrect argument order in a service call triggered by a handler). Journey tests verify the "thread" of logic that connects different system layers.
 
-34. [CP-3.34] **ZERO CREATIVITY**: Architectural or logic proposals regarding bot functionality MUST NEVER be answered conversationally. They MUST trigger Route B (**PA-1** / **APA-1**). Any technical advice outside verified patterns must be flagged as "Speculative" and require an explicit audit. Implementation planning (RNA-Blueprint) MUST start only after an explicit **RNA-1** command following an approved audit.
+35. [CP-3.35] **ZERO CREATIVITY**: Architectural or logic proposals regarding bot functionality MUST NEVER be answered conversationally. They MUST trigger Route B (**PA-1** / **APA-1**). Any technical advice outside verified patterns must be flagged as "Speculative" and require an explicit audit. Implementation planning (RNA-Blueprint) MUST start only after an explicit **RNA-1** command following an approved audit.
      > Rationale: Prevents protocol drift and ensures all changes are vetted against the Optimality Standard and project constraints before a single line of plan or code is written.
 
-35. [CP-3.35] **CONTENT ISOLATION**: All user-facing documentation, help tooltips, and long static messages MUST reside in `services/help_service.py`. Handlers MUST NOT contain hardcoded help strings. [CC-2]
+36. [CP-3.36] **CONTENT ISOLATION**: All user-facing documentation, help tooltips, and long static messages MUST reside in `services/help_service.py`. Handlers MUST NOT contain hardcoded help strings. [CC-2]
     > Rationale: Ensures a clean separation of concerns, simplifies localization, and prevents code bloat in UI handlers.
 
-36. [CP-3.36] **delete_msg AS ORPHAN TERMINATOR**: Notifications and push-messages sent via direct `bot.send_message` (outside FSM tracking) MUST be finalized using `UIService.delete_msg(callback.message)`. Using `UIService.sterile_show` for these "orphan" messages is an architectural violation.
+37. [CP-3.37] **delete_msg AS ORPHAN TERMINATOR**: Notifications and push-messages sent via direct `bot.send_message` (outside FSM tracking) MUST be finalized using `UIService.delete_msg(callback.message)`. Using `UIService.sterile_show` for these "orphan" messages is an architectural violation.
     > Rationale: Orphan messages have no FSM `last_menu_id` entry. `sterile_show` attempts to track state, which fails for orphan messages, potentially leaving active buttons in the chat history. `delete_msg` ensures the UI is cleaned and the callback is answered without state side-effects.
 
-37. [CP-3.37] **UI TRACE ENFORCEMENT**: When analyzing or proposing changes to UI transitions, the AI MUST perform a step-by-step trace of `last_menu_ids` state. It must explicitly identify which method (e.g., `sterile_ask`, `terminate_input`, or `sterile_show`) is responsible for deleting specific message IDs at each stage of the interaction.
+38. [CP-3.38] **UI TRACE ENFORCEMENT**: When analyzing or proposing changes to UI transitions, the AI MUST perform a step-by-step trace of `last_menu_ids` state. It must explicitly identify which method (e.g., `sterile_ask`, `terminate_input`, or `sterile_show`) is responsible for deleting specific message IDs at each stage of the interaction.
     > Rationale: Prevents shallow trace errors where the AI assumes cleanup happens by "magic", which leads to logic regressions and double-deletion attempts.
 
-38. [CP-3.38] **STRICT ID HARDENING**: All user IDs retrieved from DB or config MUST be explicitly cast to `int` before being used in `set()` operations or collection-based logic.
+39. [CP-3.39] **STRICT ID HARDENING**: All user IDs retrieved from DB or config MUST be explicitly cast to `int` before being used in `set()` operations or collection-based logic.
     > Rationale: Prevents duplication of notifications and logic bypasses caused by Python's type-sensitivity when handling potential mixed string/int data from SQLite.
 
-39. [CP-3.39] **UNIVERSAL INDEXING PROTOCOL**: Every logic block, rule, and pattern in strategic files MUST be assigned a unique Index ID (`CP-x` for context, `PL-x` for logic). These IDs MUST be used in `implementation_plan.md` [CP-3.25] and as in-code markers to ensure 100% traceability.
+40. [CP-3.40] **UNIVERSAL INDEXING PROTOCOL**: Every logic block, rule, and pattern in strategic files MUST be assigned a unique Index ID (`CP-x` for context, `PL-x` for logic). These IDs MUST be used in `implementation_plan.md` [CP-3.25] and as in-code markers to ensure 100% traceability.
     > Rationale: Indexing eliminates the need to copy full rule text into plans, saving context window while maintaining strict architectural alignment and facilitating rapid lookups.
 
-40. [CP-3.40] **UNIVERSAL DISPATCHING**: All interactive buttons posted in broadcast messages (Announcements) MUST use the `announcements` database registry as a dispatcher. Do not link buttons directly to entity IDs (e.g. `event_join:42`). Use `ann_join:{announcement_id}` to ensure context-aware permission checks.
+41. [CP-3.41] **UNIVERSAL DISPATCHING**: All interactive buttons posted in broadcast messages (Announcements) MUST use the `announcements` database registry as a dispatcher. Do not link buttons directly to entity IDs (e.g. `event_join:42`). Use `ann_join:{announcement_id}` to ensure context-aware permission checks.
     > Rationale: Dispatching abstracts the interaction from the entity, allowing unified handling and strict adherence to the "Only topic members" engagement rule.
 
-41. [CP-3.41] **QUICK ANNOUNCEMENT FORMAT**: The `/an` command MUST support the format `Title\nDescription`. The handler is responsible for creating a "Rapid Event" and cleaning up the trigger message to maintain thread sterility.
+42. [CP-3.42] **QUICK ANNOUNCEMENT FORMAT**: The `/an` command MUST support the format `Title\nDescription`. The handler is responsible for creating a "Rapid Event" and cleaning up the trigger message to maintain thread sterility.
     > Rationale: Standardization of command input ensures data integrity while maintaining the "Quick" nature of operational announcements.
 
-42. [CP-3.42] **CASCADE COMPLIANCE**: When implementing deletion of any entity (User, Topic, Event), the developer MUST verify both native DB cascades (FK) and polymorphic cleanups (e.g. removing entries from `announcements`). Failure to clean up dispatcher-based links is an architectural violation.
+43. [CP-3.43] **CASCADE COMPLIANCE**: When implementing deletion of any entity (User, Topic, Event), the developer MUST verify both native DB cascades (FK) and polymorphic cleanups (e.g. removing entries from `announcements`). Failure to clean up dispatcher-based links is an architectural violation.
     > Rationale: Polymorphic links bypass native FK protection. Explicit cleanup is the only way to prevent data rot and orphaned interaction buttons in the chat history.
 
-43. [CP-3.43] **FSM JOURNEY VALIDATION**: For any multi-step FSM scenario (Editing, Creation), the developer MUST provide or update an asynchronous journey test (e.g. `test_event_fsm.py`) to verify that the state machine doesn't hang and clears properly.
+44. [CP-3.44] **FSM JOURNEY VALIDATION**: For any multi-step FSM scenario (Editing, Creation), the developer MUST provide or update an asynchronous journey test (e.g. `test_event_fsm.py`) to verify that the state machine doesn't hang and clears properly.
     > Rationale: FSM is the most fragile part of the UI; automated journey tests prevent "frozen" interfaces for end-users.
 
-44. [CP-3.44] **SMART DATE PROTOCOL**: All date-related inputs MUST be processed via `DateService.parse_smart_date`. Never implement ad-hoc regex or string splitting for dates in handlers.
+45. [CP-3.45] **SMART DATE PROTOCOL**: All date-related inputs MUST be processed via `DateService.parse_smart_date`. Never implement ad-hoc regex or string splitting for dates in handlers.
     > Rationale: Centralizing date parsing ensures that natural language support ("Завтра", "Сб") and normalization to ISO-8601 remain consistent across the system.
 
-45. [CP-3.45] **PRESENTATION/DATA SEPARATION**: Strings stored in the database (e.g., `start_date`, `end_date`) MUST remain in their raw human-entered format without UI decorations like weekday suffixes (e.g., "(Пн)"). All decorations MUST be applied at the presentation layer (e.g., `EventService.format_event_card`).
+46. [CP-3.46] **PRESENTATION/DATA SEPARATION**: Strings stored in the database (e.g., `start_date`, `end_date`) MUST remain in their raw human-entered format without UI decorations like weekday suffixes (e.g., "(Пн)"). All decorations MUST be applied at the presentation layer (e.g., `EventService.format_event_card`).
     > Rationale: Prevents "data pollution" and cumulative duplication of UI elements when records are edited or displayed multiple times.
 
-46. [CP-3.46] **ADMIN CREATION UX BRANCHING**: In workflows where an entity creation triggers an automatic audit notification (to admins), the creation handler MUST NOT immediately show the final entity card to the creator if they are an admin. Show a clean success message instead.
+47. [CP-3.47] **ADMIN CREATION UX BRANCHING**: In workflows where an entity creation triggers an automatic audit notification (to admins), the creation handler MUST NOT immediately show the final entity card to the creator if they are an admin. Show a clean success message instead.
     > Rationale: Prevents UI clutter and notification fatigue for administrators who would otherwise receive both a state-update message and a new notification for the same action.
+
+48. [CP-3.48] **CREATOR AUTO-JOIN**: All event creation logic (ManagementService) MUST automatically add the creator as a participant and a lead to ensure data consistency and expected user behavior. [PL-6.7]
+
+49. [CP-3.49] **PARTICIPATION NOTIFICATIONS**: Every new participation request (Audit) or direct join (Quick Announcements) MUST trigger a notification to all global admins and the event organizer via `EventService` to ensure operational visibility. [PL-5.1.13]
+
+50. [CP-3.50] **MOCK ASSERTION PARITY**: When asserting mock calls (e.g. `bot.send_message`), ALWAYS check both positional `args` and `kwargs`. Positional parameters in code (e.g. `send_message(chat_id, text)`) will NOT be found in `kwargs`.
+    > Rationale: Prevents false-negative test failures where the call happened but the test looked in the wrong dictionary.
+
+51. [CP-3.51] **TEST ID DYNAMISM**: Strictly PROHIBITED to use hardcoded IDs (e.g. `event_id=10`) in tests using `db_setup`. Always use the ID returned by the creation method.
+    > Rationale: In isolated DBs, IDs are non-deterministic or start from 1, leading to Foreign Key violations if hardcoded.
+
+52. [CP-3.52] **DEFAULT DENY ENFORCEMENT**: All topics MUST be closed to non-admin users by default unless explicitly configured in `direct_topic_access`. Any UI display of topic status MUST clearly state when a topic is in "Default Deny" mode. [PL-3.2.1]
 
 ---
 

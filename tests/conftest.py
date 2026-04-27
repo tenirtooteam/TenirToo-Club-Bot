@@ -61,9 +61,9 @@ def create_context(mock_bot, storage):
     Фабрика для создания контекста пользователя.
     Возвращает (user, chat, message, state)
     """
-    async def _factory(user_id=123, chat_id=123, text="test", thread_id=None):
+    async def _factory(user_id=123, chat_id=123, text="test", thread_id=None, chat_type="private"):
         user = types.User(id=user_id, is_bot=False, first_name="TestUser", last_name="Tester")
-        chat = types.Chat(id=chat_id, type="private")
+        chat = types.Chat(id=chat_id, type=chat_type)
         message = types.Message(
             message_id=1,
             date=datetime.datetime.now(),
@@ -72,6 +72,7 @@ def create_context(mock_bot, storage):
             text=text,
             message_thread_id=thread_id
         )
+        message._bot = mock_bot
         state = FSMContext(storage=storage, key=StorageKey(bot_id=mock_bot.id, chat_id=chat_id, user_id=user_id))
         return user, chat, message, state
     
@@ -89,6 +90,7 @@ def create_callback(mock_bot, storage):
             chat=chat,
             text="Menu Context"
         )
+        message._bot = mock_bot
         callback = types.CallbackQuery(
             id="1",
             from_user=user,
@@ -96,6 +98,7 @@ def create_callback(mock_bot, storage):
             message=message,
             data=data
         )
+        callback._bot = mock_bot
         state = FSMContext(storage=storage, key=StorageKey(bot_id=mock_bot.id, chat_id=chat_id, user_id=user_id))
         return callback, state
         

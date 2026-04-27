@@ -71,7 +71,8 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.42] **tests/test_handlers/test_permission_scenarios.py** — Declarative security boundary tests (Admin/Moderator).
 - [PL-2.2.43] **tests/test_handlers/test_admin_flow.py** — Integration tests for Admin CRUD operations (Groups/Topics).
 - [PL-2.2.44] **tests/test_handlers/test_announcement_logic.py** — Logic tests for quick announcements and dispatching.
-- [PL-2.2.45] **tests/test_services/test_date_logic.py** — Deep unit tests for DateService parsing edge cases.
+- [PL-2.2.45] **tests/test_journeys/test_default_deny_journey.py** — Verification of "Closed by Default" logic, including admin immunity bypass.
+- [PL-2.2.46] **tests/test_services/test_date_logic.py** — Deep unit tests for DateService parsing edge cases.
 - [PL-2.2.46] **tests/test_services/test_sheets_sync.py** — Resilience tests for Google Sheets API error handling.
 - [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
 - [PL-2.2.48] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
@@ -202,11 +203,11 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 
 - [PL-3.1.1] **Transactional Integrity**: Native `ON DELETE CASCADE` is enforced at the database level via `PRAGMA foreign_keys = ON;` executed on every connection open. **Strict Enforcement**: `init_db()` performs a runtime check at startup; if `PRAGMA foreign_keys` returns `0`, the bot throws a `RuntimeError` and terminates immediately to prevent data corruption.
 
-### [PL-3.2] Access Control Logic (Template Model)
-- [PL-3.2.1] **Default State**: A topic is "Public" if absent from the `direct_topic_access` registry — all users may write.
-- [PL-3.2.2] **Restricted State**: A topic becomes "Private" once it appears in `direct_topic_access`.
-- [PL-3.2.3] **Groups as Templates**: The `groups` table (with `group_members` and `group_topics`) no longer provides runtime access. Instead, it serves as a **template toolset**. Admins use templates to bulk-copy users into a topic's `direct_topic_access`.
-- [PL-3.2.4] **Authorization**: Access is evaluated ONLY against `direct_topic_access` and user roles (Admin/Moderator).
+### [PL-3.2] Access Control Logic (Default Deny Model)
+- [PL-3.2.1] **Default State**: A topic is "Closed" (Restricted to Admins) if absent from the `direct_topic_access` registry — unauthorized users' messages are silently deleted.
+- [PL-3.2.2] **Configured State**: A topic becomes "Active" once it appears in `direct_topic_access`. Access is then strictly limited to the users/groups explicitly listed.
+- [PL-3.2.3] **Groups as Templates**: The `groups` table serves as a **template toolset**. Admins use templates to bulk-copy users into a topic's `direct_topic_access`.
+- [PL-3.2.4] **Authorization**: Access is evaluated against `direct_topic_access` and user roles. Global Admins are exempt only if `config.IMMUNITY_FOR_ADMINS` is True.
 
 ### [PL-3.3] Upsert Pattern
 - [PL-3.3.1] `update_topic_name(topic_id, name)` uses `INSERT OR REPLACE INTO topic_names` — an upsert pattern. This means the function both inserts new topic name records and updates existing ones atomically. This is the only function in the codebase that uses this pattern; all other mutations use standard `INSERT` or `UPDATE`.
@@ -262,7 +263,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.10] **UIService.generic_navigator**: Unified entry point for all UI transitions. Maps callback data strings to specific `UIService` show methods or keyboard builders. Supports global panels (Admin, Moderator, User), profile views, topic details, and **Help Infrastructure** (prefix `help:`). Decoupled help text via `HelpService` using `help:{key}:{back_data}` format. Uses the `PAGINATED_CMDS` class constant to explicitly determine if a keyboard requires the `page` argument. Includes fallback logging for unknown commands. `[AI-1]` Standard: All standard UI returns and transitions MUST traverse this router.
 - [PL-5.1.11] **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
 - [PL-5.1.12] **UIService.sterile_command**: Decorator factory applied to `@router.message(Command(...))` handlers. Decorated handler returns `(text, reply_markup)` tuple. Decorator intercepts and delegates to `sterile_redirect`, handling group-to-PM redirect, error fallback, cleanup, and `last_menu_id` tracking automatically.
-- [PL-5.1.13] **Orphan Notification Protocol**: Any message sent via direct `bot.send_message` (e.g., from `EventService.notify_admins_for_approval`) is considered an "Orphan Notification". These messages MUST be terminated via `UIService.delete_msg(callback.message)` upon user interaction (CallbackQuery) to ensure buttons are removed and the UI remains sterile.
+- [PL-5.1.13] **Orphan Notification Protocol**: Any message sent via direct `bot.send_message` (e.g., from `EventService.notify_admins_for_approval` or participation alerts) is considered an "Orphan Notification". These messages MUST be terminated via `UIService.delete_msg(callback.message)` upon user interaction (CallbackQuery) to ensure buttons are removed and the UI remains sterile. **Participation Alerts**: Admins and organizers MUST be notified of all participation requests (Audit) or direct joins (Quick Announcements) via `EventService`.
 - [PL-5.1.14] **Split Navigation Footer**: Every keyboard must use `add_nav_footer` or `build_paginated_menu` to ensure consistent navigation.
     - **Buttons**: `[ ⬅️ Назад ] [ ❌ Закрыть ] [ ❓ ]`
     - **Help Logic**: The `❓` button uses format `help:{key}:{back_data}`.
@@ -311,7 +312,7 @@ All keys stored in FSM state across the application:
 - [PL-6.4] **UIService.sterile_show as Single UI Gateway**: All menu transitions MUST use `UIService.sterile_show(state, event, text, reply_markup)`. Direct calls to `callback.message.edit_text(...)`, `message.answer(...)`, or `callback.message.edit_reply_markup(...)` from handlers are prohibited. **Prohibited Pattern**: Never "edit" a menu message into a status/log message (e.g., "Event Approved"). Use `delete_msg` to remove the interface and `NotificationService` to send a NEW message if feedback is required.
 - [PL-6.5] **Unified Navigation Protocol**: All standard UI returns and transitions from handlers SHOULD use `UIService.generic_navigator` instead of direct `UIService.sterile_show` calls where possible, to centralize routing logic.
 - [PL-6.6] **Handler State Signature Rule**: Every handler that calls `UIService.sterile_show`, `UIService.sterile_ask`, or any other `UIService` method requiring `state` MUST declare `state: FSMContext` in its signature. Omitting it causes a `NameError` at runtime.
-- [PL-6.7] **ManagementService Mutation Protocol**: All entity mutations MUST traverse `ManagementService`. Handlers are prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` writes. The service is responsible for "sanitizing" intent and returning a user-facing result. **Exception**: Data retrieval for keyboard rendering (GET-only) remains direct via `database.db`.
+- [PL-6.7] **ManagementService Mutation Protocol**: All entity mutations MUST traverse `ManagementService`. Handlers are prohibited from performing input validation (e.g., regex checks, string splitting) or direct `db.*` writes. The service is responsible for "sanitizing" intent and returning a user-facing result. **Exception**: Data retrieval for keyboard rendering (GET-only) remains direct via `database.db`. **Event Rule**: Every event creation (Standard or Quick) MUST automatically register the creator as a participant and a lead.
 - [PL-6.8] **Search Delegation Rule**: Handlers must respect the `"SEARCH_REQUIRED"` signal from the management service. This ensures that complex search and disambiguation logic is shared rather than duplicated across admin and moderator flows.
 - [PL-6.9] **Sterile UI Protocol Enforcement**: The system has moved away from direct Telegram API calls in handlers. Any new UI development must strictly follow the `UIService.sterile_show` gateway pattern.
 - [PL-6.10] **Orphan Message Constraint**: Audit-notifications and other push-messages sent without FSM context MUST use `UIService.delete_msg(callback.message)` for finalization. Using `UIService.sterile_show` for orphan messages is an architectural violation as it risks leaving "zombie" buttons.
@@ -344,25 +345,35 @@ All keys stored in FSM state across the application:
 [PL-8.1] Comprehensive automated testing suite using `pytest`. Tests are an integral part of the codebase.
 
 ### [PL-8.2] Configuration (`tests/conftest.py`)
-- [PL-8.2.1] **Database Isolation**: `mock_db_path` (autouse) redirects `connection.DB_PATH` to a temporary file in `tmp_path` and runs `init_db()`. This ensures a clean schema and WAL support for every test.
-- [PL-8.2.2] **Mocked Bot**: `mock_bot` fixture provides an `AsyncMock(spec=Bot)`. Crucially, `bot.return_value` is mocked to support the `bot(method)` call pattern in aiogram 3.
-- [PL-8.2.3] **Mocks**: `mock_dispatcher`, `mock_state` (FSMContext) available for handler/middleware testing.
+- [PL-8.2.1] **Database Isolation**: `db_setup` redirects `connection.DB_PATH` to a temporary file in `tmp_path`. This ensures a clean schema for every test.
+- [PL-8.2.2] **Mocked Bot**: `mock_bot` fixture provides an `AsyncMock(spec=Bot)`. Factories in `conftest.py` ensure `message.bot` and `callback.bot` point to this mock using `_bot` private attribute.
+- [PL-8.2.3] **FSM Context**: `storage` and `create_context` fixtures allow full FSM state simulation.
 
-### [PL-8.3] Test Categories
-- [PL-8.3.1] **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
-- [PL-8.3.2] **tests/test_services/**: Tests for domain services.
+### [PL-8.3] Journey Testing Standards
+- [PL-8.3.1] **Total Shield Pattern**: High-level tests (`tests/test_journeys/`) must cover the complete lifecycle of an operation: User Input -> Service Mutation -> Notification Trigger -> FSM Transition.
+- [PL-8.3.2] **Notification Assertions**: Every test involving a user feedback loop must assert `bot.send_message` calls with correct `chat_id` and text content (checking both `args` and `kwargs` for positional/keyword parity).
+- [PL-8.3.3] **Permission Guard Testing**: Every journey test must include a "negative path" (unauthorized user attempt) to verify `PermissionService` integration in handlers.
+- [PL-8.3.4] **Mocking Sterility**: `callback.answer` and `UIService.sterile_show` are mocked via `patch` in tests to prevent `aiogram` RuntimeError during unmounted execution.
+
+### [PL-8.4] Test Categories
+- [PL-8.4.1] **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
+- [PL-8.4.2] **tests/test_services/**: Tests for domain services.
     - `test_ui_navigation.py` (UI stabilization and route validation).
     - `test_google_sheets_service.py` (Mocked API validation).
     - `test_management_service.py` (Search-Or-Action protocol).
     - `test_permission_service.py` (Role resolution).
-- [PL-8.3.3] **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
-- [PL-8.3.4] **tests/test_integration/**: End-to-End flow tests using a real `Dispatcher` but mocked `Bot`. Focus: Full update processing chain from middleware to final handler response.
+- [PL-8.4.3] **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
+- [PL-8.4.4] **tests/test_journeys/**: End-to-End flow tests for complex user journeys (e.g., Quick Announcements, Participation Audit). Focus: Cross-service orchestration and notification delivery.
 
-### [PL-8.4] Testing Rules
-1. [PL-8.4.1] **Repository Standards**: The `tests/` directory is a permanent part of the repository.
-2. [PL-8.4.2] **Ephemeral DB**: Always use the `mock_db_path` fixture. Writing to `bot.db` during testing is strictly prohibited.
-3. [PL-8.4.3] **No Network**: All external API calls (Telegram) MUST be mocked via `mock_bot`.
-4. [PL-8.4.4] **Router Detach**: When using global routers in integration tests, use `router._parent_router = None` before including them in a test-local `Dispatcher` to prevent `RuntimeError`.
-5. [PL-8.4.5] **Pydantic Validation**: All mocked `Message` and `Update` objects must include valid data (e.g., `date=datetime.now()`) to pass Pydantic V2 validation used by aiogram 3.
+### [PL-8.5] Testing Rules
+1. [PL-8.5.1] **Repository Standards**: The `tests/` directory is a permanent part of the repository.
+2. [PL-8.5.2] **Ephemeral DB**: Always use the `db_setup` fixture. Writing to `bot.db` during testing is strictly prohibited.
+3. [PL-8.5.3] **No Network**: All external API calls (Telegram) MUST be mocked via `mock_bot`.
+4. [PL-8.5.4] **Router Detach**: When using global routers in integration tests, use `router._parent_router = None` before including them in a test-local `Dispatcher` to prevent `RuntimeError`.
+5. [PL-8.5.5] **Pydantic Validation**: All mocked `Message` and `Update` objects must include valid data (e.g., `date=datetime.now()`) to pass Pydantic V2 validation used by aiogram 3.
+6. [PL-8.5.6] **Aiogram Mocking Protocol**: 
+    - Since aiogram 3 models are **frozen**, NEVER attempt to assign `callback.answer = AsyncMock()`. 
+    - Use `with patch("aiogram.types.CallbackQuery.answer", new_callable=AsyncMock)` to intercept calls.
+    - Ensure `bot` is attached via `._bot = mock_bot` to satisfy the internal `.bot` property of messages/callbacks.
 
 

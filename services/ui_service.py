@@ -406,12 +406,16 @@ class UIService:
         
         t_name = db.get_topic_name(topic_id)
         access_groups = db.get_groups_by_topic(topic_id)
-        groups_str = ", ".join(access_groups) if access_groups else "НЕТ ДОСТУПА"
+        if not db.is_topic_restricted(topic_id):
+            status_str = "🔐 <b>Только администрация</b> (Default Deny)"
+        else:
+            status_str = ", ".join(access_groups) if access_groups else "НЕТ АКТИВНЫХ ГРУПП"
+            
         text = (
             f"📍 <b>Информация о топике</b>\n\n"
             f"<b>Наименование:</b> {t_name}\n"
             f"<b>ID:</b> <code>{topic_id}</code>\n"
-            f"<b>Доступ имеют:</b> {groups_str}"
+            f"<b>Доступ имеют:</b> {status_str}"
         )
         await UIService.sterile_show(state, event, text, reply_markup=kb.topic_edit_kb(topic_id, group_id=group_id))
 

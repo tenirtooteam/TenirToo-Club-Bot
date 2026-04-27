@@ -42,6 +42,7 @@ class ManagementService:
             end_iso=now_iso
         )
         if event_id > 0:
+            db.add_event_participant(event_id, user_id)
             db.add_event_lead(event_id, user_id)
             logger.info(f"⚡ Квик-ивент создан: {title} (ID: {event_id})")
         return event_id

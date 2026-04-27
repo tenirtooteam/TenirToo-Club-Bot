@@ -358,6 +358,8 @@ async def join_event(callback: CallbackQuery, state: FSMContext):
 
     # Регистрируем заявку на участие [CC-1]
     ManagementService.submit_request(user_id, "event_participation", event_id)
+    await EventService.notify_admins_of_participation_request(callback.message.bot, event_id, user_id)
+    
     await callback.answer("✅ Ваша заявка на участие отправлена организаторам!", show_alert=True)
     await view_event(callback, state)
 
