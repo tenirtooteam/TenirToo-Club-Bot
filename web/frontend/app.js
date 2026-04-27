@@ -12,47 +12,205 @@ const elements = {
     loader: document.getElementById('main-loader'),
     content: document.getElementById('content'),
     errorScreen: document.getElementById('error-screen'),
+    errorMsg: document.getElementById('error-msg'),
+    
+    // View Details (Announcement)
+    viewDetails: document.getElementById('view-details'),
     title: document.getElementById('event-title'),
     dates: document.getElementById('event-dates'),
     participants: document.getElementById('participants-count'),
     btn: document.getElementById('toggle-btn'),
     btnText: document.getElementById('btn-text'),
-    errorMsg: document.getElementById('error-msg'),
-    viewDetails: document.getElementById('view-details'),
-    viewDashboard: document.getElementById('view-dashboard')
+    
+    // View Dashboard
+    viewDashboard: document.getElementById('view-dashboard'),
+    userName: document.getElementById('user-name'),
+    countTopics: document.getElementById('count-topics'),
+    countEvents: document.getElementById('count-events'),
+    
+    // View Lists
+    viewTopics: document.getElementById('view-topics'),
+    topicsList: document.getElementById('topics-list'),
+    viewEvents: document.getElementById('view-events'),
+    eventsList: document.getElementById('events-list'),
+    viewProfile: document.getElementById('view-profile'),
+    profileId: document.getElementById('profile-id'),
+    profileName: document.getElementById('profile-name'),
+    profileRoles: document.getElementById('profile-roles'),
 };
 
-async function loadData() {
-    if (!annId) {
-        showDashboard();
-        return;
-    }
+let currentView = 'view-dashboard';
+const viewStack = [];
+let activeEventId = null; // Текущий ID ивента для переключения участия
 
-    try {
-        const response = await fetch(`/api/announcements/${annId}`, {
-            headers: {
-                'X-TG-Init-Data': tg.initData
-            }
-        });
+// --- API Helpers ---
 
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || "Ошибка загрузки");
+async function apiFetch(url, method = 'GET') {
+    const response = await fetch(url, {
+        method,
+        headers: {
+            'X-TG-Init-Data': tg.initData
         }
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Ошибка API");
+    }
+    return await response.json();
+}
 
-        const data = await response.json();
-        renderEvent(data);
+// --- Navigation ---
+
+function switchView(viewId, pushToStack = true) {
+    // Скрываем все вьюхи
+    document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+    
+    const target = document.getElementById(viewId);
+    if (target) {
+        target.classList.remove('hidden');
+        if (pushToStack && currentView !== viewId) {
+            viewStack.push(currentView);
+        }
+        currentView = viewId;
+    }
+    
+    // Управление кнопкой Назад
+    if (viewStack.length > 0) {
+        tg.BackButton.show();
+    } else {
+        tg.BackButton.hide();
+    }
+    
+    // Специфическая логика загрузки данных для вьюхи
+    if (viewId === 'view-topics') loadTopics();
+    if (viewId === 'view-profile') loadProfile();
+    if (viewId === 'view-events') loadEvents();
+    if (viewId === 'view-dashboard') loadDashboard();
+}
+
+tg.BackButton.onClick(() => {
+    if (viewStack.length > 0) {
+        const prevView = viewStack.pop();
+        switchView(prevView, false);
+    }
+});
+
+// --- Data Loading ---
+
+async function loadData() {
+    if (annId) {
+        try {
+            const data = await apiFetch(`/api/announcements/${annId}`);
+            activeEventId = data.event_id;
+            renderEvent(data);
+        } catch (err) {
+            showError(err.message);
+        }
+    } else {
+        switchView('view-dashboard', false);
+    }
+}
+
+async function loadDashboard() {
+    try {
+        const data = await apiFetch('/api/dashboard/init');
+        elements.userName.innerText = `Привет, ${data.name}!`;
+        elements.countTopics.innerText = data.stats.topics_available;
+        elements.countEvents.innerText = data.stats.events_active;
+        
+        if (data.is_admin) {
+            document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+        }
+        
+        elements.loader.classList.add('hidden');
+        elements.content.classList.remove('hidden');
     } catch (err) {
         showError(err.message);
     }
 }
 
-function showDashboard() {
-    elements.viewDetails.classList.add('hidden');
-    elements.viewDashboard.classList.remove('hidden');
-    elements.loader.classList.add('hidden');
-    elements.content.classList.remove('hidden');
+async function loadTopics() {
+    elements.topicsList.innerHTML = '<div class="spinner"></div>';
+    try {
+        const topics = await apiFetch('/api/dashboard/topics');
+        if (topics.length === 0) {
+            elements.topicsList.innerHTML = '<div class="empty-state">У вас пока нет доступа к топикам.</div>';
+            return;
+        }
+        
+        elements.topicsList.innerHTML = topics.map(t => `
+            <div class="list-item">
+                <div class="list-item-content">
+                    <h4>${t.name}</h4>
+                    <p>ID: ${t.id}</p>
+                </div>
+                <div class="list-item-arrow">→</div>
+            </div>
+        `).join('');
+    } catch (err) {
+        tg.showAlert("Не удалось загрузить топики");
+    }
 }
+
+async function loadEvents() {
+    elements.eventsList.innerHTML = '<div class="spinner"></div>';
+    try {
+        const events = await apiFetch('/api/dashboard/events');
+        if (events.length === 0) {
+            elements.eventsList.innerHTML = '<div class="empty-state">Пока нет активных мероприятий.</div>';
+            return;
+        }
+        
+        elements.eventsList.innerHTML = events.map(e => `
+            <div class="list-item clickable-event" data-id="${e.id}">
+                <div class="list-item-content">
+                    <h4>${e.title}</h4>
+                    <p>${e.date} • ${e.participants_count} участников</p>
+                </div>
+                <div class="list-item-arrow">${e.is_participant ? '✅' : '→'}</div>
+            </div>
+        `).join('');
+        
+        // Навешиваем клики
+        document.querySelectorAll('.clickable-event').forEach(el => {
+            el.onclick = () => {
+                const id = el.getAttribute('data-id');
+                viewEventDetails(id);
+            };
+        });
+    } catch (err) {
+        tg.showAlert("Ошибка загрузки мероприятий");
+    }
+}
+
+async function viewEventDetails(eventId) {
+    tg.HapticFeedback.selectionChanged();
+    elements.loader.classList.remove('hidden');
+    try {
+        const data = await apiFetch(`/api/dashboard/events/${eventId}`);
+        activeEventId = eventId;
+        renderEvent(data);
+    } catch (err) {
+        tg.showAlert("Не удалось загрузить детали");
+    } finally {
+        elements.loader.classList.add('hidden');
+    }
+}
+
+async function loadProfile() {
+    try {
+        const data = await apiFetch('/api/dashboard/profile');
+        elements.profileId.innerText = data.user_id;
+        elements.profileName.innerText = data.name;
+        elements.profileRoles.innerHTML = data.roles.map(r => `
+            <span class="role-tag">${r.name}${r.topic_id ? ' (T:'+r.topic_id+')' : ''}</span>
+        `).join('');
+    } catch (err) {
+        tg.showAlert("Ошибка профиля");
+    }
+}
+
+// --- Event (Announcement) Rendering ---
 
 function renderEvent(data) {
     elements.title.innerText = data.title;
@@ -61,8 +219,7 @@ function renderEvent(data) {
     
     updateButton(data.is_participant);
     
-    elements.viewDashboard.classList.add('hidden');
-    elements.viewDetails.classList.remove('hidden');
+    switchView('view-details', true);
     elements.loader.classList.add('hidden');
     elements.content.classList.remove('hidden');
 }
@@ -80,21 +237,20 @@ function updateButton(isParticipant) {
 async function toggleParticipation() {
     tg.HapticFeedback.impactOccurred('medium');
     elements.btn.disabled = true;
-    elements.btn.style.opacity = "0.7";
 
     try {
-        const response = await fetch(`/api/announcements/${annId}/toggle`, {
-            method: 'POST',
-            headers: {
-                'X-TG-Init-Data': tg.initData
-            }
-        });
-
-        const result = await response.json();
+        // Выбираем эндпоинт в зависимости от контекста (анонс или список)
+        const endpoint = annId ? `/api/announcements/${annId}/toggle` : `/api/dashboard/events/${activeEventId}/toggle`;
+        const result = await apiFetch(endpoint, 'POST');
+        
         if (result.success) {
             tg.HapticFeedback.notificationOccurred('success');
-            // Перезагружаем данные для обновления счетчика и статуса
-            await loadData();
+            // Обновляем текущую вьюху
+            if (annId) {
+                await loadData();
+            } else {
+                await viewEventDetails(activeEventId);
+            }
         } else {
             tg.showAlert(result.message);
         }
@@ -102,9 +258,10 @@ async function toggleParticipation() {
         tg.showAlert("Произошла ошибка");
     } finally {
         elements.btn.disabled = false;
-        elements.btn.style.opacity = "1";
     }
 }
+
+// --- Initialization ---
 
 function showError(msg) {
     elements.loader.classList.add('hidden');
@@ -113,7 +270,18 @@ function showError(msg) {
     elements.errorMsg.innerText = msg;
 }
 
+// Menu Click Handlers
+document.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+        const targetView = item.getAttribute('data-view');
+        if (targetView) {
+            tg.HapticFeedback.selectionChanged();
+            switchView(targetView);
+        }
+    });
+});
+
 elements.btn.onclick = toggleParticipation;
 
-// Загрузка
+// Start
 loadData();

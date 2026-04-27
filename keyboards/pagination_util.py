@@ -20,7 +20,15 @@ def add_nav_footer(builder: InlineKeyboardBuilder, back_data: str = None, includ
         # 2. Путь назад (back_data) - если мы в дочернем меню
         # 3. 'landing' - системный корень как последний рубеж
         back_link = help_back_data or back_data or "landing"
-        nav_buttons.append(InlineKeyboardButton(text="❓", callback_data=f"help:{help_key}:{back_link}"))
+        cb_data = f"help:{help_key}:{back_link}"
+        
+        # [G-DNA] Telegram Constraint: callback_data <= 64 bytes
+        if len(cb_data.encode('utf-8')) > 64:
+            import logging
+            logging.getLogger(__name__).warning(f"⚠️ [UI] Callback data too long: {cb_data}")
+            cb_data = cb_data[:64]
+            
+        nav_buttons.append(InlineKeyboardButton(text="❓", callback_data=cb_data))
     
     if nav_buttons:
         builder.row(*nav_buttons)

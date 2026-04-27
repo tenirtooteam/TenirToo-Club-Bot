@@ -8,7 +8,10 @@ def user_main_kb():
     from aiogram.types import WebAppInfo
     import config
     builder = InlineKeyboardBuilder()
-    builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
+    
+    if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
+        builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
+        
     builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data="user_topics")
     builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
     builder.button(text="[ 👤 МОЙ ПРОФИЛЬ ]", callback_data="user_profile_view")

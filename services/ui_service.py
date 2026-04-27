@@ -133,8 +133,16 @@ class UIService:
             try:
                 await event.message.edit_text(text, reply_markup=reply_markup, parse_mode=parse_mode)
             except TelegramBadRequest as e:
-                if "message is not modified" in str(e):
-                    pass  # Контент идентичен — это нормально, игнорируем
+                err_str = str(e).lower()
+                if "message is not modified" in err_str:
+                    pass  # Контент идентичен — это нормально
+                elif "button_type_invalid" in err_str:
+                    logger.error(f"❌ [UI] CRITICAL: Invalid button configuration detected!")
+                    logger.error(f"Markup: {reply_markup}")
+                    # Шлем новое сообщение без битой клавы (или пробуем принудительно)
+                    new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    await UIService.delete_msg(event.message)
+                    await state.update_data(last_menu_ids=[new_msg.message_id])
                 else:
                     # Реальная ошибка: сообщение старое или удалено — отправляем новое
                     logger.warning(f"⚠️ [UI] edit_text failed ({e}), sending new message.")
@@ -142,7 +150,13 @@ class UIService:
                     await UIService.delete_msg(event.message)
                     await state.update_data(last_menu_ids=[new_msg.message_id])
             except Exception as e:
-                logger.error(f"❌ [UI] Unexpected error in show_menu: {e}")
+                logger.error(f"❌ [UI] Unexpected error in show_menu: {e}", exc_info=True)
+                # Fallback: пробуем отправить новое сообщение
+                try:
+                    new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
+                    await state.update_data(last_menu_ids=[new_msg.message_id])
+                except Exception:
+                    pass
             
             try:
                 await event.answer()

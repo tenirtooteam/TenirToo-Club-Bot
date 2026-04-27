@@ -371,8 +371,22 @@ class ManagementService:
                 if mode == "event_participants" and entity_id:
                     details = EventService.get_event_details(entity_id)
                     if details:
+                        # Разрешаем имена участников для экспорта
+                        p_ids = details['participants']
+                        l_ids = set(details['leads'])
+                        names = db.get_user_names_by_ids(p_ids)
+                        
+                        full_participants = []
+                        for p_id in p_ids:
+                            full_participants.append({
+                                'user_id': p_id,
+                                'name': names.get(p_id, f"ID:{p_id}"),
+                                'role': "Организатор" if p_id in l_ids else "Участник",
+                                'join_date': "" # В БД пока нет даты вступления
+                            })
+                            
                         await GoogleSheetsService.export_event_participants(
-                            entity_id, details['title'], details['participants']
+                            entity_id, details['title'], full_participants
                         )
             except Exception as e:
                 logger.error(f"Фоновая синхронизация Google Sheets провалилась ({mode}): {e}")

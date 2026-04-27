@@ -6,25 +6,10 @@ from services.event_service import EventService
 from services.management_service import ManagementService
 from services.permission_service import PermissionService
 from database import db
-from ..auth import validate_webapp_init_data
+from ..auth import validate_webapp_init_data, get_current_user_id
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-async def get_current_user_id(x_tg_init_data: str = Header(None)) -> int:
-    """Dependency для извлечения и валидации user_id из заголовков [CC-3]."""
-    if not x_tg_init_data:
-        raise HTTPException(status_code=401, detail="Missing X-TG-Init-Data header")
-    
-    user_data = validate_webapp_init_data(x_tg_init_data)
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Invalid session")
-    
-    try:
-        user_info = json.loads(user_data['user'])
-        return int(user_info['id'])
-    except (KeyError, json.JSONDecodeError, ValueError):
-        raise HTTPException(status_code=401, detail="Invalid user data")
 
 @router.get("/{ann_id}")
 async def get_announcement_details(ann_id: int, user_id: int = Depends(get_current_user_id)):

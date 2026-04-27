@@ -49,21 +49,87 @@
                 </footer>
             </div>
 
-            <!-- VIEW: Dashboard (Coming Soon / Brew) -->
+            <!-- VIEW: Dashboard (Grid Menu) -->
             <div id="view-dashboard" class="view hidden">
                 <header>
-                    <div class="event-badge">Личный кабинет</div>
-                    <h1>Меню Гида</h1>
-                    <p class="date-range">Ваше центральное варево</p>
+                    <div class="user-profile-summary">
+                        <div class="avatar-placeholder" id="user-avatar">🏔</div>
+                        <div class="user-text">
+                            <h1 id="user-name">Привет, Путешественник!</h1>
+                            <p id="user-status">Ваше центральное варево</p>
+                        </div>
+                    </div>
                 </header>
 
                 <main>
-                    <div class="description-section">
-                        <h3>Скоро здесь будет:</h3>
-                        <p>• Управление всеми походами<br>
-                           • Быстрый поиск участников<br>
-                           • Статистика экспедиций<br>
-                           • Настройка профиля</p>
+                    <div class="menu-grid">
+                        <div class="menu-item" data-view="view-topics">
+                            <div class="menu-icon">📍</div>
+                            <span class="menu-label">Мои топики</span>
+                            <span class="menu-hint" id="count-topics">0</span>
+                        </div>
+                        <div class="menu-item" data-view="view-events">
+                            <div class="menu-icon">🏔</div>
+                            <span class="menu-label">Мероприятия</span>
+                            <span class="menu-hint" id="count-events">0</span>
+                        </div>
+                        <div class="menu-item" data-view="view-profile">
+                            <div class="menu-icon">👤</div>
+                            <span class="menu-label">Мой профиль</span>
+                        </div>
+                        <!-- Admin Only Items (Hidden by default) -->
+                        <div class="menu-item admin-only hidden" data-view="view-admin-tools">
+                            <div class="menu-icon">🛡️</div>
+                            <span class="menu-label">Админка</span>
+                        </div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Topics List -->
+            <div id="view-topics" class="view hidden">
+                <header class="sub-header">
+                    <h2>📍 Доступные топики</h2>
+                </header>
+                <main>
+                    <div id="topics-list" class="list-container">
+                        <!-- Topics rendered here -->
+                        <div class="empty-state">У вас пока нет доступа к топикам.</div>
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Events List -->
+            <div id="view-events" class="view hidden">
+                <header class="sub-header">
+                    <h2>🏔 Все мероприятия</h2>
+                </header>
+                <main>
+                    <div id="events-list" class="list-container">
+                        <!-- Events rendered here -->
+                    </div>
+                </main>
+            </div>
+
+            <!-- VIEW: Profile -->
+            <div id="view-profile" class="view hidden">
+                <header class="sub-header">
+                    <h2>👤 Профиль пользователя</h2>
+                </header>
+                <main>
+                    <div class="profile-card">
+                        <div class="profile-info">
+                            <label>Ваш ID</label>
+                            <span id="profile-id">---</span>
+                        </div>
+                        <div class="profile-info">
+                            <label>Имя в системе</label>
+                            <span id="profile-name">---</span>
+                        </div>
+                        <div class="profile-info">
+                            <label>Ваши роли</label>
+                            <div id="profile-roles" class="roles-list"></div>
+                        </div>
                     </div>
                 </main>
             </div>

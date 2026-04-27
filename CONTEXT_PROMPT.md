@@ -38,7 +38,7 @@
 - [CP-2.24] **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `audit_requests` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
 - [CP-2.25] **Unified Role-Based Landing**: The bot uses a single public entry point (`/start`) and a "Traffic Controller" logic in `UIService.get_landing_data` to automatically route users to their respective dashboards. Supports a `role_override` parameter allowing debug aliases (`/admin`, `/mod`) to force specific interface generation while maintaining the central logic.
 - [CP-2.26] **Automated Reporting (Sheets)**: Background synchronization of club data to Google Sheets. Includes Master User List, Group Templates, and **Expedition Export** (Master Event List + individual participant rosters for every hike). Triggered automatically by data mutations in `ManagementService`. [RA-7.3]
-- [CP-2.27] **Telegram Mini Apps (TMA) Integration**: Secure, personalized Web UI for announcements. Uses FastAPI backend and Vanilla JS/CSS frontend with Premium Minimalist design. Includes HMAC cryptographic validation, mobile-native haptic feedback, and **Dynamic Reactivity**. **Hybrid UI Strategy**: Group announcements use native buttons for speed, while the full **Mini App Dashboard** is centralized in PMs for management. [CC-5]
+- [CP-2.27] **Telegram Mini Apps (TMA) Integration**: Secure, personalized Web UI serving as a full-featured **«Personal Cabinet»**. It mirrors the Telegram Start Menu, providing dedicated views for "My Topics", "Events", and "Profile". Includes HMAC cryptographic validation, mobile-native haptic feedback, and a robust multi-view navigation system using the Telegram BackButton. **Hybrid UI Strategy**: Group announcements use native buttons for speed, while the TMA Dashboard provides the deep interactive experience. [CC-5]
 - [CP-2.28] **Unified Configuration & Logging**: Centralized constants management in `config.py`. Unified rotation-based logging (`logs/bot.log`) for both Bot and WebApp layers with global exception handling.
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJ## [CP-3] CODING RULES AND CONSTRAINTS
@@ -84,7 +84,7 @@
     - Help Button: Must provide a unique key from `HelpService` and an explicit `help_back_data` for complex screens.
     > Rationale: Separating navigation from functional buttons improves ergonomics and ensures a consistent UI across the entire bot.
 
-12. [CP-3.13] **UI Integrity & Durability**: All keyboards and FSM transitions are verified by `test_ui_integrity.py` (Registry sync), `test_fsm_isolation.py` (Bypass prevention), and the **Deep-UI Fuzzer** (`test_ui_fuzzer.py`), which uses global Bot-method interception to detect all interactive elements. All tests MUST follow the **Declarative Testing Standard [PL-HI]** using shared fixtures from `conftest.py`.
+12. [CP-3.13] **UI Integrity & Durability**: All keyboards and FSM transitions are verified by `test_ui_integrity.py` (Registry sync), `test_permission_scenarios.py` (Access isolation), and the **Deep-UI Fuzzer** (`test_ui_fuzzer.py`), which uses global Bot-method interception to detect all interactive elements. All tests MUST follow the **Declarative Testing Standard [PL-HI]** using shared fixtures from `conftest.py`.
 
 13. [CP-3.14] **Heartfelt UI**: User-facing text must be community-oriented. Avoid technical jargon like "management system", "entities", "permissions" in the interface. Use "Assistant", "Gid", "Rights".
 
@@ -203,14 +203,46 @@
 
 52. [CP-3.52] **DEFAULT DENY ENFORCEMENT**: All topics MUST be closed to non-admin users by default unless explicitly configured in `direct_topic_access`. Any UI display of topic status MUST clearly state when a topic is in "Default Deny" mode. [PL-3.2.1]
 
+53. [CP-3.53] **UI ROBUSTNESS & WEBAPP HARDENING**: 
+    - [CP-3.53.1] **WebApp URL Check**: All `web_app` buttons MUST be wrapped in a conditional check for `config.WEBAPP_URL`. Do not render the button if the URL is empty or invalid. 
+    - [CP-3.53.2] **Callback Parsing**: Help handlers and other colon-separated callback parsers MUST implement robust splitting to handle legacy button formats and prevent `IndexError`.
+    - [CP-3.53.3] **Error Recovery**: `UIService.sterile_show` MUST catch `BUTTON_TYPE_INVALID` and fall back to sending a new message to prevent the interface from "hanging" or crashing.
+    > Rationale: Prevents system-wide crashes caused by configuration errors or the presence of legacy messages in user chat history. Ensures a resilient user experience across all interaction types.
+
 ---
 
-## [CP-4] SCOPE BOUNDARY
+---
 
-[CP-4.1] This file governs **code generation and bug-fixing only**. Tasks outside this scope (such as architectural audits, documentation maintenance, or high-level session orchestration) are handled by dedicated internal instructions — do not conflate.
+## [CP-4] DESIGN SYSTEM (Premium Minimalist)
 
+[CP-4.1] **Core Palette**:
+- **Background**: `#050505` (Deep Black).
+- **Cards/Containers**: `rgba(20, 20, 20, 0.7)` (Glass Dark).
+- **Borders**: `rgba(255, 255, 255, 0.08)` (Subtle White).
+- **Accents**: Pure White (`#ffffff`) for primary, Dim White (`rgba(255, 255, 255, 0.6)`) for secondary.
 
-## [CP-5] HOW TO RESPOND
+[CP-4.2] **Typography**:
+- **Font Family**: `Outfit` (Google Fonts).
+- **Headings**: Bold, tight tracking (`letter-spacing: -1px`), line-height 1.1.
 
-- [CP-5.1] Provide production-ready code using tilde code blocks (~~~).
-- [CP-5.2] If documentation updates are needed after a change, synchronize `PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md`, and `README.md` accordingly.
+[CP-4.3] **Glassmorphism & Interactivity**:
+- **Blur Effect**: `backdrop-filter: blur(20px)`.
+- **Corner Radii**: Standard `20px` or `24px`.
+- **Micro-Animations**: Scale down on active state (`0.96`), slight opacity transitions.
+
+[CP-4.4] **Iconography & Layout**:
+- **System Emojis**: 🏔 (Expedition), 📍 (Topic), 👤 (Profile), 🛡️ (Admin), 🔎 (Search).
+- **Grid Layout**: Use 2-column grids for menus to maximize screen efficiency on mobile.
+
+---
+
+## [CP-5] SCOPE BOUNDARY
+
+[CP-5.1] This file governs **code generation and bug-fixing only**. Tasks outside this scope (such as architectural audits, documentation maintenance, or high-level session orchestration) are handled by dedicated internal instructions — do not conflate.
+
+---
+
+## [CP-6] HOW TO RESPOND
+
+- [CP-6.1] Provide production-ready code using tilde code blocks (~~~).
+- [CP-6.2] If documentation updates are needed after a change, synchronize `PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md`, and `README.md` accordingly.

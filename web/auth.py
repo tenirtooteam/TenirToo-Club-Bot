@@ -37,3 +37,22 @@ def validate_webapp_init_data(init_data: str) -> dict | None:
         
     except Exception:
         return None
+
+from fastapi import Header
+async def get_current_user_id(x_tg_init_data: str = Header(None)) -> int:
+    """Dependency для извлечения и валидации user_id из заголовков [CC-3]."""
+    from fastapi import HTTPException
+    import json
+    
+    if not x_tg_init_data:
+        raise HTTPException(status_code=401, detail="Missing X-TG-Init-Data header")
+    
+    user_data = validate_webapp_init_data(x_tg_init_data)
+    if not user_data:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    
+    try:
+        user_info = json.loads(user_data['user'])
+        return int(user_info['id'])
+    except (KeyError, json.JSONDecodeError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid user data")

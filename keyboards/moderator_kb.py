@@ -28,11 +28,15 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
         
     from aiogram.types import WebAppInfo
     import config
-    static_buttons = [
-        InlineKeyboardButton(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL)),
+    static_buttons = []
+    
+    if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
+        static_buttons.append(InlineKeyboardButton(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL)))
+        
+    static_buttons.extend([
         InlineKeyboardButton(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
-    ]
+    ])
     return build_paginated_menu(
         item_buttons, static_buttons, page, limit, "moderator",
         search_type="topic", search_action="mod_select",

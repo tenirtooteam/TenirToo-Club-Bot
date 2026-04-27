@@ -65,8 +65,20 @@ async def universal_help_handler(callback: types.CallbackQuery, state: FSMContex
     Принимает формат колбэка: help:{key}:{back_data}
     """
     parts = callback.data.split(":")
-    key = parts[1]
-    back_data = parts[2] if len(parts) > 2 else "admin_main"
+    
+    # [G-DNA] Robust Parsing: поддержка старых и новых форматов
+    if len(parts) >= 3:
+        # Новый формат: help:{key}:{back_data}
+        key = parts[1]
+        back_data = parts[2]
+    elif len(parts) == 2:
+        # Переходный формат: help:{key}
+        key = parts[1]
+        back_data = "landing"
+    else:
+        # Совсем старый формат или мусор
+        key = parts[0].replace("help_", "")
+        back_data = "landing"
     
     await show_help_view(state, callback, key, back_data)
 

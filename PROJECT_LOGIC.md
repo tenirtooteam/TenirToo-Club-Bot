@@ -46,11 +46,11 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.15] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - [PL-2.2.16] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `export_events`, `export_event_participants`, `import_users`, `import_groups`.
 - [PL-2.2.17] **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
-- [PL-2.2.18] **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action` (Internal Sanitization [PL-6.7]), `toggle_event_participation`, `approve_event_action`, `submit_request`, `resolve_request` (Atomic Audit), `get_pending_request_id`, `get_user_pending_request_id`, `get_entity_name`, `search_entities`.
+- [PL-2.2.18] **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `create_event_action` (Internal Sanitization [PL-6.7]), `toggle_event_participation`, `add_event_participation_action`, `remove_event_participation_action`, `approve_event_action`, `submit_request`, `resolve_request` (Atomic Audit), `get_pending_request_id`, `get_user_pending_request_id`, `get_entity_name`, `search_entities`, `_trigger_sheets_sync`.
 - [PL-2.2.19] **services/permission_service.py** — Unified Authorization Service: `is_superadmin`, `is_global_admin`, `is_moderator_of_topic`, `can_manage_topic`, `can_manage_user_roles`, `get_manageable_topics`, `can_user_write_in_topic`, `get_user_display_name`, `get_role_name`, `get_role_id`, `get_access_sets`.
 - [PL-2.2.20] **services/notification_service.py** — Notification logic: `send_native_all`, `send_to_users` (Targeted Broadcast).
 - [PL-2.2.21] **services/callback_guard.py** — `safe_callback()` decorator factory.
-- [PL-2.2.22] **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler`, `show_help_view`. **Decoupled**: Uses `ManagementService.search_entities`.
+- [PL-2.2.22] **handlers/common.py** — Shared logic & search. Functions: `cmd_help`, `close_menu_handler`, `roles_dashboard_menu`, `roles_faq_view`, `list_users_with_roles`, `search_start_handler`, `search_query_handler`, `search_results_pagination`, `search_pick_handler`, `perform_search_pick`, `confirm_execution`, `universal_help_handler` (Robust Parsing [G-DNA]), `show_help_view`. **Decoupled**: Uses `ManagementService.search_entities`.
 - [PL-2.2.23] **handlers/admin.py** — Superadmin flows. FSM: `waiting_for_group_name`, `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_new_name`.
 - [PL-2.2.24] **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
 - [PL-2.2.25] **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`, `confirm_date`, `waiting_for_end_date`. Functions: `show_events_list`, `show_pending_events`, `start_event_creation`, `process_event_title`, `process_event_dates`, `process_date_preset`, `process_date_retry`, `process_date_confirm`, `process_date_add_end_start`, `process_event_end_date`, `view_event`, `join_event`, `leave_event`, `delete_event_init`, `approve_event_handler`, `reject_event_handler`, `show_event_card`.
@@ -77,13 +77,17 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.46] **tests/test_services/test_date_logic.py** — Deep unit tests for DateService parsing edge cases.
 - [PL-2.2.46] **tests/test_services/test_sheets_sync.py** — Resilience tests for Google Sheets API error handling.
 - [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
-- [PL-2.2.48] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
-- [PL-2.2.49] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
-- [PL-2.2.50] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation of Telegram WebApp data). [CC-3]
-- [PL-2.2.51] **web/main.py** — FastAPI application: Unified logging (redirected to `logs/bot.log`), global exception handling, CORS configuration, static file mounting, and router inclusion.
-- [PL-2.2.52] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation`. Includes `get_current_user_id` dependency for auth. [CC-1]
-- [PL-2.2.53] **web/frontend/** — Static assets for Mini App: `index.html` (UI), `style.css` (Glassmorphism), `app.js` (TMA Bridge logic).
-- [PL-2.2.54] **tests/test_web/** — Unit tests for the Web Bridge layer.
+- [PL-2.2.48] **tests/test_services/test_ui_integrity.py** — UI Integrity and Hardening tests: callback length, WebApp URL safety, HelpService coverage.
+- [PL-2.2.49] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
+- [PL-2.2.50] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
+- [PL-2.2.51] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation), `get_current_user_id` (FastAPI dependency for user auth). [CC-3]
+- [PL-2.2.52] **web/main.py** — FastAPI application: Unified logging, router inclusion (`announcements`, `dashboard`).
+- [PL-2.2.53] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation`. [CC-1]
+- [PL-2.2.54] **web/routers/dashboard.py** — Web API for personal cabinet: `get_dashboard_init`, `get_user_topics`, `get_user_profile`, `get_all_events`, `get_event_view`, `toggle_event_participation_direct`.
+- [PL-2.2.55] **web/frontend/** — Static assets for Mini App: `index.html` (Multi-view UI), `style.css` (Premium Grid/Glassmorphism), `app.js` (Navigation & API Bridge).
+- [PL-2.2.56] **tests/test_web/test_auth.py** — Unit tests for Web Bridge authentication (HMAC-SHA256).
+- [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
+- [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
 
 ### [PL-2.3] Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -266,7 +270,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.5] **UIService.sterile_ask**: Clears previous menu, deletes trigger message if in group, sends prompt, tracks it as `last_menu_id`, sets FSM state. Used for all FSM text-input initiation flows.
 - [PL-5.1.6] **UIService.delete_tracked_ui**: Физически удаляет массив сообщений из `last_menu_ids`. Единственная точка физического уничтожения интерфейса в БД.
 - [PL-5.1.7] **UIService.sterile_ask**: Первичный терминатор. Используется ПЕРЕД запросом текстовых данных у пользователя. Удаляет предыдущее меню (`delete_tracked_ui`), шлет промпт (например, "Введите название") и ставит его на слежение.
-- [PL-5.1.8] **UIService.sterile_show**: Основной шлюз UI-переходов. Если вызван из колбэка — редактирует текущее сообщение (Swap). Если вызван из Message-хендлера (после ввода пользователя) — вызывает `terminate_input(reset_state=False)`, что удаляет промпт (созданный через `sterile_ask`) и сообщение пользователя, после чего шлет новое чистое меню.
+- [PL-5.1.8] **UIService.sterile_show**: Основной шлюз UI-переходов. Если вызван из колбэка — редактирует текущее сообщение (Swap). Если вызван из Message-хендлера (после ввода пользователя) — вызывает `terminate_input(reset_state=False)`, что удаляет промпт (созданный через `sterile_ask`) и сообщение пользователя, после чего шлет новое чистое меню. **Hardening**: Включает try-except для обработки `BUTTON_TYPE_INVALID` и автоматический fallback на `answer` (новое сообщение), если редактирование невозможно. [G-DNA]
 - [PL-5.1.9] **UIService.terminate_input**: Полная зачистка следов ввода. Удаляет tracked_ui (промпт) и само сообщение пользователя, опционально сбрасывая FSM-состояние.
 - [PL-5.1.10] **UIService.generic_navigator**: Unified entry point for all UI transitions. Maps callback data strings to specific `UIService` show methods or keyboard builders. Supports global panels (Admin, Moderator, User), profile views, topic details, and **Help Infrastructure** (prefix `help:`). Decoupled help text via `HelpService` using `help:{key}:{back_data}` format. Uses the `PAGINATED_CMDS` class constant to explicitly determine if a keyboard requires the `page` argument. Includes fallback logging for unknown commands. `[AI-1]` Standard: All standard UI returns and transitions MUST traverse this router.
 - [PL-5.1.11] **UIService.show_admin_dashboard / show_moderator_dashboard**: Wrappers for main panels that support optional custom feedback text while maintaining layout integrity and superadmin visibility.
@@ -282,7 +286,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.18] **Quick Announcement Protocol**: Support for `/an` command in forum topics. Automatically creates a "Rapid Event" (date set to 'Оперативно') and posts a rich announcement. **Dynamic Reactivity**: Any interaction with the announcement (joining/leaving) triggers a real-time text update with the current participant list. Original command message is deleted to maintain thread sterility.
 - [PL-5.1.19] **Polymorphic Cascade Cleanup**: Since the `announcements` table uses polymorphic links (linking to various entity types by ID without native FKs), any service responsible for deleting a target entity (Events, etc.) MUST manually invoke `delete_announcements_by_target` to prevent data rot.
 - [PL-5.1.20] **Telegram Mini App (TMA) Bridge**: Interactive personalized UI for announcements. Uses FastAPI backend and Vanilla JS/CSS frontend with Glassmorphism aesthetics. **Cross-Layer Reactivity**: Actions performed in TMA (joining/leaving) automatically trigger an update of the physical Telegram message via the stored `chat_id`/`message_id` metadata. Includes mobile-native Haptic Feedback and fallback logic. [CC-5]
-- [PL-5.1.21] **TMA Group Constraint Pattern**: Telegram strictly forbids `web_app` buttons in inline keyboards sent to group chats (raises `BUTTON_TYPE_INVALID`). **Resolution**: Group announcements use standard Telegram buttons (`✅ Иду` / `🚶 Не иду`) for quick interaction with localized alerts. The full **Mini App Dashboard** ("Личный кабинет") is centralized in the Private Messages main menu, serving as the primary hub for management and search.
+- [PL-5.1.21] **TMA Group Constraint Pattern**: Telegram strictly forbids `web_app` buttons in inline keyboards sent to group chats (raises `BUTTON_TYPE_INVALID`). **Resolution**: Group announcements use standard Telegram buttons (`✅ Иду` / `🚶 Не иду`) for quick interaction with localized alerts. The full **Mini App Dashboard** ("Личный кабинет") is centralized as a universal component in ALL main dashboards (User, Admin, Moderator) in Private Messages, serving as the primary hub for management and search.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:
@@ -373,13 +377,16 @@ All keys stored in FSM state across the application:
 ### [PL-8.4] Test Categories
 - [PL-8.4.1] **tests/test_database/**: Unit and integration tests for SQL operations. Focus: CRUD, cascading deletions, and access evaluation logic.
 - [PL-8.4.2] **tests/test_services/**: Tests for domain services.
-    - `test_ui_navigation.py` (UI stabilization and route validation).
+    - `test_ui_integrity.py` (Static and dynamic validation of keyboards, URLs and callbacks).
+    - `test_ui_fuzzer.py` (Autonomous recursive interface exploration).
     - `test_google_sheets_service.py` (Mocked API validation).
     - `test_management_service.py` (Search-Or-Action protocol).
     - `test_permission_service.py` (Role resolution).
 - [PL-8.4.3] **tests/test_handlers/**: Unit tests for handlers and middlewares. Focus: Routing, state transitions, and stealth moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during logic verification.
 - [PL-8.4.4] **tests/test_journeys/**: End-to-End flow tests for complex user journeys (e.g., Quick Announcements, Participation Audit). Focus: Cross-service orchestration and notification delivery.
+    - `test_tma_integration.py` (Bot reaction to WebApp actions).
 - [PL-8.4.5] **tests/test_web/**: Unit tests for Web Bridge authentication and API logic.
+    - `test_auth.py` (HMAC security).
 
 ### [PL-8.5] Testing Rules
 1. [PL-8.5.1] **Repository Standards**: The `tests/` directory is a permanent part of the repository.
