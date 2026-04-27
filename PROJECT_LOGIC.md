@@ -98,6 +98,7 @@ database/db.py          →  database/connection.py (init_db, get_conn re-export
 
 ### [PL-2.6] Context Manager Connectivity
 [PL-2.6.1] `database/connection.py` uses a custom `@contextmanager` (`get_conn`) for deterministic connection handling and guaranteed closure on both success and exception. WAL mode is activated on every individual connection open, not globally at startup. `DB_PATH` is resolved relative to `connection.py`'s own location, always placing `bot.db` inside the `database/` directory regardless of the working directory at launch.
+[PL-2.6.2] `loader.py` initializes the `Bot` instance with `DefaultBotProperties(parse_mode="HTML")`. This ensures that all messages sent via the bot (including direct `bot.send_message` calls) support HTML formatting by default, providing a systemic safety net for UI decorations.
 
 ---
 

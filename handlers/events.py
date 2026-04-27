@@ -107,10 +107,15 @@ async def process_event_dates(message: Message, state: FSMContext):
     if not iso_start:
         # Если не распарсили - сохраняем как текст, но предупреждаем
         await state.update_data(dates=human, start_iso=None, end_iso=None)
-        await message.answer(
+        text = (
             f"⚠️ Не удалось распознать точную дату в \"{human}\".\n"
             "Это мероприятие <b>не попадет</b> в Google Календарь автоматически.\n\n"
-            "Всё равно продолжить?",
+            "Всё равно продолжить?"
+        )
+        await UIService.sterile_show(
+            state,
+            message,
+            text,
             reply_markup=kb.get_date_confirm_kb(iso_start=None)
         )
         return
@@ -118,7 +123,7 @@ async def process_event_dates(message: Message, state: FSMContext):
     await state.update_data(dates=human, start_iso=iso_start, end_iso=iso_end)
     
     text = f"🤖 Я распознал дату: <b>{human}</b>\n\nПодтвердите или измените:"
-    await message.answer(text, reply_markup=kb.get_date_confirm_kb(iso_start, iso_end))
+    await UIService.sterile_show(state, message, text, reply_markup=kb.get_date_confirm_kb(iso_start, iso_end))
     await state.set_state(EventCreation.confirm_date)
 
 @router.callback_query(F.data.startswith("date_preset:"))
@@ -129,7 +134,9 @@ async def process_date_preset(callback: CallbackQuery, state: FSMContext):
     human, _, _ = DateService.parse_smart_date(iso_date)
     
     await state.update_data(dates=human, start_iso=iso_date, end_iso=None)
-    await callback.message.edit_text(
+    await UIService.sterile_show(
+        state,
+        callback,
         f"✅ Выбрано: <b>{human}</b>\n\nЭто мероприятие на один день или будет дата окончания?",
         reply_markup=kb.get_date_confirm_kb(iso_date, None)
     )
@@ -138,7 +145,9 @@ async def process_date_preset(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "date_retry")
 @safe_callback()
 async def process_date_retry(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text(
+    await UIService.sterile_show(
+        state,
+        callback,
         "📅 Введите дату заново.\n<i>Пример: 15 мая или 10-15 июня</i>",
         reply_markup=kb.get_date_picker_kb()
     )
@@ -172,7 +181,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
         new_title = data.get("new_title")
         db.update_event_details(edit_id, new_title, s_human, e_human, iso_start, iso_end)
         await state.clear()
-        await callback.message.edit_text("✅ <b>Изменения сохранены!</b>")
+        await UIService.sterile_show(state, callback, "✅ <b>Изменения сохранены!</b>")
         # Показываем карточку, так как при редактировании нет аудита
         await show_event_card(callback, edit_id, state)
     else:
@@ -194,7 +203,9 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
             await EventService.notify_admins_for_approval(callback.message.bot, event_id)
             
             await state.clear()
-            await callback.message.edit_text(
+            await UIService.sterile_show(
+                state,
+                callback,
                 f"🚀 <b>Мероприятие создано и отправлено на модерацию!</b>\n\n"
                 f"Когда администраторы одобрят его, вы получите уведомление.",
                 reply_markup=kb.simple_back_kb("event_list")
@@ -205,8 +216,13 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("date_add_end:"))
 @safe_callback()
 async def process_date_add_end_start(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text("⏳ Введите <b>дату окончания</b> (например: 20 мая):")
-    await state.set_state(EventCreation.waiting_for_end_date)
+    await UIService.sterile_ask(
+        state, 
+        callback, 
+        "⏳ Введите <b>дату окончания</b> (например: 20 мая):",
+        state_to_set=EventCreation.waiting_for_end_date,
+        reply_markup=kb.get_event_cancel_kb()
+    )
 
 @router.message(EventCreation.waiting_for_end_date)
 async def process_event_end_date(message: Message, state: FSMContext):
@@ -221,7 +237,9 @@ async def process_event_end_date(message: Message, state: FSMContext):
     new_human = f"{start_human} - {human_end}"
     await state.update_data(dates=new_human, end_iso=iso_end)
     
-    await message.answer(
+    await UIService.sterile_show(
+        state,
+        message,
         f"✅ Период установлен: <b>{new_human}</b>\n\nВсё верно?",
         reply_markup=kb.get_date_confirm_kb(iso_start, iso_end)
     )
@@ -281,7 +299,9 @@ async def process_editing_title(message: Message, state: FSMContext):
     await state.update_data(new_title=title)
     await state.set_state(EventCreation.editing_dates)
     
-    await message.answer(
+    await UIService.sterile_show(
+        state,
+        message,
         f"✅ Название принято: <b>{title}</b>\n\nТеперь введите новые даты (например: 15 мая) или выбери на кнопках.\nПришли /skip, чтобы оставить прежние.",
         reply_markup=kb.get_date_picker_kb()
     )
@@ -319,7 +339,7 @@ async def process_editing_dates(message: Message, state: FSMContext):
     await state.update_data(dates=dates, start_iso=start_iso, end_iso=end_iso)
     
     text = f"🤖 Я распознал дату: <b>{dates}</b>\n\nПодтвердите или измените:"
-    await message.answer(text, reply_markup=kb.get_date_confirm_kb(start_iso, end_iso))
+    await UIService.sterile_show(state, message, text, reply_markup=kb.get_date_confirm_kb(start_iso, end_iso))
     await state.set_state(EventCreation.confirm_date)
 
 @router.callback_query(F.data.startswith("event_join:"))
