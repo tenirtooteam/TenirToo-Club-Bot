@@ -91,19 +91,8 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
             
         await callback.answer(msg, show_alert=True)
         
-        # Обновляем текст анонса с актуальным списком участников [PL-5.1.18]
-        new_text = AnnouncementService.format_announcement_text(ann_id)
-        from keyboards.announcements_kb import get_announcement_kb
-        
-        try:
-            await callback.message.edit_text(
-                text=new_text,
-                reply_markup=get_announcement_kb(ann_id, is_group=True)
-            )
-        except Exception as e:
-            # Игнорируем ошибку, если текст не изменился (message is not modified)
-            if "message is not modified" not in str(e).lower():
-                logger.error(f"Ошибка обновления анонса: {e}")
+        # Обновляем ВСЕ анонсы этого мероприятия [CC-2]
+        await AnnouncementService.refresh_announcements(callback.message.bot, "event", target_id)
     else:
         await callback.answer("🛠 Этот тип анонса пока в разработке.")
 

@@ -104,3 +104,29 @@ class AnnouncementService:
         except Exception as e:
             logger.error(f"❌ Ошибка публикации анонса: {e}")
             return False, f"❌ Ошибка Telegram API: {e}", None
+
+    @staticmethod
+    async def refresh_announcements(bot, a_type: str, target_id: int):
+        """ Обновляет все активные сообщения анонсов для сущности в Telegram [CC-2]. """
+        announcements = db.get_announcements_by_target(a_type, target_id)
+        if not announcements:
+            return
+            
+        from keyboards.announcements_kb import get_announcement_kb
+        
+        for ann in announcements:
+            ann_id = ann[0]
+            chat_id = ann[5]
+            message_id = ann[6]
+            
+            if chat_id and message_id:
+                try:
+                    text = AnnouncementService.format_announcement_text(ann_id)
+                    await bot.edit_message_text(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=text,
+                        reply_markup=get_announcement_kb(ann_id, is_group=True)
+                    )
+                except Exception as e:
+                    logger.warning(f"⚠️ Не удалось обновить анонс {ann_id}: {e}")

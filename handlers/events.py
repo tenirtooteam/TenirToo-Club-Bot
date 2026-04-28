@@ -361,6 +361,11 @@ async def join_event(callback: CallbackQuery, state: FSMContext):
     await EventService.notify_admins_of_participation_request(callback.message.bot, event_id, user_id)
     
     await callback.answer("✅ Ваша заявка на участие отправлена организаторам!", show_alert=True)
+    
+    # Обновляем анонсы [CC-2]
+    from services.announcement_service import AnnouncementService
+    await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
+    
     await view_event(callback, state)
 
 @router.callback_query(F.data.startswith("event_leave:"))
@@ -369,6 +374,11 @@ async def leave_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     # [PL-6.7] Мутация через ManagementService
     success, msg = ManagementService.toggle_event_participation(event_id, callback.from_user.id)
+    
+    # Обновляем анонсы [CC-2]
+    from services.announcement_service import AnnouncementService
+    await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
+    
     await callback.answer(msg)
     await view_event(callback, state)
 

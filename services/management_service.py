@@ -190,6 +190,7 @@ class ManagementService:
             return False, f"❌ Максимум {ManagementService.MAX_NAME_LENGTH} символов."
             
         db.update_user_name(user_id, first_name, last_name)
+        ManagementService._trigger_sheets_sync("users")
         return True, "✅ Данные пользователя обновлены."
 
     @staticmethod
@@ -202,6 +203,7 @@ class ManagementService:
             return False, "❌ Название слишком длинное."
             
         db.update_topic_name(topic_id, new_name)
+        ManagementService._trigger_sheets_sync("all")
         return True, "✅ Название топика обновлено."
 
     @staticmethod
@@ -263,7 +265,7 @@ class ManagementService:
         """
         if action == "group_del":
             db.delete_group(target_id)
-            ManagementService._trigger_sheets_sync("all")
+            ManagementService._trigger_sheets_sync("groups")
             return True, "✅ Группа удалена", "manage_groups"
             
         elif action in ["topic_del", "mod_topic_del"]:
@@ -277,12 +279,12 @@ class ManagementService:
             
         elif action == "global_topic_del":
             db.delete_topic(target_id)
-            ManagementService._trigger_sheets_sync("all")
+            ManagementService._trigger_sheets_sync("groups") # Топики влияют на выгрузку групп
             return True, "✅ Топик полностью удален", "all_topics_list"
             
         elif action == "user_del":
             db.delete_user(target_id)
-            ManagementService._trigger_sheets_sync("all")
+            ManagementService._trigger_sheets_sync("users")
             return True, "✅ Пользователь удален", "manage_users"
 
         elif action.startswith("role_rev"):
@@ -300,7 +302,7 @@ class ManagementService:
 
         elif action == "event_del":
             db.delete_event(target_id)
-            ManagementService._trigger_sheets_sync("all")
+            ManagementService._trigger_sheets_sync("events")
             return True, "✅ Мероприятие удалено", "event_list"
 
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
@@ -412,9 +414,11 @@ class ManagementService:
         members = set(db.get_group_template_members(group_id))
         if user_id in members:
             db.remove_from_group_template(group_id, user_id)
+            ManagementService._trigger_sheets_sync("groups")
             return True, "🗑 Пользователь удален из шаблона."
         else:
             db.add_to_group_template(group_id, user_id)
+            ManagementService._trigger_sheets_sync("groups")
             return True, "📋 Пользователь добавлен в шаблон."
 
     @staticmethod

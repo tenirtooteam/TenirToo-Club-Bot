@@ -31,17 +31,17 @@ async def test_participation_request_notifies_admin(db_setup, create_callback, m
     req_id = ManagementService.get_user_pending_request_id(applicant_id, "event_participation", event_id)
     assert req_id is not None
     
-    # 2. Проверяем УВЕДОМЛЕНИЕ АДМИНА [CC-3]
+    # 2. Проверяем УВЕДОМЛЕНИЕ ОРГАНИЗАТОРА [CC-3]
     # Должен быть вызван notify_admins_of_participation_request
-    # И в итоге bot.send_message админу (config.ADMIN_ID)
+    # И в итоге bot.send_message создателю (creator_id)
     found = False
     for call in mock_bot.send_message.call_args_list:
         c_id = call.kwargs.get("chat_id") or (call.args[0] if call.args else None)
         text = call.kwargs.get("text", "") or (call.args[1] if len(call.args) > 1 else "")
-        if c_id == config.ADMIN_ID and "заявка на участие" in text.lower():
+        if c_id == creator_id and "заявка на участие" in text.lower():
             found = True
             break
-    assert found, f"Админ {config.ADMIN_ID} не получил уведомление. Вызовы: {mock_bot.send_message.call_args_list}"
+    assert found, f"Организатор {creator_id} не получил уведомление. Вызовы: {mock_bot.send_message.call_args_list}"
 
 @pytest.mark.asyncio
 async def test_audit_resolution_notifies_participant(db_setup, mock_bot):

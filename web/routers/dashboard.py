@@ -87,7 +87,13 @@ async def toggle_event_participation_direct(event_id: int, user_id: int = Depend
     if success and "записаны" in message:
         from loader import bot
         from services.event_service import EventService
+        from services.announcement_service import AnnouncementService
+        
+        # Уведомляем организаторов
         await EventService.notify_organizers_of_direct_join(bot, event_id, user_id)
+        
+        # Обновляем анонс в группе [CC-2]
+        await AnnouncementService.refresh_announcements(bot, "event", event_id)
         
     return {"success": success, "message": message}
 
