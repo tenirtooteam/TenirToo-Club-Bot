@@ -10,6 +10,11 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 - Static AST-based import boundary validator (`tests/test_services/test_import_lint.py`) to prevent direct database imports in presentation layers.
 - In-memory `UserSessionSimulator` test helper with automated UX assertions (markup balance, anti-spam, and navigation footers).
 - E2E event creation journey TDD test verifying the entire interactive creation flow.
+- `FsmButtonGuardMiddleware` (`middlewares/fsm_button_guard.py`) to prevent execution of obsolete callbacks during active FSM states.
+- Default Deny PM alerting system for administrators with 60-second rate-limiting in `services/notification_service.py`.
+- Soft close stub logic in `handlers/common.py` providing seamless PM navigation recovery.
+- Session-based onboarding screen for administrators inside `services/ui_service.py` to prevent UX confusion.
+- Comprehensive E2E journey tests validating new UX and FSM protection features.
 
 ### Changed
 - Refactored `database/events.py` and `database/audit.py` to return DTO instances instead of dict primitives (with backward-compatible dict interface).

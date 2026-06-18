@@ -61,6 +61,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.28] **handlers/user.py** — User flows: Unified `/start` (Traffic Controller), profile, topics.
 - [PL-2.2.28.1] **handlers/errors.py** — Global dispatcher exception handler catching and logging all unexpected errors.
 - [PL-2.2.27] **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
+- [PL-2.2.27.1] **middlewares/fsm_button_guard.py** — Callback query protection middleware checking message ID consistency during active FSM states.
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `get_admin_cancel_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards: `get_mod_cancel_kb`, `moderator_topics_list_kb`, `moderator_topic_menu_kb`, `topic_moderators_kb`, `moderator_search_kb`, `moderator_topic_groups_kb`, `moderator_unattached_groups_kb`.
 - [PL-2.2.30] **keyboards/announcements_kb.py** — Announcement interaction buttons: `get_announcement_kb`.
@@ -93,6 +94,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.56] **tests/test_web/test_auth.py** — Unit tests for Web Bridge authentication (HMAC-SHA256).
 - [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
 - [PL-2.2.57.1] **tests/test_journeys/test_event_creation_tdd.py** — E2E event creation journey test validating UI lifecycle via simulator.
+- [PL-2.2.57.2] **tests/test_journeys/test_ux_journeys.py** — TDD journey tests validating onboarding FAQ, PM deny alerts, soft close stubs, and FSM button guards.
 - [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
 
 
@@ -264,6 +266,9 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 ### [PL-4.6] Error Handling
 - [PL-4.6.1] All three stages follow a **fail-open** strategy: non-critical exceptions are caught, logged, and the pipeline continues.
 - [PL-4.6.2] **Critical exception** (fail-closed): `init_db()` in `connection.py` re-raises any exception after logging — a DB initialization failure must halt the bot immediately.
+
+### [PL-4.7] Stage 4 — FsmButtonGuardMiddleware (Callback Pipeline)
+- [PL-4.7.1] Registered as outer middleware on `dp.callback_query`. Inspects callback query updates in private chats: if FSM state is active, checks if the message ID matches the active `last_menu_id`. If they do not match, it deletes the obsolete message and terminates dispatcher propagation to protect the FSM chain from stale buttons. Whitelisted callbacks (e.g. `landing`, `close_menu`) bypass this check.
 
 ---
 
