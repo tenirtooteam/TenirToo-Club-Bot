@@ -116,6 +116,7 @@ async def process_group_add(message: types.Message, state: FSMContext):
         await UIService.show_temp_message(state, message, text)
         return
 
+    await state.set_state(None)
     await UIService.show_admin_dashboard(state, message, text=text)
 
 

@@ -183,3 +183,81 @@ async def test_admin_onboarding_faq_flow(create_callback, mock_bot):
         data = await state.get_data()
         assert data.get("admin_onboarded") is True
         mock_dashboard.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_default_deny_triggers_member_pm_alert(mock_bot, create_context):
+    """
+    TDD Test: AccessGuardMiddleware triggers PM alert on member message deletion
+    and applies rate limiting (1 hour).
+    """
+    with patch("middlewares.access_check.IMMUNITY_FOR_ADMINS", True), \
+         patch("services.permission_service.PermissionService.is_global_admin", return_value=False), \
+         patch("services.permission_service.PermissionService.can_user_write_in_topic", return_value=False):
+        
+        from middlewares.access_check import AccessGuardMiddleware
+        middleware = AccessGuardMiddleware()
+        handler = AsyncMock()
+
+        # Simulate ordinary member message in supergroup (negative ID)
+        _, _, message, state = await create_context(user_id=777777777, chat_id=-100123456789, chat_type="supergroup", thread_id=42)
+
+        # First trigger - must send alert
+        await middleware(handler, message, {"state": state})
+        handler.assert_not_called() # Denied and deleted
+        
+        mock_bot.send_message.assert_called_once()
+        args, kwargs = mock_bot.send_message.call_args
+        assert kwargs.get("chat_id") == 777777777 or (len(args) > 0 and args[0] == 777777777)
+        assert "Доступ ограничен" in kwargs.get("text", "") or (len(args) > 1 and "Доступ ограничен" in args[1])
+        
+        # Second immediate trigger - must be rate-limited (no alert sent)
+        mock_bot.send_message.reset_mock()
+        await middleware(handler, message, {"state": state})
+        mock_bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fsm_reset_after_group_creation(create_context, mock_bot):
+    """
+    TDD Test: Creating a group template successfully nullifies the FSM state.
+    """
+    from handlers.admin import process_group_add
+    from handlers.admin import AdminStates
+
+    _, _, message, state = await create_context(user_id=123, chat_id=123, chat_type="private", text="Спортсмены")
+    await state.set_state(AdminStates.waiting_for_group_name)
+
+    with patch("services.management_service.ManagementService.create_group", return_value=(True, "Группа создана")), \
+         patch("services.ui_service.UIService.show_admin_dashboard", new_callable=AsyncMock) as mock_dashboard:
+        
+        await process_group_add(message, state)
+        
+        # FSM state must be reset to None
+        curr_state = await state.get_state()
+        assert curr_state is None
+        mock_dashboard.assert_called_once()
+
+
+
+@pytest.mark.asyncio
+async def test_fsm_reset_after_search_pick(create_callback, mock_bot):
+    """
+    TDD Test: Selection in search pick handler resets FSM state and routes appropriately.
+    """
+    from handlers.common import perform_search_pick
+    from handlers.common import SearchStates
+
+    callback, state = await create_callback(chat_id=123, user_id=123, data="search_pick_user_dir_add_1")
+    await state.set_state(SearchStates.waiting_for_query)
+    await state.update_data(search_context=1) # topic_id = 1
+
+    with patch("services.management_service.ManagementService.grant_direct_access_by_id", return_value=(True, "Доступ выдан")), \
+         patch("services.ui_service.UIService.sterile_show", new_callable=AsyncMock) as mock_show:
+        
+        await perform_search_pick(state, callback, "user", "dir_add", 1, 1)
+        
+        # FSM state must be reset to None
+        curr_state = await state.get_state()
+        assert curr_state is None
+        mock_show.assert_called_once()

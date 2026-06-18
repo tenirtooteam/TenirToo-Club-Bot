@@ -2,6 +2,22 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.2] - 2026-06-19
+
+### Added
+- **Rate-Limited PM Alerts for Members**: Added `send_member_deny_alert` in `NotificationService` to send a soft rate-limited (1 hour) warning to ordinary members when their messages are stealth-deleted.
+- **Cognitive UX Audit Expansion**: Prepopulated test database with new mock roles (`moderator`, `direct_member`, `group_member`) and added 8 new scenarios for message moderation (admin immunity, unconfigured Default Deny, private chat bypass, and moderator permissions).
+
+### Changed
+- **Admin Default Deny Navigation**: Enhanced the default deny PM alert keyboard by replacing the generic close button with a direct link to the topic access settings interface (`all_topics_list`).
+
+### Fixed
+- **FSM State Hygiene**:
+  - Added FSM state reset (`await state.set_state(None)`) in `handlers/admin.py:process_group_add` immediately after group template creation.
+  - Added FSM state reset in `handlers/common.py:perform_search_pick` after role or access assignment to prevent search state hangs.
+- **Navigator Route Fix**: Fixed a navigation routing leak in `handlers/common.py:perform_search_pick` where moderators were incorrectly routed using admin-only dashboard buttons.
+- **Pydantic Validation Error in Journey Tests**: Fixed mutating frozen Pydantic instances in journey tests by defining the test message content within the context initialization block.
+
 ## [1.1.1] - 2026-06-18
 
 ### Added

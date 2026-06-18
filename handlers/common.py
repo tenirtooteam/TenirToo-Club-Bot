@@ -236,18 +236,37 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
     if s_action == "info":
         return await UIService.generic_navigator(state, event, f"{s_type}_info_{item_id}")
         
+    # Определяем ID пользователя, совершившего действие
+    user_id = event.from_user.id
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from keyboards.pagination_util import add_nav_footer
+    
+    # Вычисляем back_data в зависимости от прав
+    if PermissionService.is_global_admin(user_id):
+        back_data = "admin_main"
+    else:
+        back_data = "landing"
+        
+    builder = InlineKeyboardBuilder()
+    add_nav_footer(builder, back_data=back_data, help_key="roles")
+    reply_markup = builder.as_markup()
+
     if s_action == "mod_add":
         success, result = ManagementService.assign_moderator_role_by_id(item_id, int(s_context))
-        return await UIService.sterile_show(state, event, result, reply_markup=kb.back_to_main_kb())
+        await state.set_state(None)
+        return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
         
     if s_action == "dir_add":
         success, result = ManagementService.grant_direct_access_by_id(item_id, int(s_context))
-        return await UIService.sterile_show(state, event, result, reply_markup=kb.back_to_main_kb())
+        await state.set_state(None)
+        return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
 
     if s_action == "admin_role_target":
+        await state.set_state(None)
         return await UIService.generic_navigator(state, event, f"user_roles_manage_{item_id}")
 
     if s_action == "mod_select":
+        await state.set_state(None)
         return await UIService.generic_navigator(state, event, f"mod_topic_select_{item_id}")
 
 

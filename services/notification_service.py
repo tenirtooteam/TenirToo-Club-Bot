@@ -35,6 +35,7 @@ class NotificationService:
         )
         
         reply_markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="⚙️ Настроить доступ", callback_data="all_topics_list")],
             [InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")]
         ])
         
@@ -48,6 +49,39 @@ class NotificationService:
             logger.info(f"✉️ Отправлен PM-алерт Default Deny администратору {user_id}")
         except Exception as e:
             logger.warning(f"⚠️ Не удалось отправить PM-алерт Default Deny администратору {user_id}: {e}")
+
+    @classmethod
+    async def send_member_deny_alert(cls, bot: Bot, user_id: int, topic_name: str):
+        """
+        Sends a rate-limited (1 hour) soft PM alert to a member when their message
+        is stealth-deleted in a restricted topic.
+        """
+        now = time.time()
+        cache_key = (user_id, f"member_{topic_name}")
+        last_sent = cls._alert_cache.get(cache_key, 0)
+        
+        # 1-hour rate limit to avoid PM spamming
+        if now - last_sent < 3600:
+            return
+            
+        cls._alert_cache[cache_key] = now
+        
+        text = (
+            f"📍 <b>Доступ ограничен</b>\n\n"
+            f"Топик <b>«{topic_name}»</b> находится в закрытом режиме. "
+            f"Ваше сообщение было удалено.\n\n"
+            f"Доступ в эту локацию предоставляется только организаторам или участникам по спискам."
+        )
+        
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=text,
+                parse_mode="HTML"
+            )
+            logger.info(f"✉️ Отправлен PM-алерт о модерации участнику {user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отправить PM-алерт о модерации участнику {user_id}: {e}")
     @staticmethod
     async def send_native_all(bot: Bot, chat_id: int, topic_id: int, sender_name: str, text: str):
         """
