@@ -1,5 +1,27 @@
 import pytest
+import datetime
+import dateparser
+from unittest.mock import patch
 from services.date_service import DateService
+
+@pytest.fixture(autouse=True)
+def mock_dateparser_now():
+    """
+    Фиксирует базовую дату для парсинга на 1 января 2026 года во время тестов.
+    Это предотвращает перенос прошедших дат на будущий год из-за настройки PREFER_DATES_FROM=future.
+    """
+    original_parse = dateparser.parse
+    
+    def fake_parse(x, **kwargs):
+        settings = kwargs.get('settings', {}).copy()
+        if 'RELATIVE_BASE' not in settings:
+            settings['RELATIVE_BASE'] = datetime.datetime(2026, 1, 1)
+        kwargs['settings'] = settings
+        return original_parse(x, **kwargs)
+        
+    with patch("services.date_service.dateparser.parse", side_effect=fake_parse):
+        yield
+
 
 @pytest.mark.parametrize("input_text, expected_human, expected_start, expected_end", [
     ("15 мая", "15 мая", "2026-05-15", None),
