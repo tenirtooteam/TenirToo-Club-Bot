@@ -16,6 +16,10 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 - Eliminated direct `database.db` imports in handlers, delegating operations to `ManagementService` and `AnnouncementService`.
 - Expanded autonomous UI fuzzer with unexpected command injection stress-tests during FSM states.
 
+### Fixed
+- Fixed relative date parsing unit tests failing due to system year mismatch by introducing static base date mock fixture.
+
+
 ## [1.0.0] - 2026-06-18
 
 ### Changed
