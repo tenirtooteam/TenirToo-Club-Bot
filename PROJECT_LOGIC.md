@@ -44,6 +44,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.12] **database/events.py** — Expedition management: `create_event`, `update_event_details`, `approve_event`, `set_event_sheet_url`, `delete_event`, `add_event_lead`, `add_event_participant`, `remove_event_participant`, `is_event_participant`, `get_event_details`, `get_active_events`, `get_pending_events`. (Supports ISO-8601 storage with contract validation).
 - [PL-2.2.13] **database/announcements.py** — Announcement dispatcher management: `create_announcement`, `get_announcement`, `get_announcements_by_target`, `update_announcement_metadata`, `delete_announcements_by_target`, `delete_announcements_by_topic`.
 - [PL-2.2.14] **database/db.py** — Single facade re-exporting all database functions (including announcements.py). **The only permitted import point for data operations.**
+- [PL-2.2.14.1] **database/dtos.py** — Domain data containers (EventDTO, AuditRequestDTO) with dict-like compatibility interface.
 - [PL-2.2.15] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data(user_id, role_override)` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - [PL-2.2.16] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - [PL-2.2.17] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `export_events`, `export_event_participants`, `import_users`, `import_groups`.
@@ -58,6 +59,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.26] **handlers/moderator.py** — Moderator flows. FSM: `waiting_for_topic_name`, `waiting_for_user_data`, `waiting_for_direct_access_user`.
 - [PL-2.2.27] **handlers/events.py** — Expedition flows (Events). FSM: `waiting_for_title`, `waiting_for_dates`, `confirm_date`, `waiting_for_end_date`. Functions: `show_events_list`, `show_pending_events`, `start_event_creation`, `process_event_title`, `process_event_dates`, `process_date_preset`, `process_date_retry`, `process_date_confirm`, `process_date_add_end_start`, `process_event_end_date`, `view_event`, `join_event`, `leave_event`, `delete_event_init`, `approve_event_handler`, `reject_event_handler`, `show_event_card`.
 - [PL-2.2.28] **handlers/user.py** — User flows: Unified `/start` (Traffic Controller), profile, topics.
+- [PL-2.2.28.1] **handlers/errors.py** — Global dispatcher exception handler catching and logging all unexpected errors.
 - [PL-2.2.27] **middlewares/access_check.py** — Sequential chain: `UserManagerMiddleware` → `ForumUtilityMiddleware` → `AccessGuardMiddleware`.
 - [PL-2.2.28] **keyboards/admin_kb.py** — Admin keyboards: `main_admin_kb`, `get_admin_cancel_kb`, `all_topics_kb`, `group_topics_list_kb`, `available_topics_kb`, `groups_list_kb`, `group_edit_kb`, `template_action_topic_select_kb`, `users_list_kb`, `user_edit_kb`, `user_groups_edit_kb`, `roles_dashboard_kb`, `role_selection_kb`, `user_roles_manage_kb`, `topic_selection_for_role_kb`, `back_to_roles_dashboard_kb`, `search_results_kb`, `confirmation_kb`, `simple_back_kb`.
 - [PL-2.2.29] **keyboards/moderator_kb.py** — Moderator keyboards: `get_mod_cancel_kb`, `moderator_topics_list_kb`, `moderator_topic_menu_kb`, `topic_moderators_kb`, `moderator_search_kb`, `moderator_topic_groups_kb`, `moderator_unattached_groups_kb`.
@@ -80,6 +82,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.46] **tests/test_services/test_sheets_sync.py** — Resilience tests for Google Sheets API error handling.
 - [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
 - [PL-2.2.48] **tests/test_services/test_ui_integrity.py** — UI Integrity and Hardening tests: callback length, WebApp URL safety, HelpService coverage.
+- [PL-2.2.48.1] **tests/test_services/test_import_lint.py** — AST-based static analyzer checking architectural import violations (e.g. database in handlers).
 - [PL-2.2.49] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
 - [PL-2.2.50] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
 - [PL-2.2.51] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation), `get_current_user_id` (FastAPI dependency for user auth). [CC-3]
@@ -89,7 +92,9 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.55] **web/frontend/** — Static assets for Mini App: `index.html` (Multi-view Dashboard), `style.css` (Premium Grid/Glassmorphism), `app.js` (Navigation, API Bridge, Admin Views).
 - [PL-2.2.56] **tests/test_web/test_auth.py** — Unit tests for Web Bridge authentication (HMAC-SHA256).
 - [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
+- [PL-2.2.57.1] **tests/test_journeys/test_event_creation_tdd.py** — E2E event creation journey test validating UI lifecycle via simulator.
 - [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
+
 
 ### [PL-2.3] Import Dependency Graph
 Permitted import direction — top consumers to bottom providers. Any arrow reversal is an architectural violation.
@@ -345,8 +350,10 @@ All keys stored in FSM state across the application:
 - [PL-6.21] **Search Deduplication Rule**: Search result fetching logic must use the `_fetch_search_results(s_type, query)` helper in `handlers/common.py`. Do not inline `if s_type == "user" / elif group / elif topic` branches in individual handlers.
 - [PL-6.22] **No N+1 Queries in UI**: Any keyboard builder iterating over a list (users, groups, topics) MUST use batch-fetching methods from `database.db` (e.g., `get_topic_names_by_ids`) and set-based lookups. Direct DB calls inside loops are strictly prohibited to maintain performance. [PL-HI]
 - [PL-6.23] **Verify Before Change (Rule 21)**: BEFORE making any code changes, it is mandatory to view the target file and all related signatures (methods, keyboards, DB tables). Writing calls without confirming their existence in the current code context is strictly prohibited.
+- [PL-6.24] **Imports boundary verification**: Direct imports of database facade or modules inside `handlers/` are strictly prohibited and checked by static AST linting test.
 
 ---
+
 
 ## [PL-7] CRITICAL CONSTANTS
 

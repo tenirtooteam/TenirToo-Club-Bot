@@ -4,7 +4,6 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 
-from database import db
 import keyboards as kb
 from services.ui_service import UIService
 from services.callback_guard import safe_callback
@@ -12,6 +11,7 @@ from services.event_service import EventService
 from services.management_service import ManagementService
 from services.permission_service import PermissionService
 from services.date_service import DateService
+
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -179,7 +179,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
     if edit_id:
         # FLOW: Editing [CC-1]
         new_title = data.get("new_title")
-        db.update_event_details(edit_id, new_title, s_human, e_human, iso_start, iso_end)
+        ManagementService.update_event_details(edit_id, new_title, s_human, e_human, iso_start, iso_end)
         await state.clear()
         await UIService.sterile_show(state, callback, "✅ <b>Изменения сохранены!</b>")
         # Показываем карточку, так как при редактировании нет аудита
@@ -187,18 +187,17 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
     else:
         # FLOW: Creation [CC-1]
         title = data.get("title")
-        event_id = db.create_event(
+        event_id = ManagementService.create_event_action(
             title=title,
             start_date=s_human,
-            end_date=e_human, 
             creator_id=user_id,
             is_approved=0,
+            end_date=e_human,
             start_iso=iso_start,
             end_iso=iso_end
         )
         
         if event_id > 0:
-            db.add_event_lead(event_id, user_id)
             ManagementService.submit_request(user_id, "event_approval", event_id)
             await EventService.notify_admins_for_approval(callback.message.bot, event_id)
             
@@ -212,6 +211,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
             )
         else:
             await callback.answer("❌ Ошибка базы данных", show_alert=True)
+
 
 @router.callback_query(F.data.startswith("date_add_end:"))
 @safe_callback()
@@ -317,10 +317,11 @@ async def process_editing_dates(message: Message, state: FSMContext):
     new_title = data['new_title']
     
     if dates_input == "/skip":
-        event = db.get_event_details(event_id)
+        event = EventService.get_event_details(event_id)
         dates = event['start_date']
         start_iso = event['start_iso']
         end_iso = event['end_iso']
+
     else:
         human, start_iso, end_iso = DateService.parse_smart_date(dates_input)
         dates = human

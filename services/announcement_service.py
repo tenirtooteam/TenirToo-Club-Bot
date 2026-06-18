@@ -1,10 +1,12 @@
 # Файл: services/announcement_service.py
 import logging
+from typing import Optional
 from aiogram import types
 from database import db
 from services.management_service import ManagementService
 
 logger = logging.getLogger(__name__)
+
 
 class AnnouncementService:
     @staticmethod
@@ -130,3 +132,14 @@ class AnnouncementService:
                     )
                 except Exception as e:
                     logger.warning(f"⚠️ Не удалось обновить анонс {ann_id}: {e}")
+
+    @staticmethod
+    def get_announcement(ann_id: int) -> Optional[tuple]:
+        """Получает детали анонса по ID."""
+        return db.get_announcement(ann_id)
+
+    @staticmethod
+    def update_announcement_metadata(ann_id: int, chat_id: int, message_id: int) -> bool:
+        """Обновляет метаданные сообщения анонса."""
+        return db.update_announcement_metadata(ann_id, chat_id, message_id)
+

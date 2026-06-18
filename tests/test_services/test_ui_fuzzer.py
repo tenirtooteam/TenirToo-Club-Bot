@@ -125,8 +125,13 @@ class UIFuzzer:
                 state: FSMContext = self.dp.fsm.get_context(self.bot, chat_id, user_id)
                 current_state = await state.get_state()
                 if current_state:
-                    logger.info(f"FSM State: {current_state}. Injecting payload.")
+                    logger.info(f"FSM State: {current_state}. Injecting stress-mutation: unexpected /start during active FSM state")
+                    await self.simulate_input(user_id, chat_id, "/start")
+                    
+                    # Восстанавливаем стейт для продолжения рекурсивного обхода fuzzer
+                    await state.set_state(current_state)
                     await self.simulate_input(user_id, chat_id, "Fuzzer Payload")
+
                 
                 await process_all_mocks(depth)
 

@@ -1,7 +1,10 @@
 import logging
+from typing import List, Optional
 from aiogram import Bot
 from database import db
+from database.dtos import EventDTO
 import keyboards as kb
+
 
 logger = logging.getLogger(__name__)
 
@@ -94,19 +97,20 @@ class EventService:
         return event["creator_id"] == user_id
 
     @staticmethod
-    def get_active_events() -> list:
+    def get_active_events() -> List[EventDTO]:
         """Возвращает список активных мероприятий."""
         return db.get_active_events()
 
     @staticmethod
-    def get_pending_events() -> list:
+    def get_pending_events() -> List[EventDTO]:
         """Возвращает список мероприятий на модерации."""
         return db.get_pending_events()
 
     @staticmethod
-    def get_event_details(event_id: int) -> dict:
+    def get_event_details(event_id: int) -> Optional[EventDTO]:
         """Возвращает полную информацию о мероприятии."""
         return db.get_event_details(event_id)
+
 
     @staticmethod
     def is_event_participant(event_id: int, user_id: int) -> bool:

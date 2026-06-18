@@ -8,8 +8,8 @@ from services.callback_guard import safe_callback
 from services.permission_service import PermissionService
 from services.announcement_service import AnnouncementService
 from services.ui_service import UIService
-from database import db
 import keyboards as kb
+
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def cmd_quick_announcement(message: types.Message, state: FSMContext):
     sent = await message.answer(text, reply_markup=get_announcement_kb(ann_id, is_group=is_group))
     
     # 4. Сохраняем ID сообщения в БД для будущего контроля
-    db.update_announcement_metadata(ann_id, message.chat.id, sent.message_id)
+    AnnouncementService.update_announcement_metadata(ann_id, message.chat.id, sent.message_id)
 
     # 5. Стерильность: Удаляем сообщение с командой
     await UIService.delete_msg(message)
@@ -57,12 +57,13 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     ann_id = int(callback.data.split(":")[1])
     
     # 1. Получаем данные анонса
-    ann = db.get_announcement(ann_id)
+    ann = AnnouncementService.get_announcement(ann_id)
     if not ann:
         await callback.answer("❌ Анонс не найден или удален.", show_alert=True)
         return
         
     ann_type = ann[1]
+
     target_id = ann[2]
     topic_id = ann[3]
 

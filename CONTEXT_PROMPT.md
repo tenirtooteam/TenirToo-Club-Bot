@@ -41,6 +41,11 @@
 - [CP-2.27] **Topic Lifecycle Synchronization**: Automated parity with Telegram Forum. Middleware intercepts `forum_topic_deleted` events to purge orphaned data (announcements, perms, group links) from the DB, preventing `BAD_REQUEST` API errors. [PL-5.1.22]
 - [CP-2.28] **Telegram Mini Apps (TMA) Integration**: Secure, personalized Web UI serving as a full-featured **«Personal Cabinet»**. Includes **Real-time UI Reactivity**: actions in TMA (like joining an event) automatically refresh physical Telegram announcements in groups. [CC-2]
 - [CP-2.29] **Unified Configuration & Logging**: Centralized constants management in `config.py`. Unified rotation-based logging (`logs/bot.log`) for both Bot and WebApp layers with global exception handling.
+- [CP-2.30] **Error Interceptor Layer**: Global dispatcher exception router logging errors and notifying users without thread blocking.
+- [CP-2.31] **AST Import Linter**: Static code validation enforcing architectural boundaries, strictly prohibiting db imports in handlers.
+- [CP-2.32] **UserSessionSimulator**: Declarative zero-token in-memory UI simulator for E2E journey testing with automatic markup, anti-spam, and footer assertions.
+- [CP-2.33] **Type Hardening (DTOs)**: Event and Audit entities strictly typed using dataclass DTO containers (EventDTO, AuditRequestDTO) with fallback dict interface.
+
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJ## [CP-3] CODING RULES AND CONSTRAINTS
 
@@ -216,7 +221,14 @@
 55. [CP-3.55] **LOCAL AUXILIARY FILES**: All files prefixed with `_nogit_` (e.g., `_nogit_roadmap.md`, `_nogit_audit_report.md`) are local auxiliary documents and are strictly ignored in Git. They must be used for temporary notes, roadmaps, and developer-only tasks.
     > Rationale: Keeps Git history clean while permitting the maintenance of local design and strategy notes.
 
+56. [CP-3.56] **DTO CONTRACTS**: Any query returning events or audit requests must return EventDTO or AuditRequestDTO instances. Handlers must interact with their fields using standard property access (e.g. event.title) while maintaining dict-fallback for legacy code.
+    > Rationale: Enforces strict data models and prevents type errors, while backward compatibility prevents breaking unchanged legacy code.
+
+57. [CP-3.57] **IMPORTS BOUNDARY**: Handlers must never import any modules under database/ package directly. All mutations and database interactions must be delegated to service layers.
+    > Rationale: Preserves MVC layer separation and handles handlers sterility, preventing tight coupling with the storage engine.
+
 ---
+
 
 ---
 

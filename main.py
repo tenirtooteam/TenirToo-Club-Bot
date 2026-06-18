@@ -5,7 +5,7 @@ import os
 from logging.handlers import RotatingFileHandler
 from loader import bot, dp
 from database import db
-from handlers import admin, user, common, moderator, events, announcements
+from handlers import admin, user, common, moderator, events, announcements, errors
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
 import uvicorn
 from config import WEBAPP_HOST, WEBAPP_PORT, LOG_MAX_BYTES, LOG_BACKUP_COUNT
@@ -61,6 +61,8 @@ async def main():
     dp.include_router(moderator.router)
     dp.include_router(events.router)
     dp.include_router(announcements.router)
+    dp.include_router(errors.router)
+
 
     logging.info("🚀 Запуск систем...")
 

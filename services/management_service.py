@@ -5,8 +5,10 @@ from typing import Optional, List
 from aiogram.types import User
 from aiogram import Bot
 from database import db
+from database.dtos import EventDTO, AuditRequestDTO
 from services.permission_service import PermissionService
 from services.notification_service import NotificationService
+
 
 logger = logging.getLogger(__name__)
 
@@ -461,19 +463,31 @@ class ManagementService:
     # --- МЕРОПРИЯТИЯ (EXPEDITION PROTOCOL) ---
 
     @staticmethod
-    def create_event_action(title: str, start_date: str, creator_id: int, is_approved: int = 0) -> int:
+    def create_event_action(title: str, start_date: str, creator_id: int, is_approved: int = 0, end_date: Optional[str] = None, start_iso: Optional[str] = None, end_iso: Optional[str] = None) -> int:
         """
         Бизнес-логика создания мероприятия [PL-6.7]: 
-        санитизация ввода и регистрация автора как лидера.
+        санитизация ввода и регистрация автора как лидера и участника.
         """
         title = html.escape(title.strip())[:100]
         start_date = html.escape(start_date.strip())[:100]
+        if end_date:
+            end_date = html.escape(end_date.strip())[:100]
         
-        event_id = db.create_event(title, start_date, "", creator_id, is_approved)
+        event_id = db.create_event(title, start_date, end_date or "", creator_id, is_approved, start_iso, end_iso)
         if event_id > 0:
             db.add_event_participant(event_id, creator_id)
             db.add_event_lead(event_id, creator_id)
         return event_id
+
+    @staticmethod
+    def update_event_details(event_id: int, title: str, start_date: str, end_date: Optional[str] = None, start_iso: Optional[str] = None, end_iso: Optional[str] = None) -> bool:
+        """Обновляет детали мероприятия с санитизацией."""
+        title = html.escape(title.strip())[:100]
+        start_date = html.escape(start_date.strip())[:100]
+        if end_date:
+            end_date = html.escape(end_date.strip())[:100]
+        return db.update_event_details(event_id, title, start_date, end_date or "", start_iso, end_iso)
+
 
     @staticmethod
     def add_event_participation_action(event_id: int, user_id: int) -> str:

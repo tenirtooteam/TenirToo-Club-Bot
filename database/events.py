@@ -2,8 +2,10 @@ import sqlite3
 import logging
 from typing import List, Dict, Any, Optional
 from database.connection import get_conn
+from database.dtos import EventDTO
 
 logger = logging.getLogger(__name__)
+
 
 def create_event(title: str, start_date: str, end_date: str, creator_id: int, is_approved: int = 0, start_iso: str = None, end_iso: str = None) -> int:
     try:
@@ -106,7 +108,7 @@ def is_event_participant(event_id: int, user_id: int) -> bool:
         logger.error(f"❌ Ошибка проверки участника: {e}")
         return False
 
-def get_event_details(event_id: int) -> Optional[Dict[str, Any]]:
+def get_event_details(event_id: int) -> Optional[EventDTO]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
@@ -121,39 +123,64 @@ def get_event_details(event_id: int) -> Optional[Dict[str, Any]]:
             cursor.execute("SELECT user_id FROM event_participants WHERE event_id = ?", (event_id,))
             participants = [r[0] for r in cursor.fetchall()]
             
-            return {
-                "event_id": row[0],
-                "title": row[1],
-                "start_date": row[2],
-                "end_date": row[3],
-                "creator_id": row[4],
-                "is_approved": bool(row[5]),
-                "sheet_url": row[6],
-                "start_iso": row[7],
-                "end_iso": row[8],
-                "leads": leads,
-                "participants": participants
-            }
+            return EventDTO(
+                id=row[0],
+                title=row[1],
+                start_date=row[2],
+                end_date=row[3],
+                creator_id=row[4],
+                is_approved=bool(row[5]),
+                sheet_url=row[6],
+                start_iso=row[7],
+                end_iso=row[8],
+                leads=leads,
+                participants=participants
+            )
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения деталей {event_id}: {e}")
         return None
 
-def get_active_events() -> List[Dict[str, Any]]:
+def get_active_events() -> List[EventDTO]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date, start_iso, end_iso FROM events WHERE is_approved = 1 ORDER BY start_date ASC")
-            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3], "start_iso": r[4], "end_iso": r[5]} for r in cursor.fetchall()]
+            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url, start_iso, end_iso FROM events WHERE is_approved = 1 ORDER BY start_date ASC")
+            return [
+                EventDTO(
+                    id=r[0],
+                    title=r[1],
+                    start_date=r[2],
+                    end_date=r[3],
+                    creator_id=r[4],
+                    is_approved=bool(r[5]),
+                    sheet_url=r[6],
+                    start_iso=r[7],
+                    end_iso=r[8]
+                ) for r in cursor.fetchall()
+            ]
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения списка активных мероприятий: {e}")
         return []
 
-def get_pending_events() -> List[Dict[str, Any]]:
+def get_pending_events() -> List[EventDTO]:
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, start_iso, end_iso FROM events WHERE is_approved = 0 ORDER BY event_id ASC")
-            return [{"event_id": r[0], "title": r[1], "start_date": r[2], "end_date": r[3], "creator_id": r[4], "start_iso": r[5], "end_iso": r[6]} for r in cursor.fetchall()]
+            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url, start_iso, end_iso FROM events WHERE is_approved = 0 ORDER BY event_id ASC")
+            return [
+                EventDTO(
+                    id=r[0],
+                    title=r[1],
+                    start_date=r[2],
+                    end_date=r[3],
+                    creator_id=r[4],
+                    is_approved=bool(r[5]),
+                    sheet_url=r[6],
+                    start_iso=r[7],
+                    end_iso=r[8]
+                ) for r in cursor.fetchall()
+            ]
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения списка ожидающих мероприятий: {e}")
         return []
+

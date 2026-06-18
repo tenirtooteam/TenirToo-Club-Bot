@@ -2,8 +2,10 @@ import sqlite3
 import logging
 from typing import List, Optional, Tuple, Any
 from database.connection import get_conn
+from database.dtos import AuditRequestDTO
 
 logger = logging.getLogger(__name__)
+
 
 def create_audit_request(user_id: int, entity_type: str, entity_id: int) -> int:
     """Создает новую заявку на аудит."""
@@ -20,25 +22,27 @@ def create_audit_request(user_id: int, entity_type: str, entity_id: int) -> int:
         logger.error(f"❌ Ошибка создания audit_request: {e}")
         return -1
 
-def get_audit_request(request_id: int) -> Optional[dict]:
+def get_audit_request(request_id: int) -> Optional[AuditRequestDTO]:
     """Получает детали заявки по ID."""
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, user_id, entity_type, entity_id, status, comment FROM audit_requests WHERE id = ?", (request_id,))
+            cursor.execute("SELECT id, user_id, entity_type, entity_id, status, comment, created_at FROM audit_requests WHERE id = ?", (request_id,))
             row = cursor.fetchone()
             if row:
-                return {
-                    "id": row[0],
-                    "user_id": row[1],
-                    "entity_type": row[2],
-                    "entity_id": row[3],
-                    "status": row[4],
-                    "comment": row[5]
-                }
+                return AuditRequestDTO(
+                    id=row[0],
+                    user_id=row[1],
+                    entity_type=row[2],
+                    entity_id=row[3],
+                    status=row[4],
+                    comment=row[5],
+                    created_at=row[6]
+                )
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка получения audit_request {request_id}: {e}")
     return None
+
 
 def resolve_audit_request(request_id: int, status: str, comment: str = None) -> bool:
     """Обновляет статус заявки (approve/reject)."""
