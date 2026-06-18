@@ -62,7 +62,7 @@ class AnnouncementService:
         # Создаем ивент
         event_id = ManagementService.create_quick_event(user_id, title)
         if event_id <= 0:
-            return "❌ Ошибка: Не удалось создать мероприятие.", None
+            return "❌ Ошибка: Не удалось создать поход.", None
         
         # Регистрируем анонс
         ann_id = db.create_announcement(
