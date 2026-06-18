@@ -129,15 +129,15 @@
     > Rationale: Blocking the main event loop during network latency causes the bot to "freeze" for all users. Background execution ensures a fluid user experience.
 
 28. [CP-3.28] **STRATEGIC PLANNING (RNA-BLUEPRINT)**: For any non-trivial logical change (features, refactoring, audit), an implementation plan using the **RNA-Blueprint** format must be established.
-    - [CP-3.28.1] **Header Logic**: The header must include **Base DNA** (standards), **Task RNA** (logic, risks), and **Contextual Constraints (CC)**. CC are critical principles and nuances extracted from `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` specifically for the current task, indexed (e.g., `[CC-1]`). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory.
+    - [CP-3.28.1] **Header Logic**: The header must include **Base DNA** (standards), **Task RNA** (logic, risks), and **Contextual Constraints (CC)**. CC are critical principles and nuances extracted from `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` specifically for the current task, indexed (e.g., `[CC-1]`). It must explicitly state that execution is limited to 3-5 steps, after which a status report and user approval are mandatory. For bug fixes, the plan MUST explicitly define the reproducing test file and test case name.
     - [CP-3.28.2] **Incremental Principle**: Do not rewrite the entire plan for every correction; update only the affected parts.
     - [CP-3.28.3] **Constraint Mapping**: Every step in the plan must be tagged with short codes (e.g., `[G-DNA]`, `[CC-x]`) referring to the header logic. Every task must be verified against the CC list for compliance.
     - [CP-3.28.4] **Native Process**: Plan updates are handled natively in chat without requiring a separate plan for the update itself.
     - [CP-3.28.5] **Execution & Reporting**: Plan execution is strictly limited to 3-5 steps per iteration. After each chunk, a status report and user approval are mandatory to proceed.
     > Rationale: Externalizing strategic reasoning before action prevents instruction drift and ensures total architectural alignment.
 
-29. [CP-3.29] **GIT WORKFLOW [GW-1]**: All repository updates must follow the mandatory sequence: OS validation, `git status`, `git add .` (unless selective staging is explicitly requested), concise English commit message, and `git push`. **Execution occurs ONLY upon explicit user request.**
-     > Rationale: Standardizing the synchronization process prevents accidental data loss, ensures clear history, and maintains environment parity across distributed workspaces.
+29. [CP-3.29] **GIT WORKFLOW [GW-1]**: AI is allowed to automatically run GW-1 to stage and commit changes locally upon completing significant milestones/refactors to keep history clean. Staging uses `git add .` (unless selective staging is explicitly requested). Commit messages must be concise and in English. Automatic `git push` is strictly forbidden and must only be executed upon explicit user request.
+     > Rationale: Standardizing local commits ensures a clean and traceable project history while keeping remote pushes under strict user control.
 
 30. [CP-3.30] **ANALYSIS & IMPROVEMENT [AI-1]**: Proactive system auditing using the Proposal Analysis engine to identify technical debt and philosophy violations. RNA plans are generated only for significant improvements.
      > Rationale: Prevents architectural decay and ensures the codebase remains lean and aligned with project-specific constraints without introducing unnecessary churn.
@@ -210,6 +210,12 @@
     - [CP-3.53.3] **Error Recovery**: `UIService.sterile_show` MUST catch `BUTTON_TYPE_INVALID` and fall back to sending a new message to prevent the interface from "hanging" or crashing.
     > Rationale: Prevents system-wide crashes caused by configuration errors or the presence of legacy messages in user chat history. Ensures a resilient user experience across all interaction types.
 
+54. [CP-3.54] **CHANGELOG**: When implementing a feature, refactor, or documentation update, you must update the root `CHANGELOG.md` file (which is public and tracked in Git) using the `CMD-4` command from the `tenirtoo-docs-update` skill.
+    > Rationale: Ensures version history is consistently documented in a centralized file without cluttering the main context pre-reads.
+
+55. [CP-3.55] **LOCAL AUXILIARY FILES**: All files prefixed with `_nogit_` (e.g., `_nogit_roadmap.md`, `_nogit_audit_report.md`) are local auxiliary documents and are strictly ignored in Git. They must be used for temporary notes, roadmaps, and developer-only tasks.
+    > Rationale: Keeps Git history clean while permitting the maintenance of local design and strategy notes.
+
 ---
 
 ---
@@ -246,4 +252,5 @@
 ## [CP-6] HOW TO RESPOND
 
 - [CP-6.1] Provide production-ready code using tilde code blocks (~~~).
-- [CP-6.2] If documentation updates are needed after a change, synchronize `PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md`, and `README.md` accordingly.
+- [CP-6.2] If documentation updates are needed after a change, synchronize `PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md`, `README.md`, and `CHANGELOG.md` accordingly using `tenirtoo-docs-update` skill commands.
+- [CP-6.3] Be concise. No preamble. No restating what the code does. Token-efficient: if files were modified using tools, do NOT paste them in chat. Summary only. Always address the user as "Шэф" and respond in Russian.

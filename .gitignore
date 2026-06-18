@@ -23,10 +23,11 @@ env/
 
 # Скрипты
 local_scripts/
-# Инструкции для AI
-MASTER_INSTRUCTION.md
-DOCS_UPDATE_PROMPT.md
-PROPOSAL_ANALYSIS_PROMPT.md
+# AI Local Rules & Plugins
+AGENTS.md
+CLAUDE.md
+.agents/
+_nogit_*
 GEMINI.md
 
 # JSON
