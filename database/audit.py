@@ -86,3 +86,16 @@ def get_user_pending_request(user_id: int, entity_type: str, entity_id: int) -> 
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка проверки активной заявки пользователя: {e}")
         return None
+
+
+def delete_audit_request(request_id: int) -> bool:
+    """Удаляет заявку на аудит из базы данных."""
+    try:
+        with get_conn() as conn:
+            with conn:
+                conn.execute("DELETE FROM audit_requests WHERE id = ?", (request_id,))
+        return True
+    except sqlite3.Error as e:
+        logger.error(f"❌ Ошибка удаления audit_request {request_id}: {e}")
+        return False
+

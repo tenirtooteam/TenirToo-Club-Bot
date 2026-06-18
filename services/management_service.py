@@ -256,7 +256,7 @@ class ManagementService:
             return db.get_user_name(entity_id) or f"Пользователь {entity_id}"
         elif entity_type in ["event", "event_approval", "event_participation"]:
             event = db.get_event_details(entity_id)
-            return event["title"] if event else f"Мероприятие {entity_id}"
+            return event["title"] if event else f"Поход {entity_id}"
         return "Неизвестный объект"
 
     @staticmethod
@@ -305,7 +305,7 @@ class ManagementService:
         elif action == "event_del":
             db.delete_event(target_id)
             ManagementService._trigger_sheets_sync("events")
-            return True, "✅ Мероприятие удалено", "event_list"
+            return True, "✅ Поход удален", "event_list"
 
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
     
@@ -580,7 +580,7 @@ class ManagementService:
             if request["entity_type"] == "event_approval":
                 # Если отклонили создание мероприятия — удаляем черновик [CC-1]
                 db.delete_event(request["entity_id"])
-                logger.info(f"🗑 Мероприятие {request['entity_id']} удалено из-за отклонения заявки.")
+                logger.info(f"🗑 Поход {request['entity_id']} удален из-за отклонения заявки.")
 
         # Формируем человекочитаемое уведомление [CC-2]
         entity_name = ManagementService.get_entity_name(request["entity_type"], request["entity_id"])
@@ -589,8 +589,8 @@ class ManagementService:
 
         # Маппинг названий и окончаний в зависимости от рода
         naming_map = {
-            "event_approval": ("Ваше мероприятие", "одобрено", "отклонено"),
-            "event_participation": ("Ваша запись на мероприятие", "одобрена", "отклонена"),
+            "event_approval": ("Ваш поход", "одобрен", "отклонен"),
+            "event_participation": ("Ваша запись на поход", "одобрена", "отклонена"),
             "group": ("Ваша группа", "одобрена", "отклонена"),
             "topic": ("Ваш топик", "одобрен", "отклонен"),
             "user": ("Пользователь", "одобрен", "отклонен")
@@ -610,3 +610,15 @@ class ManagementService:
         await NotificationService.send_to_users(bot, [request["user_id"]], notify_text)
         
         return True, f"✅ Заявка {request_id} разрешена ({res_text})."
+
+    @staticmethod
+    def cancel_participation_request_action(user_id: int, event_id: int) -> tuple[bool, str]:
+        """Отменяет заявку пользователя на участие в походе (удаляет pending запись аудита)."""
+        req_id = db.get_user_pending_request(user_id, "event_participation", event_id)
+        if not req_id:
+            return False, "❌ Активная заявка не найдена."
+        
+        if db.delete_audit_request(req_id):
+            return True, "✅ Заявка на участие отменена."
+        return False, "❌ Ошибка при удалении заявки из базы данных."
+

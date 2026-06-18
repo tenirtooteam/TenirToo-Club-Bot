@@ -519,7 +519,7 @@ class UIService:
         elif action == "event_del":
             name = ManagementService.get_entity_name("event", target_id)
             return (
-                f"⚠️ <b>ВНИМАНИЕ!</b>\n\nВы действительно хотите удалить мероприятие <b>{name}</b>?\n<i>Это действие нельзя отменить!</i>",
+                f"⚠️ <b>ВНИМАНИЕ!</b>\n\nВы действительно хотите удалить поход <b>{name}</b>?\n<i>Это действие нельзя отменить!</i>",
                 f"event_view:{target_id}"
             )
         elif action == "mod_rem":

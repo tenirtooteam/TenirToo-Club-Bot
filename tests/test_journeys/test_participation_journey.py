@@ -69,7 +69,7 @@ async def test_audit_resolution_notifies_participant(db_setup, mock_bot):
     for call in mock_bot.send_message.call_args_list:
         if call.kwargs.get("chat_id") == applicant_id:
             text = call.kwargs.get("text").lower()
-            if "запись на мероприятие" in text and "big expedition" in text and "одобрена" in text:
+            if "запись на поход" in text and "big expedition" in text and "одобрена" in text:
                 found = True
                 break
     assert found, "Участник не получил корректное уведомление об одобрении"

@@ -69,7 +69,7 @@ class EventService:
         # Обязательно добавляем системного админа из конфига (кастуем для верности)
         admin_ids.add(int(config.ADMIN_ID))
         
-        card_text = f"🚨 <b>Новое Мероприятие на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
+        card_text = f"🚨 <b>Новый поход на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
         kb_markup = kb.get_event_moderation_kb(event_id)
         
         for adm_id in admin_ids:
@@ -138,7 +138,7 @@ class EventService:
         text = (
             f"🔔 <b>Новая заявка на участие!</b>\n\n"
             f"👤 Пользователь: <b>{user_name}</b>\n"
-            f"🏔 Мероприятие: <b>{event['title']}</b>\n\n"
+            f"🏔 Поход: <b>{event['title']}</b>\n\n"
             f"Рассмотрите заявку в разделе 'Аудит'."
         )
         
@@ -168,7 +168,7 @@ class EventService:
         text = (
             f"✅ <b>Новый участник!</b>\n\n"
             f"👤 Пользователь: <b>{user_name}</b>\n"
-            f"🏔 Мероприятие: <b>{event['title']}</b>\n\n"
+            f"🏔 Поход: <b>{event['title']}</b>\n\n"
             f"Запись прошла автоматически через анонс."
         )
         

@@ -2,6 +2,19 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.1] - 2026-06-18
+
+### Added
+- `cancel_participation_request_action` in `ManagementService` and `delete_audit_request` in `database/audit.py` allowing users to cancel their pending participation requests.
+- Interactive `[🚶 Отменить заявку]` button on event cards for pending requests.
+- E2E and integration tests in `tests/test_handlers/test_ux_audited_flows.py` verifying access controls and cancellation flows.
+
+### Fixed
+- FSM state clearance: Replaced `state.clear()` with `state.set_state(None)` in `handlers/events.py` to preserve tracking metadata keys (`last_menu_ids`).
+- Term Parity: Replaced all occurrences of "мероприятие" with "поход" in user-facing texts and notifications.
+- UI Deadlocks: Added standard navigation footers to the date confirmation keyboard. Parametrized `get_date_picker_kb` and `get_event_cancel_kb` to allow dynamic back navigation.
+- Access Control: Restricted viewing and participation actions for non-approved events to only admins and event creators.
+
 ## [1.1.0] - 2026-06-18
 
 ### Added
