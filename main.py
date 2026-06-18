@@ -7,6 +7,7 @@ from loader import bot, dp
 from database import db
 from handlers import admin, user, common, moderator, events, announcements, errors
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
+from middlewares.fsm_button_guard import FsmButtonGuardMiddleware
 import uvicorn
 from config import WEBAPP_HOST, WEBAPP_PORT, LOG_MAX_BYTES, LOG_BACKUP_COUNT
 from web.main import app as web_app
@@ -53,6 +54,9 @@ async def main():
     dp.message.outer_middleware(ForumUtilityMiddleware())
     # 3. В последнюю очередь проверяем доступ к контенту
     dp.message.outer_middleware(AccessGuardMiddleware())
+    
+    # 4. Защита от старых кнопок
+    dp.callback_query.outer_middleware(FsmButtonGuardMiddleware())
 
     # Register Routers (common первым для перехвата глобальных кнопок)
     dp.include_router(common.router)

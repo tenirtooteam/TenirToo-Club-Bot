@@ -227,10 +227,11 @@
 57. [CP-3.57] **IMPORTS BOUNDARY**: Handlers must never import any modules under database/ package directly. All mutations and database interactions must be delegated to service layers.
     > Rationale: Preserves MVC layer separation and handles handlers sterility, preventing tight coupling with the storage engine.
 
+- [CP-3.58] **FEATURE ALIGNMENT RULE**: For any global or architectural features (excluding minor technical fixes), the AI MUST explicitly present and align the implementation options, system impact, and design alternatives with the user (Шэф) before creating the final RNA-Blueprint or writing code.
+     > Rationale: Prevents architectural drift and ensures that UX logic matches user expectations and mental models prior to implementation planning.
+
 ---
 
-
----
 
 ## [CP-4] DESIGN SYSTEM (Premium Minimalist)
 

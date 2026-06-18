@@ -376,10 +376,27 @@ class UIService:
 
     @staticmethod
     async def show_admin_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery, text: str = "🛠 <b>Панель управления</b>"):
-        """Отображает главную панель администратора."""
+        """Отображает главную панель администратора с сессионным онбордингом."""
         from services.permission_service import PermissionService
         import keyboards as kb
         
+        state_data = await state.get_data()
+        if not state_data.get("admin_onboarded"):
+            text_onboarding = (
+                "🏔 <b>Добро пожаловать в Панель управления!</b>\n\n"
+                "Перед началом работы ознакомьтесь с ключевыми принципами взаимодействия с ботом:\n\n"
+                "1. 🧹 <b>Стерильный интерфейс (Sterile UI)</b>: Бот автоматически удаляет старые сообщения меню "
+                "при переходах, чтобы чат оставался чистым. Не пытайтесь кликать по старым кнопкам в истории "
+                "чата — они блокируются и стираются.\n"
+                "2. 🛡️ <b>Закрыто по умолчанию (Default Deny)</b>: Любые новые топики группы закрыты для участников. "
+                "Вы должны явно настроить и применить права доступа для каждого топика в панели управления.\n\n"
+                "Нажмите кнопку ниже, чтобы подтвердить ознакомление и войти."
+            )
+            markup = types.InlineKeyboardMarkup(inline_keyboard=[
+                [types.InlineKeyboardButton(text="🏔 Начать работу", callback_data="admin_confirm_onboarding")]
+            ])
+            return await UIService.sterile_show(state, event, text_onboarding, reply_markup=markup)
+
         await UIService.sterile_show(state, event, text, reply_markup=kb.main_admin_kb())
 
     @staticmethod

@@ -86,10 +86,26 @@ async def universal_help_handler(callback: types.CallbackQuery, state: FSMContex
 @router.callback_query(F.data == "close_menu")
 @safe_callback()
 async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):
-    """Удаляет меню и очищает состояние трекинга (синхронизация со стеком [CC-3])."""
-    await UIService.delete_msg(callback.message)
-    # Очищаем оба поля для поддержки перехода на новую систему стеков
+    """Удаляет меню или заменяет его на заглушку в ЛС, сбрасывая FSM-состояние."""
+    if callback.message and callback.message.chat.type == "private":
+        markup = types.InlineKeyboardMarkup(inline_keyboard=[
+            [types.InlineKeyboardButton(text="🏔 Главное меню", callback_data="landing")]
+        ])
+        try:
+            await callback.bot.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.message_id,
+                text="🏔 <b>Интерфейс закрыт.</b>\n\nДля возврата в главное меню используйте кнопку ниже.",
+                reply_markup=markup,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Failed to edit close menu to stub: {e}")
+    else:
+        await UIService.delete_msg(callback.message)
+
     await state.update_data(last_menu_id=None, last_menu_ids=[])
+    await state.set_state(None)  # FSM Hygiene [CC-2]
 
 
 @router.callback_query(F.data == "landing")

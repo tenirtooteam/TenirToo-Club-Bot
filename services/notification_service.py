@@ -1,12 +1,53 @@
 # Файл: services/notification_service.py
+import time
 import logging
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from database import db
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationService:
+    _alert_cache = {}
+
+    @classmethod
+    async def send_default_deny_alert(cls, bot: Bot, user_id: int, topic_name: str):
+        """
+        Sends a rate-limited PM alert to an administrator when their message is deleted
+        due to Default Deny mode.
+        """
+        now = time.time()
+        cache_key = (user_id, topic_name)
+        last_sent = cls._alert_cache.get(cache_key, 0)
+        
+        if now - last_sent < 60:
+            logger.info(f"🔇 Default Deny PM alert rate-limited for admin {user_id} in {topic_name}")
+            return
+            
+        cls._alert_cache[cache_key] = now
+        
+        text = (
+            f"🏔 <b>Доступ ограничен (Default Deny)</b>\n\n"
+            f"Топик <b>«{topic_name}»</b> находится в режиме закрытого доступа по умолчанию. "
+            f"Ваше сообщение было удалено.\n\n"
+            f"Настройте права доступа в панели управления или свяжитесь с создателем."
+        )
+        
+        reply_markup = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")]
+        ])
+        
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=reply_markup,
+                parse_mode="HTML"
+            )
+            logger.info(f"✉️ Отправлен PM-алерт Default Deny администратору {user_id}")
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось отправить PM-алерт Default Deny администратору {user_id}: {e}")
     @staticmethod
     async def send_native_all(bot: Bot, chat_id: int, topic_id: int, sender_name: str, text: str):
         """

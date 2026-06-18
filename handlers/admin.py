@@ -45,6 +45,14 @@ async def admin_dashboard(message: types.Message, state: FSMContext):
     return text, kb_func()
 
 
+@router.callback_query(F.data == "admin_confirm_onboarding")
+@safe_callback()
+async def admin_confirm_onboarding(callback: types.CallbackQuery, state: FSMContext):
+    """Подтверждает онбординг администратора и открывает админ-панель."""
+    await state.update_data(admin_onboarded=True)
+    await UIService.show_admin_dashboard(state, callback)
+
+
 @router.callback_query(F.data == "admin_main")
 @safe_callback()
 async def back_to_main(callback: types.CallbackQuery, state: FSMContext):
