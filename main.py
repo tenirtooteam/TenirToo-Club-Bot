@@ -67,6 +67,10 @@ async def main():
     dp.include_router(announcements.router)
     dp.include_router(errors.router)
 
+    # 5. Default handler for unhandled callback queries (Frictionless UX)
+    @dp.callback_query()
+    async def default_callback_handler(callback: types.CallbackQuery):
+        await callback.answer("❌ Действие недоступно или не поддерживается.", show_alert=True)
 
     logging.info("🚀 Запуск систем...")
 

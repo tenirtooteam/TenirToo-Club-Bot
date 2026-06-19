@@ -105,7 +105,8 @@ async def close_menu_handler(callback: types.CallbackQuery, state: FSMContext):
         await UIService.delete_msg(callback.message)
 
     await state.update_data(last_menu_id=None, last_menu_ids=[])
-    await state.set_state(None)  # FSM Hygiene [CC-2]
+    await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
 
 
 @router.callback_query(F.data == "landing")

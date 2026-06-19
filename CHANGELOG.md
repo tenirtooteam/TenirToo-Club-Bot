@@ -7,6 +7,7 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 ### Added
 - **Rate-Limited PM Alerts for Members**: Added `send_member_deny_alert` in `NotificationService` to send a soft rate-limited (1 hour) warning to ordinary members when their messages are stealth-deleted.
 - **Cognitive UX Audit Expansion**: Prepopulated test database with new mock roles (`moderator`, `direct_member`, `group_member`) and added 8 new scenarios for message moderation (admin immunity, unconfigured Default Deny, private chat bypass, and moderator permissions).
+- **Security Fallback Handler**: Registered a global fallback callback query handler in `main.py` to intercept and answer unhandled callbacks (such as unauthorized clicks on admin options), preventing infinite loading indicators.
 
 ### Changed
 - **Admin Default Deny Navigation**: Enhanced the default deny PM alert keyboard by replacing the generic close button with a direct link to the topic access settings interface (`all_topics_list`).
@@ -16,10 +17,12 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 - **FSM State & Data Hygiene**:
   - Added FSM state reset (`await state.set_state(None)`) in `handlers/admin.py:process_group_add` immediately after group template creation.
   - Added FSM state reset in `handlers/common.py:perform_search_pick` after role or access assignment to prevent search state hangs.
-  - Implemented `UIService.clear_fsm_data_safely` which strips user-defined context keys while retaining Sterile UI menu tracking stack.
+  - Implemented `UIService.clear_fsm_data_safely` which strips user-defined context keys while retaining Sterile UI menu tracking stack, and expanded its usage across all major menu entry points.
+  - Added FSM state reset in `handlers/admin.py:process_topic_name_save` upon successfully editing a topic name.
 - **Search Picker Callback Parsing**: Fixed `search_pick_handler` parsing algorithm in `handlers/common.py` to correctly extract action names containing underscores (e.g., `dir_add` or `mod_add`).
 - **Navigator Route Fix**: Fixed a navigation routing leak in `handlers/common.py:perform_search_pick` where moderators were incorrectly routed using admin-only dashboard buttons.
 - **Pydantic Validation Error in Journey Tests**: Fixed mutating frozen Pydantic instances in journey tests by defining the test message content within the context initialization block.
+
 
 
 ## [1.1.1] - 2026-06-18

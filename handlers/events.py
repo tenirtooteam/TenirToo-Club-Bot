@@ -26,8 +26,8 @@ class EventCreation(StatesGroup):
 
 @router.callback_query(F.data == "event_list")
 async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMContext, custom_text: str = None):
-    # [CP-3.3] Sterile UI: Не используем state.clear(), чтобы не сломать трекинг меню
     await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
     user_id = event_or_msg.from_user.id
     
     # [PL-6.7] Данные получаем через EventService или db (GET разрешен)
@@ -50,6 +50,7 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
         return await callback.answer("❌ У вас нет прав.", show_alert=True)
         
     await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
     events = EventService.get_pending_events()
     reply_markup = kb.get_events_list_kb(events, is_admin=True)
     
@@ -59,6 +60,7 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
         "⏳ <b>Мероприятия на модерации</b>\nВыберите мероприятие для проверки:",
         reply_markup=reply_markup
     )
+
 
 @router.callback_query(F.data == "event_create")
 async def start_event_creation(callback: CallbackQuery, state: FSMContext):
@@ -199,6 +201,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
         new_title = data.get("new_title")
         ManagementService.update_event_details(edit_id, new_title, s_human, e_human, iso_start, iso_end)
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         await UIService.sterile_show(state, callback, "✅ <b>Изменения сохранены!</b>")
         # Показываем карточку, так как при редактировании нет аудита
         await show_event_card(callback, edit_id, state)
@@ -220,6 +223,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
             await EventService.notify_admins_for_approval(callback.message.bot, event_id)
             
             await state.set_state(None)
+            await UIService.clear_fsm_data_safely(state)
             await UIService.sterile_show(
                 state,
                 callback,
@@ -227,6 +231,7 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
                 f"Когда администраторы одобрят его, вы получите уведомление.",
                 reply_markup=kb.simple_back_kb("event_list")
             )
+
         else:
             await callback.answer("❌ Ошибка базы данных", show_alert=True)
 

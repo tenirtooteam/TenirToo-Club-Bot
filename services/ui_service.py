@@ -280,6 +280,8 @@ class UIService:
         cmd = callback_data.split("_pg_")[0]
         page = int(callback_data.split("_pg_")[1]) if "_pg_" in callback_data else 1
         if cmd in simple:
+            await state.set_state(None)
+            await UIService.clear_fsm_data_safely(state)
             text, kb_func = simple[cmd]
             
             # 1.1 Специальные редиректы

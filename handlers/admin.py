@@ -239,6 +239,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
 
     if t_id is None:
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         await UIService.show_temp_message(state, message, "❌ Ошибка: данные топика потеряны.")
         return
 
@@ -251,7 +252,10 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
         logger.warning(f"⚠️ Ошибка API: {e}")
         status = f"\n⚠️ Только в БД (Ошибка API)"
 
+    await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
     await UIService.show_admin_dashboard(state, message, text=f"✅ Топик {t_id} обновлен.{status}")
+
 
 
 
