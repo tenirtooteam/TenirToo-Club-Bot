@@ -85,17 +85,18 @@ def build_paginated_menu(
 
     for s_btn in static_buttons:
         # Если в статичных кнопках есть "Назад" или "Закрыть", мы их обработаем в футере
-        if s_btn.callback_data == "close_menu":
-            continue
-        if s_btn.text == "⬅️ НАЗАД" or s_btn.callback_data == callback_prefix:
-            footer_back_data = s_btn.callback_data
-            continue
-        # Если в статичных кнопках есть справка (help:key:back)
-        if s_btn.callback_data.startswith("help:"):
-            parts = s_btn.callback_data.split(":")
-            if len(parts) >= 2:
-                footer_help_key = parts[1]
+        if s_btn.callback_data:
+            if s_btn.callback_data == "close_menu":
                 continue
+            if s_btn.text == "⬅️ НАЗАД" or s_btn.callback_data == callback_prefix:
+                footer_back_data = s_btn.callback_data
+                continue
+            # Если в статичных кнопках есть справка (help:key:back)
+            if s_btn.callback_data.startswith("help:"):
+                parts = s_btn.callback_data.split(":")
+                if len(parts) >= 2:
+                    footer_help_key = parts[1]
+                    continue
 
         # Остальные (функциональные) кнопки — на всю строку
         builder.row(s_btn)
