@@ -18,7 +18,7 @@ def get_announcement_kb(announcement_id: int, is_group: bool = False) -> InlineK
         # Шэф, тут теперь 'Центральное варево'
         builder.row(
             InlineKeyboardButton(
-                text="🏔 Личный кабинет", 
+                text="🏔 Личный кабинет",
                 web_app=WebAppInfo(url=f"{config.WEBAPP_URL}/?ann_id={announcement_id}")
             )
         )

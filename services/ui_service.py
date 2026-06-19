@@ -17,7 +17,7 @@ class UIService:
         """Удаляет все запомненные системные сообщения (стек last_menu_ids)."""
         data = await state.get_data()
         last_ids = data.get("last_menu_ids", [])
-        
+
         # Поддержка старого формата (если остался в FSM)
         old_id = data.get("last_menu_id")
         if old_id: last_ids.append(old_id)
@@ -28,7 +28,7 @@ class UIService:
                 logger.info(f"🧹 Удалено сообщение: {msg_id}")
             except Exception:
                 pass
-        
+
         await state.update_data(last_menu_ids=[], last_menu_id=None)
 
     @staticmethod
@@ -99,7 +99,7 @@ class UIService:
                 await UIService.delete_msg(message)
                 return sent_error
         else:
-            # Если уже в личке или редирект не требуется. 
+            # Если уже в личке или редирект не требуется.
             await UIService.terminate_input(state, message, reset_state=False)
             sent_message = await message.answer(
                 text=text,
@@ -112,15 +112,15 @@ class UIService:
     @staticmethod
     async def show_temp_message(state: FSMContext, event: types.Message | types.CallbackQuery, text: str, reply_markup=None):
         """Отображает временное сообщение БЕЗ удаления предыдущего (добавляет в стек)."""
-        bot = event.bot if isinstance(event, types.Message) else event.message.bot
-        chat_id = event.chat.id if isinstance(event, types.Message) else event.message.chat.id
-        
+        event.bot if isinstance(event, types.Message) else event.message.bot
+        event.chat.id if isinstance(event, types.Message) else event.message.chat.id
+
         if isinstance(event, types.Message):
             await UIService.delete_msg(event)
-            
+
         msg_source = event if isinstance(event, types.Message) else event.message
         sent = await msg_source.answer(text, reply_markup=reply_markup, parse_mode="HTML")
-        
+
         # Добавляем в список для последующей зачистки
         data = await state.get_data()
         last_ids = data.get("last_menu_ids", [])
@@ -151,7 +151,7 @@ class UIService:
                 if "message is not modified" in err_str:
                     pass  # Контент идентичен — это нормально
                 elif "button_type_invalid" in err_str:
-                    logger.error(f"❌ [UI] CRITICAL: Invalid button configuration detected!")
+                    logger.error("❌ [UI] CRITICAL: Invalid button configuration detected!")
                     logger.error(f"Markup: {reply_markup}")
                     # Шлем новое сообщение без битой клавы (или пробуем принудительно)
                     new_msg = await event.message.answer(text, reply_markup=reply_markup, parse_mode=parse_mode)
@@ -171,7 +171,7 @@ class UIService:
                     await state.update_data(last_menu_ids=[new_msg.message_id])
                 except Exception:
                     pass
-            
+
             try:
                 await event.answer()
             except Exception:
@@ -220,7 +220,7 @@ class UIService:
         """
         from services.permission_service import PermissionService
         import keyboards as kb
-        
+
         # 1. Принудительный выбор роли (debug aliases)
         if role_override == "admin":
             return "🛠 <b>Панель управления</b>", kb.main_admin_kb
@@ -234,18 +234,18 @@ class UIService:
         # 2.1 Глобальный админ
         if PermissionService.is_global_admin(user_id):
             return "🛠 <b>Панель управления</b>", kb.main_admin_kb
-            
+
         # 2.2 Модератор (есть хотя бы один управляемый топик)
         manageable = PermissionService.get_manageable_topics(user_id)
         if manageable:
             return "🛠 <b>Панель модератора</b>\nВыберите топик:", lambda: kb.moderator_topics_list_kb(manageable)
-            
+
         # 2.3 Обычный участник
         return (
-            f"Привет! 👋\n\n"
-            f"Добро пожаловать в круг друзей клуба <b>«Теңир-Too»</b>.\n\n"
-            f"Я твой походный гид. Помогу записаться в горы, найти нужные обсуждения или проверить свой профиль.\n\n"
-            f"Выбирай, с чего начнем:",
+            "Привет! 👋\n\n"
+            "Добро пожаловать в круг друзей клуба <b>«Теңир-Too»</b>.\n\n"
+            "Я твой походный гид. Помогу записаться в горы, найти нужные обсуждения или проверить свой профиль.\n\n"
+            "Выбирай, с чего начнем:",
             kb.user_main_kb
         )
 
@@ -255,9 +255,9 @@ class UIService:
         from database import db
         import keyboards as kb
         from services.permission_service import PermissionService
-        
+
         user_id = event.from_user.id
-        
+
         # 1. Глобальная навигация (Simple)
         simple = {
             "admin_main": ("🛠 <b>Штаб управления</b>\nЗдесь настраивается жизнь всего клуба.", kb.main_admin_kb),
@@ -276,18 +276,18 @@ class UIService:
             "event_pending_list": ("⏳ <b>Новые заявки</b>\nМероприятия, ожидающие одобрения:", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
             "landing": (None, None), # Специальный вызов через get_landing_data
         }
-        
+
         cmd = callback_data.split("_pg_")[0]
         page = int(callback_data.split("_pg_")[1]) if "_pg_" in callback_data else 1
         if cmd in simple:
             await state.set_state(None)
             await UIService.clear_fsm_data_safely(state)
             text, kb_func = simple[cmd]
-            
+
             # 1.1 Специальные редиректы
             if cmd == "templates_faq":
-                return await UIService.generic_navigator(state, event, f"help:templates:manage_groups")
-            
+                return await UIService.generic_navigator(state, event, "help:templates:manage_groups")
+
             if cmd == "user_profile_view":
                 # Переходим к блоку "Инфо-карточки" ниже
                 pass
@@ -309,7 +309,7 @@ class UIService:
 
         # 2. Параметризованная навигация
         p = callback_data.split("_")
-        
+
         # Инфо-карточки
         if cmd == "user_profile_view":
             user_name = db.get_user_name(user_id)
@@ -346,19 +346,19 @@ class UIService:
         if cmd.startswith("mod_topic_select") or cmd.startswith("mod_back_to_topic"):
             t_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_menu_kb(t_id))
-        
+
         if cmd.startswith("mod_topic_groups"):
             t_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"📂 <b>Группы топика: {db.get_topic_name(t_id)}</b>", kb.moderator_group_list_kb(t_id, page=page))
-            
+
         if cmd.startswith("mod_topic_moderators"):
             t_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"👑 <b>Модераторы: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_moderators_kb(t_id))
-            
+
         if cmd.startswith("mod_gr_addlist"):
             t_id = int(p[-1])
             return await UIService.sterile_show(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(t_id, page=page))
-            
+
         if cmd.startswith("mod_users_manage"):
             t_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"👥 <b>Юзеры топика: {db.get_topic_name(t_id)}</b>", kb.moderator_users_list_kb(t_id, page=page))
@@ -367,7 +367,7 @@ class UIService:
         if cmd.startswith("user_roles_manage"):
             u_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
-            
+
         if cmd.startswith("user_templates_manage"):
             u_id = int(p[3])
             return await UIService.sterile_show(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
@@ -377,11 +377,11 @@ class UIService:
             g_id = int(p[4])
             title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
             return await UIService.sterile_show(state, event, title, reply_markup=kb.template_action_topic_select_kb(g_id, action, page=page))
-            
+
         if cmd.startswith("group_topics_list"):
             g_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"📍 <b>Топики группы: {db.get_group_name(g_id)}</b>", kb.group_topics_list_kb(g_id, page=page))
-            
+
         if cmd.startswith("topic_assign_pg"):
             u_id = int(p[-1])
             return await UIService.sterile_show(state, event, f"📍 <b>Выбор топика для: {db.get_user_name(u_id)}</b>", kb.topic_selection_for_role_kb(u_id, page=page))
@@ -393,9 +393,8 @@ class UIService:
     @staticmethod
     async def show_admin_dashboard(state: FSMContext, event: types.Message | types.CallbackQuery, text: str = "🛠 <b>Панель управления</b>"):
         """Отображает главную панель администратора с сессионным онбордингом."""
-        from services.permission_service import PermissionService
         import keyboards as kb
-        
+
         state_data = await state.get_data()
         if not state_data.get("admin_onboarded"):
             text_onboarding = (
@@ -427,11 +426,11 @@ class UIService:
         groups_str = ", ".join(g[1] for g in user_templates) if user_templates else "нет назначенных шаблонов"
         roles = db.get_user_roles(user_id)
         topics = db.get_user_available_topics(user_id)
-        
+
         text = UIService.format_user_card(user_id, user_name, groups_str, roles, topics)
-        
+
         is_sa = PermissionService.is_superadmin(event.from_user.id)
-        
+
         await UIService.sterile_show(state, event, text, reply_markup=kb.user_edit_kb(user_id, is_superadmin=is_sa))
 
     @staticmethod
@@ -439,7 +438,7 @@ class UIService:
         """Отображает информацию о группе."""
         from database import db
         import keyboards as kb
-        
+
         g_name = db.get_group_name(group_id)
         topics_count = len(db.get_topics_of_group(group_id))
         text = f"📂 <b>Группа:</b> {g_name}\n📍 <b>Топиков:</b> {topics_count}"
@@ -450,14 +449,14 @@ class UIService:
         """Отображает информацию о топике."""
         from database import db
         import keyboards as kb
-        
+
         t_name = db.get_topic_name(topic_id)
         access_groups = db.get_groups_by_topic(topic_id)
         if not db.is_topic_restricted(topic_id):
             status_str = "🔐 <b>Только администрация</b> (Default Deny)"
         else:
             status_str = ", ".join(access_groups) if access_groups else "НЕТ АКТИВНЫХ ГРУПП"
-            
+
         text = (
             f"📍 <b>Информация о топике</b>\n\n"
             f"<b>Наименование:</b> {t_name}\n"
@@ -497,7 +496,7 @@ class UIService:
         """
         from services.management_service import ManagementService
         from database import db
-        
+
         # Логика текстов и навигации
         if action == "group_del":
             name = ManagementService.get_entity_name("group", target_id)
@@ -510,7 +509,7 @@ class UIService:
             g_name = ManagementService.get_entity_name("group", extra_id)
             back = f"topic_in_group_{target_id}_{extra_id}" if action == "topic_del" else f"mod_topic_groups_{target_id}"
             return (f"❓ Убрать топик <b>{name}</b> из группы <b>{g_name}</b>?", back)
-            
+
         elif action == "global_topic_del":
             name = ManagementService.get_entity_name("topic", target_id)
             return (

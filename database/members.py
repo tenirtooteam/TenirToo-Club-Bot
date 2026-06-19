@@ -80,8 +80,8 @@ def find_users_by_query(query: str) -> list:
     parts = [p.lower().strip() for p in query.split() if p.strip()]
     if not parts:
         return []
-    
-    # SQLite's LOWER() only works for ASCII, failing on Cyrillic. 
+
+    # SQLite's LOWER() only works for ASCII, failing on Cyrillic.
     # Fetch all users and filter in Python.
     all_users = get_all_users()
     matched = []
@@ -90,17 +90,17 @@ def find_users_by_query(query: str) -> list:
         w = parts[0]
         for user_id, fname, lname in all_users:
             f = fname.lower() if fname else ""
-            l = lname.lower() if lname else ""
-            if w in f or w in l:
+            last_n = lname.lower() if lname else ""
+            if w in f or w in last_n:
                 matched.append((user_id, fname, lname))
     else:
         w1, w2 = parts[0], parts[1]
         for user_id, fname, lname in all_users:
             f = fname.lower() if fname else ""
-            l = lname.lower() if lname else ""
-            if (w1 in f and w2 in l) or (w2 in f and w1 in l):
+            last_n = lname.lower() if lname else ""
+            if (w1 in f and w2 in last_n) or (w2 in f and w1 in last_n):
                 matched.append((user_id, fname, lname))
-                
+
     return matched
 
 

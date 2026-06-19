@@ -40,7 +40,7 @@ class FsmButtonGuardMiddleware(BaseMiddleware):
 
             data_str = event.data or ""
             is_bypass = (
-                data_str in bypass_exact or 
+                data_str in bypass_exact or
                 any(data_str.startswith(p) for p in bypass_prefixes)
             )
 

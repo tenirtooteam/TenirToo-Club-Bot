@@ -1,10 +1,9 @@
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from aiogram import types
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from keyboards.pagination_util import add_nav_footer
-import config
 
 def test_callback_data_length_integrity():
     """Проверка, что все стандартные callback_data в подвале не превышают 64 байт."""
@@ -13,7 +12,7 @@ def test_callback_data_length_integrity():
     long_key = "a" * 30
     long_back = "b" * 30
     add_nav_footer(builder, help_key=long_key, help_back_data=long_back)
-    
+
     markup = builder.as_markup()
     for row in markup.inline_keyboard:
         for btn in row:
@@ -36,13 +35,13 @@ async def test_help_handler_robustness():
     """Проверка, что universal_help_handler переваривает старые форматы."""
     from handlers.common import universal_help_handler
     from aiogram.fsm.context import FSMContext
-    
+
     # Мокаем колбэк со старым форматом (без двоеточий)
     callback = AsyncMock(spec=types.CallbackQuery)
     callback.data = "help_main_menu"
     callback.message = AsyncMock(spec=types.Message)
     state = AsyncMock(spec=FSMContext)
-    
+
     with patch("handlers.common.show_help_view", new_callable=AsyncMock) as mock_show:
         await universal_help_handler(callback, state)
         # Должен распарсить как key="main_menu" и back_data="landing"
@@ -56,7 +55,7 @@ def test_all_help_keys_exist():
     from services.help_service import HelpService
     from keyboards.admin_kb import main_admin_kb
     from keyboards.user_kb import user_main_kb
-    
+
     for kb_func in [main_admin_kb, user_main_kb]:
         markup = kb_func()
         for row in markup.inline_keyboard:

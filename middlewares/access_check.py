@@ -81,13 +81,13 @@ class AccessGuardMiddleware(BaseMiddleware):
             try:
                 await event.delete()
                 logger.info(f"❌ {log_base} | Сообщение УДАЛЕНО (нет доступа)")
-                
+
                 # If the sender is an admin, send a rate-limited PM alert about Default Deny
                 if PermissionService.is_global_admin(user_id):
                     await NotificationService.send_default_deny_alert(event.bot, user_id, topic_name)
                 else:
                     await NotificationService.send_member_deny_alert(event.bot, user_id, topic_name)
-                    
+
                 return
             except Exception as e:
                 logger.error(f"⚠️ Ошибка модерации: {e}")

@@ -1,15 +1,14 @@
 # Файл: tests/test_journeys/test_tma_integration.py
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from keyboards.announcements_kb import get_announcement_kb
-from aiogram.types import WebAppInfo
 
 @pytest.mark.asyncio
 async def test_announcement_kb_tma_logic():
     """Тест логики клавиатуры анонса: группа vs ЛС."""
     ann_id = 42
     test_url = "https://club.tenirtoo.kg"
-    
+
     # 1. Группа (Две кнопки Иду/Не иду)
     with patch("config.WEBAPP_URL", test_url):
         kb = get_announcement_kb(ann_id, is_group=True)

@@ -39,10 +39,10 @@ def init_db():
 
             with conn:
                 c = conn.cursor()
-                
+
                 # Таблица групп
                 c.execute("CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)")
-                
+
                 # Таблица связи топиков с группами
                 c.execute("""CREATE TABLE IF NOT EXISTS group_topics (
                     group_id INTEGER,
@@ -50,10 +50,10 @@ def init_db():
                     PRIMARY KEY (group_id, topic_id),
                     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
                     FOREIGN KEY (topic_id) REFERENCES topic_names(topic_id) ON DELETE CASCADE)""")
-                
+
                 # Таблица пользователей
                 c.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, first_name TEXT, last_name TEXT)")
-                
+
                 # Таблица участников шаблонов групп (NEW TEMPLATE MODEL)
                 c.execute("""CREATE TABLE IF NOT EXISTS group_members (
                     group_id INTEGER,
@@ -61,10 +61,10 @@ def init_db():
                     PRIMARY KEY (group_id, user_id),
                     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
                     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE)""")
-                
+
                 # Таблица имен топиков
                 c.execute("CREATE TABLE IF NOT EXISTS topic_names (topic_id INTEGER PRIMARY KEY, name TEXT NOT NULL)")
-                
+
                 # Прямой доступ к топикам
                 c.execute("""CREATE TABLE IF NOT EXISTS direct_topic_access (
                     user_id INTEGER,
@@ -79,7 +79,7 @@ def init_db():
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT UNIQUE NOT NULL
                 )""")
-                
+
                 # Связь пользователей с ролями (и топиками для модераторов)
                 c.execute("""CREATE TABLE IF NOT EXISTS user_roles (
                     user_id INTEGER,
@@ -104,7 +104,7 @@ def init_db():
                     sheet_url TEXT,
                     FOREIGN KEY (creator_id) REFERENCES users(user_id) ON DELETE SET NULL
                 )""")
-                
+
                 # Миграция: Проверяем наличие новых колонок для старых баз
                 columns = [col[1] for col in c.execute("PRAGMA table_info(events)").fetchall()]
                 if 'start_iso' not in columns:

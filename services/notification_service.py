@@ -20,25 +20,25 @@ class NotificationService:
         now = time.time()
         cache_key = (user_id, topic_name)
         last_sent = cls._alert_cache.get(cache_key, 0)
-        
+
         if now - last_sent < 60:
             logger.info(f"🔇 Default Deny PM alert rate-limited for admin {user_id} in {topic_name}")
             return
-            
+
         cls._alert_cache[cache_key] = now
-        
+
         text = (
             f"🏔 <b>Доступ ограничен (Default Deny)</b>\n\n"
             f"Топик <b>«{topic_name}»</b> находится в режиме закрытого доступа по умолчанию. "
             f"Ваше сообщение было удалено.\n\n"
             f"Настройте права доступа в панели управления или свяжитесь с создателем."
         )
-        
+
         reply_markup = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="⚙️ Настроить доступ", callback_data="all_topics_list")],
             [InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")]
         ])
-        
+
         try:
             await bot.send_message(
                 chat_id=user_id,
@@ -59,20 +59,20 @@ class NotificationService:
         now = time.time()
         cache_key = (user_id, f"member_{topic_name}")
         last_sent = cls._alert_cache.get(cache_key, 0)
-        
+
         # 1-hour rate limit to avoid PM spamming
         if now - last_sent < 3600:
             return
-            
+
         cls._alert_cache[cache_key] = now
-        
+
         text = (
             f"📍 <b>Доступ ограничен</b>\n\n"
             f"Топик <b>«{topic_name}»</b> находится в закрытом режиме. "
             f"Ваше сообщение было удалено.\n\n"
             f"Доступ в эту локацию предоставляется только организаторам или участникам по спискам."
         )
-        
+
         try:
             await bot.send_message(
                 chat_id=user_id,

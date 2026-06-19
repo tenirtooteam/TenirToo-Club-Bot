@@ -27,9 +27,9 @@ class EventService:
         lead_ids = event["leads"]
         all_relevant_ids = list(set(participant_ids + lead_ids + ([event["creator_id"]] if event["creator_id"] else [])))
         user_names = db.get_user_names_by_ids(all_relevant_ids)
-        
+
         creator_name = user_names.get(event["creator_id"], "Удален")
-        
+
         participant_names = [f"• {user_names.get(uid, f'ID:{uid}')}" for uid in participant_ids]
         lead_names = [user_names.get(uid, f"ID:{uid}") for uid in lead_ids]
 
@@ -37,12 +37,12 @@ class EventService:
         participants_str = "\n".join(participant_names) if participant_names else "Пока никого нет"
 
         from services.date_service import DateService
-        
+
         # Динамически добавляем дни недели для красоты UI [CC-2]
         d_start = event['start_date']
         if event['start_iso']:
             d_start += DateService.get_weekday_suffix(event['start_iso'])
-            
+
         d_end = event['end_date']
         if d_end and event['end_iso']:
             d_end += DateService.get_weekday_suffix(event['end_iso'])
@@ -63,15 +63,15 @@ class EventService:
     async def notify_admins_for_approval(bot: Bot, event_id: int):
         """Отправляет карточку на модерацию всем администраторам."""
         import config
-        
+
         # Получаем всех глобальных админов из БД и гарантируем тип int [PL-HI]
         admin_ids = set(int(uid) for uid in db.get_global_admin_ids())
         # Обязательно добавляем системного админа из конфига (кастуем для верности)
         admin_ids.add(int(config.ADMIN_ID))
-        
-        card_text = f"🚨 <b>Новый поход на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
+
+        card_text = "🚨 <b>Новый поход на модерацию!</b>\n\n" + EventService.format_event_card(event_id)
         kb_markup = kb.get_event_moderation_kb(event_id)
-        
+
         for adm_id in admin_ids:
             try:
                 await bot.send_message(adm_id, card_text, reply_markup=kb_markup, parse_mode="HTML")
@@ -89,11 +89,11 @@ class EventService:
         """
         if db.is_global_admin(user_id):
             return True
-            
+
         event = db.get_event_details(event_id)
         if not event:
             return False
-            
+
         return event["creator_id"] == user_id
 
     @staticmethod
@@ -123,25 +123,25 @@ class EventService:
         Отправляет уведомление о новой заявке на участие ТОЛЬКО организаторам (лидам и создателю). [CC-3]
         """
         from database.db import get_user_name
-        
+
         event = db.get_event_details(event_id)
         if not event:
             return
-            
+
         user_name = get_user_name(user_id) or f"ID:{user_id}"
-        
+
         # [CC-3] Получатели: создатель + назначенные лидеры (без общего списка админов)
         organizer_ids = set(event["leads"])
         if event["creator_id"]:
             organizer_ids.add(int(event["creator_id"]))
-            
+
         text = (
             f"🔔 <b>Новая заявка на участие!</b>\n\n"
             f"👤 Пользователь: <b>{user_name}</b>\n"
             f"🏔 Поход: <b>{event['title']}</b>\n\n"
             f"Рассмотрите заявку в разделе 'Аудит'."
         )
-        
+
         for org_id in organizer_ids:
             try:
                 await bot.send_message(org_id, text, parse_mode="HTML")
@@ -154,24 +154,24 @@ class EventService:
         Отправляет уведомление о прямой записи ТОЛЬКО организаторам. [CC-3]
         """
         from database.db import get_user_name
-        
+
         event = db.get_event_details(event_id)
         if not event: return
-        
+
         user_name = get_user_name(user_id) or f"ID:{user_id}"
-        
+
         # [CC-3] Получатели: создатель + назначенные лидеры
         organizer_ids = set(event["leads"])
         if event["creator_id"]:
             organizer_ids.add(int(event["creator_id"]))
-            
+
         text = (
             f"✅ <b>Новый участник!</b>\n\n"
             f"👤 Пользователь: <b>{user_name}</b>\n"
             f"🏔 Поход: <b>{event['title']}</b>\n\n"
             f"Запись прошла автоматически через анонс."
         )
-        
+
         for org_id in organizer_ids:
             try:
                 await bot.send_message(org_id, text, parse_mode="HTML")

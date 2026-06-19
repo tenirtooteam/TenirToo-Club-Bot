@@ -88,7 +88,7 @@ class PermissionService:
     def can_user_write_in_topic(user_id: int, topic_id: int) -> bool:
         """
         Проверка прав на запись в конкретный топик.
-        Логика: Default Deny. Если топик не настроен (пустой список) или 
+        Логика: Default Deny. Если топик не настроен (пустой список) или
         пользователя нет в списке — доступ запрещен.
         """
         if not db.is_topic_restricted(topic_id):

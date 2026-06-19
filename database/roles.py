@@ -62,11 +62,11 @@ def get_user_roles(user_id: int) -> list:
             WHERE ur.user_id = ?
         """, (user_id,))
         roles = c.fetchall()
-        
+
     from config import ADMIN_ID
     if user_id == ADMIN_ID and not any(r[0] == 'superadmin' for r in roles):
         roles.append(('superadmin', None))
-        
+
     return roles
 
 def get_moderators_of_topic(topic_id: int) -> list:
@@ -86,7 +86,7 @@ def is_global_admin(user_id: int) -> bool:
     import config
     if user_id == config.ADMIN_ID:
         return True
-        
+
     with get_conn() as conn:
         c = conn.cursor()
         c.execute("""
@@ -127,7 +127,7 @@ def get_global_admin_ids() -> list:
     with get_conn() as conn:
         c = conn.cursor()
         c.execute("""
-            SELECT DISTINCT ur.user_id 
+            SELECT DISTINCT ur.user_id
             FROM user_roles ur
             JOIN roles r ON ur.role_id = r.id
             WHERE r.name IN ('admin', 'superadmin')

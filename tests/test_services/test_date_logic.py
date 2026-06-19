@@ -11,14 +11,14 @@ def mock_dateparser_now():
     Это предотвращает перенос прошедших дат на будущий год из-за настройки PREFER_DATES_FROM=future.
     """
     original_parse = dateparser.parse
-    
+
     def fake_parse(x, **kwargs):
         settings = kwargs.get('settings', {}).copy()
         if 'RELATIVE_BASE' not in settings:
             settings['RELATIVE_BASE'] = datetime.datetime(2026, 1, 1)
         kwargs['settings'] = settings
         return original_parse(x, **kwargs)
-        
+
     with patch("services.date_service.dateparser.parse", side_effect=fake_parse):
         yield
 
@@ -33,13 +33,13 @@ def mock_dateparser_now():
 def test_parse_smart_date_variants(input_text, expected_human, expected_start, expected_end):
     """Проверка различных форматов ввода дат."""
     human, start, end = DateService.parse_smart_date(input_text)
-    
+
     assert human == expected_human
     if expected_start:
         assert start == expected_start
     if expected_end:
         assert end == expected_end
-    
+
     # КРИТИЧЕСКИЙ ТЕСТ: Проверка отсутствия "цирка" (скобок в human строке)
     assert "(" not in human, f"Обнаружены скобки в human-строке: {human}"
     assert ")" not in human, f"Обнаружены скобки в human-строке: {human}"
@@ -64,7 +64,7 @@ def test_range_with_spaces():
     h1, s1, e1 = DateService.parse_smart_date("10-12 мая")
     assert s1 == "2026-05-10"
     assert e1 == "2026-05-12"
-    
+
     # С пробелами
     h2, s2, e2 = DateService.parse_smart_date("10 - 12 мая")
     assert s2 == "2026-05-10"

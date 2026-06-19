@@ -1,6 +1,6 @@
 import sqlite3
 import logging
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional
 from database.connection import get_conn
 from database.dtos import AuditRequestDTO
 

@@ -4,6 +4,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 from loader import bot, dp
+from aiogram import types
 from database import db
 from handlers import admin, user, common, moderator, events, announcements, errors
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
@@ -23,9 +24,9 @@ def setup_logging():
 
     # File handler [PL-2.2.1]
     file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=LOG_MAX_BYTES, 
-        backupCount=LOG_BACKUP_COUNT, 
+        log_file,
+        maxBytes=LOG_MAX_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
         encoding='utf-8'
     )
     file_handler.setFormatter(log_formatter)
@@ -54,7 +55,7 @@ async def main():
     dp.message.outer_middleware(ForumUtilityMiddleware())
     # 3. В последнюю очередь проверяем доступ к контенту
     dp.message.outer_middleware(AccessGuardMiddleware())
-    
+
     # 4. Защита от старых кнопок
     dp.callback_query.outer_middleware(FsmButtonGuardMiddleware())
 
@@ -75,7 +76,7 @@ async def main():
     logging.info("🚀 Запуск систем...")
 
     await bot.delete_webhook(drop_pending_updates=True)
-    
+
     # WebApp Server [CC-3] [PL-2.2.1]
     web_config = uvicorn.Config(web_app, host=WEBAPP_HOST, port=WEBAPP_PORT, log_level="info")
     web_server = uvicorn.Server(web_config)

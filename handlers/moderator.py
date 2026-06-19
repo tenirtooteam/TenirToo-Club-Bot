@@ -1,6 +1,5 @@
 # Файл: handlers/moderator.py
 import logging
-import math
 from aiogram import Router, F, types
 from aiogram.filters import Command, Filter
 from aiogram.fsm.context import FSMContext
@@ -19,12 +18,12 @@ class IsTopicManager(Filter):
     """Фильтр: суперадмин, глобальный admin или модератор конкретного топика."""
     async def __call__(self, event: types.Message | types.CallbackQuery) -> bool:
         user_id = event.from_user.id
-        
+
         # Если это сообщение из группы, разрешаем только команду /mod
         if isinstance(event, types.Message) and event.chat.type != "private":
             if not (event.text and event.text.startswith("/mod")):
                 return False
-        
+
         # Проверка прав доступа через PermissionService
         if PermissionService.is_global_admin(user_id):
             return True
@@ -84,9 +83,9 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
 
     await state.update_data(moderator_edit_topic_id=topic_id)
     await UIService.sterile_ask(
-        state, 
-        callback, 
-        "✍️ Введите новое название топика:", 
+        state,
+        callback,
+        "✍️ Введите новое название топика:",
         ModeratorStates.waiting_for_topic_name,
         reply_markup=kb.get_mod_cancel_kb(f"mod_topic_select_{topic_id}")
     )
@@ -108,14 +107,11 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
         await UIService.show_temp_message(state, message, msg)
         return
 
-    status = ""
     if topic_id != -1:
         try:
             await message.bot.edit_forum_topic(chat_id=GROUP_ID, message_thread_id=topic_id, name=new_name)
-            status = "\n✅ Синхронизировано с Telegram."
         except Exception as e:
             logger.warning(f"⚠️ Ошибка API: {e}")
-            status = f"\n⚠️ Только в БД (Ошибка API)"
 
     await UIService.generic_navigator(state, message, f"mod_topic_select_{topic_id}")
 
@@ -147,7 +143,7 @@ async def moderator_link_group(callback: types.CallbackQuery, state: FSMContext)
 
     ManagementService.add_topic_to_group(group_id, topic_id)
     await callback.answer("✅ Группа привязана.")
-    
+
     await UIService.generic_navigator(state, callback, f"mod_topic_groups_{topic_id}")
 
 @router.callback_query(F.data.startswith("mod_group_remove_"))
@@ -214,7 +210,7 @@ async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMConte
     await state.update_data(moderator_direct_access_topic=topic_id)
     await state.set_state(ModeratorStates.waiting_for_direct_access_user)
     await UIService.sterile_show(
-        state, callback, 
+        state, callback,
         "✍️ Введите ID пользователя или его Фамилию и Имя для поиска:\n\nИли выберите из списка:",
         reply_markup=kb.moderator_users_to_add_kb(topic_id, page=page)
     )

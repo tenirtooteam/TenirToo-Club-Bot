@@ -8,10 +8,10 @@ def user_main_kb():
     from aiogram.types import WebAppInfo
     import config
     builder = InlineKeyboardBuilder()
-    
+
     if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
         builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
-        
+
     builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data="user_topics")
     builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
     builder.button(text="[ 👤 МОЙ ПРОФИЛЬ ]", callback_data="user_profile_view")
@@ -25,7 +25,7 @@ def user_topics_list_kb(user_id: int, page: int = 1, limit: int = 7):
     all_topics = db.get_all_unique_topics()
     user_available = set(db.get_user_available_topics(user_id))
     names_map = db.get_topic_names_by_ids(all_topics)
-    
+
     item_buttons = []
     for t_id in all_topics:
         t_name = names_map.get(t_id, f"ID: {t_id}")

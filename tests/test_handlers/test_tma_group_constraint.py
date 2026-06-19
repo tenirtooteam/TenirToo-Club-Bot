@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import InlineKeyboardMarkup
 from handlers.announcements import cmd_quick_announcement
-import config
 from database import db
 
 def simulate_telegram_server_validation(text, reply_markup=None, **kwargs):
@@ -32,31 +31,31 @@ async def test_quick_announcement_group_web_app_constraint(create_context, db_se
     """
     user_id = 123
     topic_id = 42
-    
+
     db.add_user(user_id, "Admin", "User")
     db.grant_role(user_id, db.get_role_id("admin"))
     db.register_topic_if_not_exists(topic_id)
-    
+
     _, _, message, state = await create_context(
-        user_id=user_id, 
+        user_id=user_id,
         text="/an Hike to Peak\nGreat view guaranteed",
         thread_id=topic_id,
         chat_type="supergroup" # Указываем, что это группа
     )
-    
+
     with patch("config.WEBAPP_URL", "https://club.tenirtoo.kg"), \
          patch("services.ui_service.UIService.delete_msg", new_callable=AsyncMock), \
          patch("aiogram.types.Message.answer", side_effect=simulate_telegram_server_validation) as mock_answer:
-        
+
         # Если код не адаптирован к группам, этот вызов бросит TelegramBadRequest
         # Тест должен пройти без исключений, если архитектура правильная.
         await cmd_quick_announcement(message, state)
-        
+
         # Проверяем, что в клавиатуре именно две кнопки и нет web_app
         call_args = mock_answer.call_args
         kb = call_args.kwargs.get("reply_markup")
         assert kb is not None
-        
+
         buttons = [btn for row in kb.inline_keyboard for btn in row]
         assert len(buttons) == 2
         assert "Иду" in buttons[0].text

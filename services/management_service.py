@@ -1,11 +1,10 @@
 # Файл: services/management_service.py
 import logging
 import html
-from typing import Optional, List
+from typing import Optional
 from aiogram.types import User
 from aiogram import Bot
 from database import db
-from database.dtos import EventDTO, AuditRequestDTO
 from services.permission_service import PermissionService
 from services.notification_service import NotificationService
 
@@ -108,7 +107,7 @@ class ManagementService:
             l_name = name_parts[-1]
 
         f_name, l_name = html.escape(f_name), html.escape(l_name)
-        
+
         if len(f_name) > ManagementService.MAX_NAME_LENGTH or len(l_name) > ManagementService.MAX_NAME_LENGTH:
             return False, f"❌ Ошибка: Имя/Фамилия не должны превышать {ManagementService.MAX_NAME_LENGTH} симв."
 
@@ -124,7 +123,7 @@ class ManagementService:
         name = html.escape(name.strip())
         if not name:
             return False, "❌ Название группы не может быть пустым."
-        
+
         if len(name) > ManagementService.MAX_NAME_LENGTH:
             return False, f"❌ Ошибка: Название не должно превышать {ManagementService.MAX_NAME_LENGTH} симв."
 
@@ -187,10 +186,10 @@ class ManagementService:
         first_name, last_name = html.escape(first_name.strip()), html.escape(last_name.strip())
         if not first_name:
             return False, "❌ Имя не может быть пустым."
-            
+
         if len(first_name) > ManagementService.MAX_NAME_LENGTH or len(last_name) > ManagementService.MAX_NAME_LENGTH:
             return False, f"❌ Максимум {ManagementService.MAX_NAME_LENGTH} символов."
-            
+
         db.update_user_name(user_id, first_name, last_name)
         ManagementService._trigger_sheets_sync("users")
         return True, "✅ Данные пользователя обновлены."
@@ -203,7 +202,7 @@ class ManagementService:
             return False, "❌ Название не может быть пустым."
         if len(new_name) > ManagementService.MAX_NAME_LENGTH:
             return False, "❌ Название слишком длинное."
-            
+
         db.update_topic_name(topic_id, new_name)
         ManagementService._trigger_sheets_sync("all")
         return True, "✅ Название топика обновлено."
@@ -275,21 +274,21 @@ class ManagementService:
             db.delete_group(target_id)
             ManagementService._trigger_sheets_sync("groups")
             return True, "✅ Группа удалена", "manage_groups"
-            
+
         elif action in ["topic_del", "mod_topic_del"]:
             # target_id — топик, extra_id — группа
             db.remove_topic_from_group(extra_id, target_id)
             ManagementService._trigger_sheets_sync("all")
-            
+
             if action == "mod_topic_del":
                  return True, "✅ Топик убран из группы", f"mod_topic_groups_{target_id}"
             return True, "✅ Топик убран из группы", f"group_topics_list_{extra_id}"
-            
+
         elif action == "global_topic_del":
             db.delete_topic(target_id)
             ManagementService._trigger_sheets_sync("groups") # Топики влияют на выгрузку групп
             return True, "✅ Топик полностью удален", "all_topics_list"
-            
+
         elif action == "user_del":
             db.delete_user(target_id)
             ManagementService._trigger_sheets_sync("users")
@@ -314,26 +313,26 @@ class ManagementService:
             return True, "✅ Поход удален", "event_list"
 
         return False, "❌ Ошибка: неизвестное действие", "admin_main"
-    
+
     @staticmethod
     async def sync_from_sheets() -> tuple[bool, str]:
         """Синхронизирует локальную БД данными из Google Sheets (Manual Import)."""
         from services.google_sheets_service import GoogleSheetsService
-        
+
         users_data = await GoogleSheetsService.import_users()
         if not users_data:
             return False, "❌ Ошибка: Данные пользователей не получены или лист пуст."
-            
+
         # Оптимизация: получаем текущих юзеров для сравнения [PL-HI]
         current_users = {u[0]: (u[1], u[2]) for u in db.get_all_users()}
-        
+
         imported_count = 0
         updated_count = 0
         for row in users_data:
             u_id = row.get("User ID")
             f_name = str(row.get("First Name", ""))
             l_name = str(row.get("Last Name", ""))
-            
+
             if u_id and f_name:
                 try:
                     u_id_int = int(u_id)
@@ -349,7 +348,7 @@ class ManagementService:
                             updated_count += 1
                 except Exception as e:
                     logger.warning(f"Ошибка парсинга строки при импорте: {row} ({e})")
-        
+
         status = f"✅ Синхронизировано. Новых: {imported_count}, Обновлено: {updated_count}"
         return True, status
 
@@ -359,7 +358,7 @@ class ManagementService:
         import asyncio
         from services.google_sheets_service import GoogleSheetsService
         from services.event_service import EventService
-        
+
         async def _task():
             try:
                 if mode in ["all", "users"]:
@@ -370,7 +369,7 @@ class ManagementService:
                         roles_str = ", ".join([f"{r[0]}({r[1]})" if r[1] else r[0] for r in roles])
                         users_with_roles.append((u[0], u[1], u[2], roles_str))
                     await GoogleSheetsService.export_users(users_with_roles)
-                
+
                 if mode in ["all", "groups"]:
                     groups = db.get_all_groups()
                     groups_data = []
@@ -396,7 +395,7 @@ class ManagementService:
                         p_ids = details['participants']
                         l_ids = set(details['leads'])
                         names = db.get_user_names_by_ids(p_ids)
-                        
+
                         full_participants = []
                         for p_id in p_ids:
                             full_participants.append({
@@ -405,7 +404,7 @@ class ManagementService:
                                 'role': "Организатор" if p_id in l_ids else "Участник",
                                 'join_date': "" # В БД пока нет даты вступления
                             })
-                            
+
                         await GoogleSheetsService.export_event_participants(
                             entity_id, details['title'], full_participants
                         )
@@ -435,7 +434,7 @@ class ManagementService:
         user_ids = db.get_group_template_members(group_id)
         if not user_ids:
             return False, "⚠️ Шаблон группы пуст."
-        
+
         if db.grant_direct_access_bulk(user_ids, topic_id):
             return True, f"✅ Шаблон применен! Добавлено {len(user_ids)} чел."
         return False, "❌ Ошибка при применении шаблона."
@@ -446,7 +445,7 @@ class ManagementService:
         user_ids = db.get_group_template_members(group_id)
         # Очищаем старый доступ
         db.revoke_all_direct_access(topic_id)
-        
+
         if not user_ids:
             return True, "✅ Доступ очищен (шаблон пуст)."
 
@@ -460,7 +459,7 @@ class ManagementService:
         users = db.get_direct_access_users(source_topic_id)
         if not users:
             return False, "⚠️ Исходный топик не имеет прямого доступа."
-        
+
         user_ids = [u[0] for u in users]
         if db.grant_direct_access_bulk(user_ids, target_topic_id):
             return True, f"✅ Права скопированы ({len(user_ids)} чел.)."
@@ -471,14 +470,14 @@ class ManagementService:
     @staticmethod
     def create_event_action(title: str, start_date: str, creator_id: int, is_approved: int = 0, end_date: Optional[str] = None, start_iso: Optional[str] = None, end_iso: Optional[str] = None) -> int:
         """
-        Бизнес-логика создания мероприятия [PL-6.7]: 
+        Бизнес-логика создания мероприятия [PL-6.7]:
         санитизация ввода и регистрация автора как лидера и участника.
         """
         title = html.escape(title.strip())[:100]
         start_date = html.escape(start_date.strip())[:100]
         if end_date:
             end_date = html.escape(end_date.strip())[:100]
-        
+
         event_id = db.create_event(title, start_date, end_date or "", creator_id, is_approved, start_iso, end_iso)
         if event_id > 0:
             db.add_event_participant(event_id, creator_id)
@@ -500,7 +499,7 @@ class ManagementService:
         """Логика записи на мероприятие с текстовым статусом."""
         if db.is_event_participant(event_id, user_id):
             return "Вы уже записаны!"
-        
+
         db.add_event_participant(event_id, user_id)
         ManagementService._trigger_sheets_sync("event_participants", event_id)
         return "Вы записаны!"
@@ -510,7 +509,7 @@ class ManagementService:
         """Логика отписки от мероприятия с текстовым статусом."""
         if not db.is_event_participant(event_id, user_id):
             return "Вы еще не записались чтобы не идти!"
-        
+
         db.remove_event_participant(event_id, user_id)
         ManagementService._trigger_sheets_sync("event_participants", event_id)
         return "Ваша запись отменена!"
@@ -581,7 +580,7 @@ class ManagementService:
             elif request["entity_type"] == "event_participation":
                 db.add_event_participant(request["entity_id"], request["user_id"])
                 ManagementService._trigger_sheets_sync("event_participants", request["entity_id"])
-        
+
         elif status == "rejected":
             if request["entity_type"] == "event_approval":
                 # Если отклонили создание мероприятия — удаляем черновик [CC-1]
@@ -601,20 +600,20 @@ class ManagementService:
             "topic": ("Ваш топик", "одобрен", "отклонен"),
             "user": ("Пользователь", "одобрен", "отклонен")
         }
-        
+
         prefix, ok_text, fail_text = naming_map.get(
-            request["entity_type"], 
+            request["entity_type"],
             ("Ваша заявка по объекту", "одобрена", "отклонена")
         )
-        
+
         res_text = ok_text if is_approved else fail_text
         notify_text = f"{status_icon} {prefix} <b>{entity_name}</b> {res_text}.\n"
-        
+
         if comment:
             notify_text += f"💬 Комментарий: <i>{comment}</i>"
 
         await NotificationService.send_to_users(bot, [request["user_id"]], notify_text)
-        
+
         return True, f"✅ Заявка {request_id} разрешена ({res_text})."
 
     @staticmethod
@@ -623,7 +622,7 @@ class ManagementService:
         req_id = db.get_user_pending_request(user_id, "event_participation", event_id)
         if not req_id:
             return False, "❌ Активная заявка не найдена."
-        
+
         if db.delete_audit_request(req_id):
             return True, "✅ Заявка на участие отменена."
         return False, "❌ Ошибка при удалении заявки из базы данных."

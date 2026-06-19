@@ -14,10 +14,10 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
     """Список топиков, доступных модератору для управления (оптимизировано)."""
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
-    
+
     # Оптимизация: получаем имена всех топиков одним запросом [PL-HI]
     names_map = db.get_topic_names_by_ids(topics)
-    
+
     item_buttons = []
     for topic_id in topics:
         topic_name = names_map.get(topic_id, f"ID: {topic_id}")
@@ -25,14 +25,14 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
             text=f"📍 {topic_name} (ID: {topic_id})",
             callback_data=f"mod_topic_select_{topic_id}"
         ))
-        
+
     from aiogram.types import WebAppInfo
     import config
     static_buttons = []
-    
+
     if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
         static_buttons.append(InlineKeyboardButton(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL)))
-        
+
     static_buttons.extend([
         InlineKeyboardButton(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
@@ -75,7 +75,7 @@ def moderator_group_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     all_groups = db.get_all_groups()
     # Оптимизация: получаем ID всех привязанных групп одним запросом [PL-HI]
     attached_ids = set(db.get_group_ids_by_topic(topic_id))
-    
+
     item_buttons = []
     for g_id, g_name in all_groups:
         if g_id in attached_ids:
@@ -100,7 +100,7 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
     all_groups = db.get_all_groups()
     # Оптимизация: получаем ID всех привязанных групп одним запросом [PL-HI]
     attached_ids = set(db.get_group_ids_by_topic(topic_id))
-            
+
     item_buttons = []
     for g_id, g_name in all_groups:
         if g_id not in attached_ids:
@@ -108,7 +108,7 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
                 text=f"🔗 {g_name}",
                 callback_data=f"mod_gr_link_{g_id}_{topic_id}"
             ))
-        
+
     static_buttons = []
     return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_gr_addlist_{topic_id}", help_key="templates")
 
@@ -119,12 +119,12 @@ def moderator_users_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     users = db.get_all_users()
-    
+
     # Оптимизация: пакетная выборка прав [PL-HI]
     direct_users = set(db.get_direct_access_user_ids(topic_id))
     all_authorized = set(db.get_topic_authorized_user_ids(topic_id))
     group_users = all_authorized - direct_users
-    
+
     item_buttons = []
     for u_id, f_name, l_name in users:
         if u_id in direct_users:
@@ -137,7 +137,7 @@ def moderator_users_list_kb(topic_id: int, page: int = 1, limit: int = 7):
                 text=f"🌐 {f_name} {l_name}",
                 callback_data=f"mod_tgl_dir_{u_id}_{topic_id}"
             ))
-            
+
     static_buttons = [
         InlineKeyboardButton(
             text="➕ Выдать доступ",
@@ -157,10 +157,10 @@ def moderator_users_to_add_kb(topic_id: int, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     users = db.get_all_users()
-    
+
     # Оптимизация: пакетная выборка прав [PL-HI]
     has_access = set(db.get_topic_authorized_user_ids(topic_id))
-    
+
     item_buttons = []
     for u_id, f_name, l_name in users:
         if u_id not in has_access:
@@ -168,7 +168,7 @@ def moderator_users_to_add_kb(topic_id: int, page: int = 1, limit: int = 7):
                 text=f"❌ {f_name} {l_name}",
                 callback_data=f"mod_tgl_dir_{u_id}_{topic_id}"
             ))
-            
+
     static_buttons = [
         InlineKeyboardButton(
             text="⬅️ Назад",
@@ -184,14 +184,14 @@ def moderator_topic_moderators_kb(topic_id: int, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
     from aiogram.types import InlineKeyboardButton
     moderators = db.get_moderators_of_topic(topic_id)
-    
+
     item_buttons = []
     for u_id, f_name, l_name in moderators:
         item_buttons.append(InlineKeyboardButton(
             text=f"👑 {f_name} {l_name}",
             callback_data=f"mod_moderator_remove_{u_id}_{topic_id}"
         ))
-        
+
     static_buttons = [
         InlineKeyboardButton(
             text="➕ Назначить модератора",

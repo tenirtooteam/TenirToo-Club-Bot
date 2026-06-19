@@ -14,25 +14,25 @@ class AnnouncementService:
         """Формирует актуальный текст анонса с участниками [PL-5.1.18]."""
         ann = db.get_announcement(ann_id)
         if not ann: return "❌ Анонс не найден."
-        
+
         ann_type, target_id, topic_id, creator_id = ann[1], ann[2], ann[3], ann[4]
-        
+
         if ann_type == "event":
             from services.event_service import EventService
             event = EventService.get_event_details(target_id)
             if not event: return "❌ Мероприятие не найдено."
-            
+
             # Получаем имена участников
             participant_ids = event["participants"]
             user_names = db.get_user_names_by_ids(participant_ids)
             participant_list = "\n".join([f"• {user_names.get(uid, f'ID:{uid}')}" for uid in participant_ids])
-            
+
             creator_name = db.get_user_name(creator_id) or f"ID:{creator_id}"
             topic_name = db.get_topic_name(topic_id) or "Общий чат"
-            
+
             # [CC-2] Если дата 'Оперативно', не выводим её (квик-анонс)
             date_str = f"📅 Дата: {event['start_date']}\n" if event['start_date'] != "Оперативно" else ""
-            
+
             text = (
                 f"📢 <b>НОВЫЙ АНОНС</b>\n\n"
                 f"📌 <b>{event['title']}</b>\n"
@@ -43,7 +43,7 @@ class AnnouncementService:
                 f"{participant_list or '<i>Пока никого нет</i>'}"
             )
             return text
-        
+
         return "🛠 Тип анонса в разработке."
 
     @staticmethod
@@ -51,19 +51,19 @@ class AnnouncementService:
         """Парсит команду /an и создает быстрое мероприятие с анонсом."""
         user_id = message.from_user.id
         topic_id = message.message_thread_id or 0
-        
+
         full_text = message.text.replace("/an", "", 1).strip()
         if not full_text:
             return "❌ Ошибка: Введите текст анонса. Пример: <code>/an Заголовок</code>", None
 
         lines = full_text.split("\n", 1)
         title = lines[0].strip()[:100]
-        
+
         # Создаем ивент
         event_id = ManagementService.create_quick_event(user_id, title)
         if event_id <= 0:
             return "❌ Ошибка: Не удалось создать поход.", None
-        
+
         # Регистрируем анонс
         ann_id = db.create_announcement(
             a_type="event",
@@ -78,7 +78,7 @@ class AnnouncementService:
     async def broadcast_event_announcement(bot, event_id: int, target_topic_id: int, creator_id: int):
         """Публикует анонс существующего мероприятия в целевой топик."""
         import config
-        
+
         # [CC-2] Проверка существования топика перед публикацией
         if target_topic_id != 0 and not db.get_topic_name(target_topic_id):
              return False, "❌ Ошибка: Целевой топик не найден в БД (возможно, удален).", None
@@ -113,14 +113,14 @@ class AnnouncementService:
         announcements = db.get_announcements_by_target(a_type, target_id)
         if not announcements:
             return
-            
+
         from keyboards.announcements_kb import get_announcement_kb
-        
+
         for ann in announcements:
             ann_id = ann[0]
             chat_id = ann[5]
             message_id = ann[6]
-            
+
             if chat_id and message_id:
                 try:
                     text = AnnouncementService.format_announcement_text(ann_id)

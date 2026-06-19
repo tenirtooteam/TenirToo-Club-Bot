@@ -1,7 +1,6 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 from services.google_sheets_service import GoogleSheetsService
-import config
 
 @pytest.mark.asyncio
 async def test_sheets_export_missing_config(db_setup):
@@ -27,13 +26,13 @@ async def test_sheets_export_success_mock(db_setup):
         mock_client = AsyncMock()
         mock_sh = AsyncMock()
         mock_ws = AsyncMock()
-        
+
         mock_client.open_by_key.return_value = mock_sh
         mock_sh.worksheet.return_value = mock_ws
-        
+
         with patch.object(GoogleSheetsService, "get_client", return_value=mock_client):
             result = await GoogleSheetsService.export_users([(1, "Test", "User", "Admin")])
-            
+
             assert result is True
             assert mock_client.open_by_key.called
             assert mock_sh.worksheet.called

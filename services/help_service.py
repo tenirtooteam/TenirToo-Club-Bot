@@ -5,7 +5,7 @@ class HelpService:
     Centralized registry for help content and tooltips.
     Decouples help text from UI handlers for better scalability and localization.
     """
-    
+
     # [CC-2] Content Registry: All help strings must reside here.
     HELP_CONTENT: Dict[str, str] = {
         "help_general": (
@@ -72,6 +72,6 @@ class HelpService:
         Retrieves help text by key. Returns a fallback message if key is missing.
         """
         return HelpService.HELP_CONTENT.get(
-            key, 
+            key,
             "<i>⚠️ Справочная информация для данного раздела пока не добавлена.</i>"
         )

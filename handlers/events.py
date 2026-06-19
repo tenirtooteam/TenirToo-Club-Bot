@@ -1,5 +1,5 @@
 import logging
-from aiogram import Router, F, types
+from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -29,15 +29,15 @@ async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMCont
     await state.set_state(None)
     await UIService.clear_fsm_data_safely(state)
     user_id = event_or_msg.from_user.id
-    
+
     # [PL-6.7] Данные получаем через EventService или db (GET разрешен)
     events = EventService.get_active_events()
     is_admin = PermissionService.is_global_admin(user_id)
-    
+
     text = custom_text or "🏔 <b>Мероприятия Клуба</b>\nЗдесь вы можете записаться на походы и тренировки."
     # [PL-5.1.13] Используем kb фасад
     reply_markup = kb.get_events_list_kb(events, is_admin)
-    
+
     # [PL-5.1.8] Используем UIService для отображения меню
     await UIService.sterile_show(state, event_or_msg, text, reply_markup=reply_markup)
 
@@ -48,12 +48,12 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
     # [PL-7.1] Используем PermissionService
     if not PermissionService.is_global_admin(user_id):
         return await callback.answer("❌ У вас нет прав.", show_alert=True)
-        
+
     await state.set_state(None)
     await UIService.clear_fsm_data_safely(state)
     events = EventService.get_pending_events()
     reply_markup = kb.get_events_list_kb(events, is_admin=True)
-    
+
     await UIService.sterile_show(
         state,
         callback,
@@ -66,12 +66,12 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
 async def start_event_creation(callback: CallbackQuery, state: FSMContext):
     # [PL-5.1.4] Sterile UI: очистка перед началом нового ввода
     await UIService.terminate_input(state, callback.message, reset_state=True)
-    
+
     # [PL-5.1.11] Sterile Ask
     await UIService.sterile_ask(
-        state, 
-        callback, 
-        "Отлично! Введите <b>Название</b> похода (например, 'Поход на Ала-Арчу'):", 
+        state,
+        callback,
+        "Отлично! Введите <b>Название</b> похода (например, 'Поход на Ала-Арчу'):",
         EventCreation.waiting_for_title,
         reply_markup=kb.get_event_cancel_kb() # Только отмена на первом шаге
     )
@@ -80,17 +80,17 @@ async def start_event_creation(callback: CallbackQuery, state: FSMContext):
 async def process_event_title(message: Message, state: FSMContext):
     if not message.text:
         return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текстовое</b> название похода.")
-        
+
     # [PL-6.7] Санитизация делегирована сервису
     await state.update_data(title=message.text)
-    
+
     # [PL-5.1.16] Heartfelt Ask with Examples
     text = (
         "📅 <b>Когда идем?</b>\n\n"
         "Выбери дату на кнопках или введи текстом.\n"
         "<i>Примеры: \"15 мая\", \"Завтра\", \"10-15 июня\"</i>"
     )
-    
+
     await UIService.sterile_show(
         state,
         message,
@@ -103,9 +103,9 @@ async def process_event_title(message: Message, state: FSMContext):
 async def process_event_dates(message: Message, state: FSMContext):
     if not message.text:
         return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>дату</b> текстом или выберите на кнопках.")
-        
+
     human, iso_start, iso_end = DateService.parse_smart_date(message.text)
-    
+
     if not iso_start:
         # Если не распарсили - сохраняем как текст, но предупреждаем
         await state.update_data(dates=human, start_iso=None, end_iso=None)
@@ -114,11 +114,11 @@ async def process_event_dates(message: Message, state: FSMContext):
             "Этот поход <b>не попадет</b> в Google Календарь автоматически.\n\n"
             "Всё равно продолжить?"
         )
-        
+
         data = await state.get_data()
         edit_id = data.get("edit_event_id")
         back_data = f"event_edit:{edit_id}" if edit_id else "event_create"
-        
+
         await UIService.sterile_show(
             state,
             message,
@@ -128,11 +128,11 @@ async def process_event_dates(message: Message, state: FSMContext):
         return
 
     await state.update_data(dates=human, start_iso=iso_start, end_iso=iso_end)
-    
+
     data = await state.get_data()
     edit_id = data.get("edit_event_id")
     back_data = f"event_edit:{edit_id}" if edit_id else "event_create"
-    
+
     text = f"🤖 Я распознал дату: <b>{human}</b>\n\nПодтвердите или измените:"
     await UIService.sterile_show(state, message, text, reply_markup=kb.get_date_confirm_kb(iso_start, iso_end, back_data=back_data))
     await state.set_state(EventCreation.confirm_date)
@@ -143,13 +143,13 @@ async def process_date_preset(callback: CallbackQuery, state: FSMContext):
     iso_date = callback.data.split(":")[1]
     # Получаем человеческое название для ISO даты
     human, _, _ = DateService.parse_smart_date(iso_date)
-    
+
     await state.update_data(dates=human, start_iso=iso_date, end_iso=None)
-    
+
     data = await state.get_data()
     edit_id = data.get("edit_event_id")
     back_data = f"event_edit:{edit_id}" if edit_id else "event_create"
-    
+
     await UIService.sterile_show(
         state,
         callback,
@@ -164,7 +164,7 @@ async def process_date_retry(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     edit_id = data.get("edit_event_id")
     back_data = f"event_edit:{edit_id}" if edit_id else "event_create"
-    
+
     await UIService.sterile_show(
         state,
         callback,
@@ -217,18 +217,18 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
             start_iso=iso_start,
             end_iso=iso_end
         )
-        
+
         if event_id > 0:
             ManagementService.submit_request(user_id, "event_approval", event_id)
             await EventService.notify_admins_for_approval(callback.message.bot, event_id)
-            
+
             await state.set_state(None)
             await UIService.clear_fsm_data_safely(state)
             await UIService.sterile_show(
                 state,
                 callback,
-                f"🚀 <b>Поход создан и отправлен на модерацию!</b>\n\n"
-                f"Когда администраторы одобрят его, вы получите уведомление.",
+                "🚀 <b>Поход создан и отправлен на модерацию!</b>\n\n"
+                "Когда администраторы одобрят его, вы получите уведомление.",
                 reply_markup=kb.simple_back_kb("event_list")
             )
 
@@ -240,8 +240,8 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
 @safe_callback()
 async def process_date_add_end_start(callback: CallbackQuery, state: FSMContext):
     await UIService.sterile_ask(
-        state, 
-        callback, 
+        state,
+        callback,
         "⏳ Введите <b>дату окончания</b> (например: 20 мая):",
         state_to_set=EventCreation.waiting_for_end_date,
         reply_markup=kb.get_event_cancel_kb()
@@ -252,14 +252,14 @@ async def process_event_end_date(message: Message, state: FSMContext):
     human_end, iso_end, _ = DateService.parse_smart_date(message.text)
     if not iso_end:
         return await message.answer("⚠️ Не удалось распознать дату. Попробуй еще раз (например: 20 мая):")
-        
+
     data = await state.get_data()
     start_human = data.get("dates")
     iso_start = data.get("start_iso")
-    
+
     new_human = f"{start_human} - {human_end}"
     await state.update_data(dates=new_human, end_iso=iso_end)
-    
+
     await UIService.sterile_show(
         state,
         message,
@@ -288,7 +288,7 @@ async def show_event_card(event_or_msg: CallbackQuery | Message, event_id: int, 
     can_edit = EventService.can_edit_event(user_id, event_id)
     is_admin = PermissionService.is_global_admin(user_id)
     is_creator = event['creator_id'] == user_id
-    
+
     has_pending = bool(ManagementService.get_user_pending_request_id(user_id, "event_participation", event_id))
 
     if not event['is_approved']:
@@ -301,7 +301,7 @@ async def show_event_card(event_or_msg: CallbackQuery | Message, event_id: int, 
             reply_markup = kb.get_event_card_kb(event_id, is_participant, can_edit, has_pending=has_pending, show_actions=False)
     else:
         reply_markup = kb.get_event_card_kb(event_id, is_participant, can_edit, has_pending=has_pending, show_actions=True)
-        
+
     await UIService.sterile_show(state, event_or_msg, card_text, reply_markup=reply_markup)
 
 @router.callback_query(F.data.startswith("event_edit:"))
@@ -310,15 +310,15 @@ async def edit_event_init(callback: CallbackQuery, state: FSMContext):
     """Начало процесса редактирования."""
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
-    
+
     if not EventService.can_edit_event(user_id, event_id):
         return await callback.answer("❌ У вас нет прав на редактирование.", show_alert=True)
-        
+
     await state.update_data(edit_event_id=event_id)
     await state.set_state(EventCreation.editing_title)
-    
+
     await UIService.sterile_show(
-        state, callback, 
+        state, callback,
         "📝 <b>Редактирование похода</b>\n\nВведите новое название или пришлите <code>/cancel</code> для отмены.",
         reply_markup=kb.get_event_cancel_kb(back_data=f"event_view:{event_id}") # [CP-3.11] Изолируем ввод от функциональных кнопок
     )
@@ -327,13 +327,13 @@ async def edit_event_init(callback: CallbackQuery, state: FSMContext):
 async def process_editing_title(message: Message, state: FSMContext):
     title = message.text.strip()
     if title.startswith("/"): return # Игнорируем команды
-    
+
     data = await state.get_data()
     event_id = data.get("edit_event_id")
-    
+
     await state.update_data(new_title=title)
     await state.set_state(EventCreation.editing_dates)
-    
+
     await UIService.sterile_show(
         state,
         message,
@@ -349,8 +349,8 @@ async def process_editing_dates(message: Message, state: FSMContext):
 
     data = await state.get_data()
     event_id = data['edit_event_id']
-    new_title = data['new_title']
-    
+    data['new_title']
+
     if dates_input == "/skip":
         event = EventService.get_event_details(event_id)
         dates = event['start_date']
@@ -367,13 +367,12 @@ async def process_editing_dates(message: Message, state: FSMContext):
         elif "-" in dates:
             s_human, e_human = dates.split("-", 1)
         else:
-            s_human, e_human = dates, None
+            _s_human, _e_human = dates, None
     else:
-        s_human = dates
-        e_human = None
+        pass
 
     await state.update_data(dates=dates, start_iso=start_iso, end_iso=end_iso)
-    
+
     text = f"🤖 Я распознал дату: <b>{dates}</b>\n\nПодтвердите или измените:"
     await UIService.sterile_show(state, message, text, reply_markup=kb.get_date_confirm_kb(start_iso, end_iso))
     await state.set_state(EventCreation.confirm_date)
@@ -383,16 +382,16 @@ async def process_editing_dates(message: Message, state: FSMContext):
 async def join_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
-    
+
     event = EventService.get_event_details(event_id)
     if not event:
         return await callback.answer("❌ Поход не найден.", show_alert=True)
-        
+
     is_admin = PermissionService.is_global_admin(user_id)
     is_creator = event['creator_id'] == user_id
     if not event['is_approved'] and not is_admin and not is_creator:
         return await callback.answer("❌ Запись закрыта. Поход на модерации.", show_alert=True)
-        
+
     if EventService.is_event_participant(event_id, user_id):
         return await callback.answer("⚠️ Вы уже участвуете в этом походе.", show_alert=True)
 
@@ -404,13 +403,13 @@ async def join_event(callback: CallbackQuery, state: FSMContext):
     # Регистрируем заявку на участие [CC-1]
     ManagementService.submit_request(user_id, "event_participation", event_id)
     await EventService.notify_admins_of_participation_request(callback.message.bot, event_id, user_id)
-    
+
     await callback.answer("✅ Ваша заявка на участие отправлена организаторам!", show_alert=True)
-    
+
     # Обновляем анонсы [CC-2]
     from services.announcement_service import AnnouncementService
     await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
-    
+
     await view_event(callback, state)
 
 @router.callback_query(F.data.startswith("event_cancel_join:"))
@@ -418,14 +417,14 @@ async def join_event(callback: CallbackQuery, state: FSMContext):
 async def cancel_join_handler(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
-    
+
     success, msg = ManagementService.cancel_participation_request_action(user_id, event_id)
     await callback.answer(msg, show_alert=True)
-    
+
     # Обновляем анонсы [CC-2]
     from services.announcement_service import AnnouncementService
     await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
-    
+
     await view_event(callback, state)
 
 @router.callback_query(F.data.startswith("event_leave:"))
@@ -433,23 +432,23 @@ async def cancel_join_handler(callback: CallbackQuery, state: FSMContext):
 async def leave_event(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
-    
+
     event = EventService.get_event_details(event_id)
     if not event:
         return await callback.answer("❌ Поход не найден.", show_alert=True)
-        
+
     is_admin = PermissionService.is_global_admin(user_id)
     is_creator = event['creator_id'] == user_id
     if not event['is_approved'] and not is_admin and not is_creator:
         return await callback.answer("❌ Действие недоступно. Поход на модерации.", show_alert=True)
-        
+
     # [PL-6.7] Мутация через ManagementService
     success, msg = ManagementService.toggle_event_participation(event_id, user_id)
-    
+
     # Обновляем анонсы [CC-2]
     from services.announcement_service import AnnouncementService
     await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
-    
+
     await callback.answer(msg)
     await view_event(callback, state)
 
@@ -459,10 +458,10 @@ async def delete_event_init(callback: CallbackQuery, state: FSMContext):
     # [PL-5.1.10] Confirmation Protocol
     event_id = int(callback.data.split(":")[1])
     user_id = callback.from_user.id
-    
+
     if not EventService.can_edit_event(user_id, event_id):
         return await callback.answer("❌ У вас нет прав.", show_alert=True)
-        
+
     text, back = UIService.get_confirmation_ui("event_del", event_id)
     await UIService.sterile_show(
         state, callback, text,
@@ -475,16 +474,16 @@ async def approve_event_handler(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     if not PermissionService.is_global_admin(callback.from_user.id):
         return await callback.answer("❌ Нет прав.", show_alert=True)
-        
+
     # Находим ID заявки [PL-8.1]
     request_id = ManagementService.get_pending_request_id("event_approval", event_id)
     if not request_id:
         await callback.answer("⚠️ Заявка не найдена. Возможно, она уже была обработана.", show_alert=True)
         return await view_event(callback, state)
- 
+
     # Разрешаем через универсальный сервис [PL-8.2]
     success, msg = await ManagementService.resolve_request(callback.bot, request_id, "approved")
-    
+
     if not success:
         await callback.answer(msg, show_alert=True)
         return await view_event(callback, state)
@@ -498,7 +497,7 @@ async def reject_event_handler(callback: CallbackQuery, state: FSMContext):
     event_id = int(callback.data.split(":")[1])
     if not PermissionService.is_global_admin(callback.from_user.id):
         return await callback.answer("❌ Нет прав.", show_alert=True)
-        
+
     # Находим ID заявки [PL-8.1]
     request_id = ManagementService.get_pending_request_id("event_approval", event_id)
     if not request_id:
@@ -508,7 +507,7 @@ async def reject_event_handler(callback: CallbackQuery, state: FSMContext):
     # Разрешаем через универсальный сервис [PL-8.2]
     # Сервис САМ удалит черновик мероприятия при отклонении event_approval
     success, msg = await ManagementService.resolve_request(callback.bot, request_id, "rejected", comment="Отклонено администратором.")
-    
+
     if not success:
         await callback.answer(msg, show_alert=True)
         return await view_event(callback, state)

@@ -3,7 +3,6 @@ import logging
 from aiogram import Router, types, F, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-import keyboards as kb
 from services.ui_service import UIService
 from services.callback_guard import safe_callback
 from services.notification_service import NotificationService

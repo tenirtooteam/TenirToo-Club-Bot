@@ -8,7 +8,7 @@ from services.callback_guard import safe_callback
 from services.permission_service import PermissionService
 from services.announcement_service import AnnouncementService
 from services.ui_service import UIService
-import keyboards as kb
+from services.event_service import EventService
 
 
 router = Router()
@@ -19,11 +19,11 @@ async def cmd_quick_announcement(message: types.Message, state: FSMContext):
     """Хендлер быстрой команды анонса."""
     user_id = message.from_user.id
     topic_id = message.message_thread_id or 0
-    
+
     # 1. Проверка прав (Admin или Moderator топика)
     is_admin = PermissionService.is_global_admin(user_id)
     is_mod = PermissionService.is_moderator_of_topic(user_id, topic_id)
-    
+
     if not (is_admin or is_mod):
         # Молча игнорируем или удаляем, чтобы не мусорить
         await UIService.delete_msg(message)
@@ -31,7 +31,7 @@ async def cmd_quick_announcement(message: types.Message, state: FSMContext):
 
     # 2. Создаем анонс через сервис
     text, ann_id = await AnnouncementService.create_quick_event(message)
-    
+
     if not ann_id:
         # Ошибка парсинга
         await message.answer(text)
@@ -41,7 +41,7 @@ async def cmd_quick_announcement(message: types.Message, state: FSMContext):
     from keyboards.announcements_kb import get_announcement_kb
     is_group = (message.chat.type != "private")
     sent = await message.answer(text, reply_markup=get_announcement_kb(ann_id, is_group=is_group))
-    
+
     # 4. Сохраняем ID сообщения в БД для будущего контроля
     AnnouncementService.update_announcement_metadata(ann_id, message.chat.id, sent.message_id)
 
@@ -55,13 +55,13 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     """Универсальный обработчик клика по кнопке анонса."""
     user_id = callback.from_user.id
     ann_id = int(callback.data.split(":")[1])
-    
+
     # 1. Получаем данные анонса
     ann = AnnouncementService.get_announcement(ann_id)
     if not ann:
         await callback.answer("❌ Анонс не найден или удален.", show_alert=True)
         return
-        
+
     ann_type = ann[1]
 
     target_id = ann[2]
@@ -76,10 +76,10 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     if ann_type == "event":
         from services.management_service import ManagementService
         from services.event_service import EventService
-        
+
         # Получаем код действия (1 - иду, 0 - не иду)
         action_code = callback.data.split(":")[-1]
-        
+
         if action_code == "1":
             msg = ManagementService.add_event_participation_action(target_id, user_id)
             if "записаны" in msg:
@@ -89,15 +89,14 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
         else:
             # Старый формат (тоггл) - на всякий случай
             _, msg = ManagementService.toggle_event_participation(target_id, user_id)
-            
+
         await callback.answer(msg, show_alert=True)
-        
+
         # Обновляем ВСЕ анонсы этого мероприятия [CC-2]
         await AnnouncementService.refresh_announcements(callback.message.bot, "event", target_id)
     else:
         await callback.answer("🛠 Этот тип анонса пока в разработке.")
 
-from services.event_service import EventService
 
 @router.callback_query(F.data.startswith("event_announce_init:"))
 @safe_callback()
@@ -105,23 +104,23 @@ async def event_announce_init_handler(callback: types.CallbackQuery, state: FSMC
     """Инициализация анонсирования по кнопке из карточки."""
     user_id = callback.from_user.id
     event_id = int(callback.data.split(":")[1])
-    
+
     # 1. Проверка прав [PL-2.2.15]
     if not EventService.can_edit_event(user_id, event_id):
         return await callback.answer("❌ У вас нет прав на анонсирование этого мероприятия.", show_alert=True)
-        
+
     # 2. Для MVP: анонсируем в тот же топик, где находится пользователь
     # или предлагаем выбрать (в будущем).
     # Пока просто анонсируем в топик по умолчанию или текущий.
     target_topic_id = callback.message.message_thread_id or 0
-    
+
     if target_topic_id == 0:
         return await callback.answer("⚠️ Анонсирование доступно только внутри топиков клуба.", show_alert=True)
 
     success, msg, ann_id = await AnnouncementService.broadcast_event_announcement(
         callback.bot, event_id, target_topic_id, user_id
     )
-    
+
     await callback.answer(msg, show_alert=True)
 
 

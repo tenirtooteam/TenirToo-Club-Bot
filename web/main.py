@@ -1,10 +1,9 @@
 import os
 import logging
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from config import WEBAPP_CORS_ORIGINS
-from .auth import validate_webapp_init_data
 from .routers import announcements, dashboard
 
 app = FastAPI(title="Tenir-Too Web Bridge")

@@ -1,9 +1,6 @@
 # tests/test_journeys/test_ux_journeys.py
 import pytest
-import time
 from unittest.mock import AsyncMock, patch
-from aiogram import types
-from aiogram.fsm.context import FSMContext
 
 # We expect these imports to fail initially (TDD baseline check)
 try:
@@ -11,7 +8,6 @@ try:
 except ImportError:
     FsmButtonGuardMiddleware = None
 
-from services.notification_service import NotificationService
 from handlers.common import close_menu_handler
 from services.ui_service import UIService
 
@@ -19,7 +15,7 @@ from services.ui_service import UIService
 @pytest.mark.asyncio
 async def test_fsm_button_guard_deletes_outdated_buttons(create_callback, mock_bot):
     """
-    TDD Test: Verify that callback queries from obsolete messages are deleted 
+    TDD Test: Verify that callback queries from obsolete messages are deleted
     and block handler execution when FSM is active.
     """
     if FsmButtonGuardMiddleware is None:
@@ -102,7 +98,7 @@ async def test_default_deny_triggers_rate_limited_pm_alert(mock_bot, create_cont
     with patch("middlewares.access_check.IMMUNITY_FOR_ADMINS", False), \
          patch("services.permission_service.PermissionService.is_global_admin", return_value=True), \
          patch("services.permission_service.PermissionService.can_user_write_in_topic", return_value=False):
-        
+
         # AccessGuardMiddleware is imported and instantiated
         from middlewares.access_check import AccessGuardMiddleware
         middleware = AccessGuardMiddleware()
@@ -114,13 +110,13 @@ async def test_default_deny_triggers_rate_limited_pm_alert(mock_bot, create_cont
         # 1. First trigger
         await middleware(handler, message, {"state": state})
         handler.assert_not_called() # Denied
-        
+
         # Verify PM alert sent with Mock Assertion Parity (both args and kwargs)
         mock_bot.send_message.assert_called_once()
         args, kwargs = mock_bot.send_message.call_args
         assert kwargs.get("chat_id") == 999999999 or (len(args) > 0 and args[0] == 999999999)
         assert "Default Deny" in kwargs.get("text", "") or (len(args) > 1 and "Default Deny" in args[1])
-        
+
         # 2. Immediate second trigger (must be rate-limited)
         mock_bot.send_message.reset_mock()
         await middleware(handler, message, {"state": state})
@@ -146,7 +142,7 @@ async def test_soft_close_creates_navigation_stub_in_pm(create_callback, mock_bo
     mock_bot.edit_message_text.assert_called_once()
     args, kwargs = mock_bot.edit_message_text.call_args
     assert "Интерфейс закрыт" in kwargs.get("text", "") or (len(args) > 0 and "Интерфейс закрыт" in args[0])
-    
+
     # Inline keyboard is attached with Main Menu landing
     markup = kwargs.get("reply_markup") or (len(args) > 1 and args[1])
     assert markup is not None
@@ -175,7 +171,7 @@ async def test_admin_onboarding_faq_flow(create_callback, mock_bot):
     # Simulate confirm callback
     from handlers.admin import admin_confirm_onboarding
     callback_confirm, _ = await create_callback(chat_id=123, user_id=123, data="admin_confirm_onboarding")
-    
+
     # Mocking standard landing data rendering
     with patch("services.ui_service.UIService.show_admin_dashboard", new_callable=AsyncMock) as mock_dashboard:
         await admin_confirm_onboarding(callback_confirm, state)
@@ -194,7 +190,7 @@ async def test_default_deny_triggers_member_pm_alert(mock_bot, create_context):
     with patch("middlewares.access_check.IMMUNITY_FOR_ADMINS", True), \
          patch("services.permission_service.PermissionService.is_global_admin", return_value=False), \
          patch("services.permission_service.PermissionService.can_user_write_in_topic", return_value=False):
-        
+
         from middlewares.access_check import AccessGuardMiddleware
         middleware = AccessGuardMiddleware()
         handler = AsyncMock()
@@ -205,12 +201,12 @@ async def test_default_deny_triggers_member_pm_alert(mock_bot, create_context):
         # First trigger - must send alert
         await middleware(handler, message, {"state": state})
         handler.assert_not_called() # Denied and deleted
-        
+
         mock_bot.send_message.assert_called_once()
         args, kwargs = mock_bot.send_message.call_args
         assert kwargs.get("chat_id") == 777777777 or (len(args) > 0 and args[0] == 777777777)
         assert "Доступ ограничен" in kwargs.get("text", "") or (len(args) > 1 and "Доступ ограничен" in args[1])
-        
+
         # Second immediate trigger - must be rate-limited (no alert sent)
         mock_bot.send_message.reset_mock()
         await middleware(handler, message, {"state": state})
@@ -230,9 +226,9 @@ async def test_fsm_reset_after_group_creation(create_context, mock_bot):
 
     with patch("services.management_service.ManagementService.create_group", return_value=(True, "Группа создана")), \
          patch("services.ui_service.UIService.show_admin_dashboard", new_callable=AsyncMock) as mock_dashboard:
-        
+
         await process_group_add(message, state)
-        
+
         # FSM state must be reset to None
         curr_state = await state.get_state()
         assert curr_state is None
@@ -254,19 +250,19 @@ async def test_fsm_reset_after_search_pick(create_callback, mock_bot):
 
     with patch("services.management_service.ManagementService.grant_direct_access_by_id", return_value=(True, "Доступ выдан")), \
          patch("services.ui_service.UIService.sterile_show", new_callable=AsyncMock) as mock_show:
-        
+
         await perform_search_pick(state, callback, "user", "dir_add", 1, 1)
-        
+
         # FSM state must be reset to None
         curr_state = await state.get_state()
         assert curr_state is None
-        
+
         # FSM custom data must be cleaned while preserving last_menu_ids
         data = await state.get_data()
         assert "search_context" not in data
         assert "search_type" not in data
         assert data.get("last_menu_ids") == [100]
-        
+
         mock_show.assert_called_once()
 
 
@@ -287,14 +283,14 @@ async def test_no_auto_pick_on_single_search_result(create_context, mock_bot):
 
     with patch("services.management_service.ManagementService.search_entities", return_value=mock_results), \
          patch("services.ui_service.UIService.sterile_show", new_callable=AsyncMock) as mock_show:
-         
+
         await search_query_handler(message, state)
-        
+
         # Verify it did not auto-call perform_search_pick but called sterile_show to render picker keyboard
         mock_show.assert_called_once()
         args, kwargs = mock_show.call_args
         assert "Найдено вариантов: 1" in args[2] or "Найдено вариантов: 1" in kwargs.get("text", "")
-        
+
         # State must remain waiting_for_query since user has to click explicitly
         curr_state = await state.get_state()
         assert curr_state == SearchStates.waiting_for_query

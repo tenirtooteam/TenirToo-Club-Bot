@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 import keyboards as kb
 
-from config import ADMIN_ID, GROUP_ID
+from config import GROUP_ID
 from services.callback_guard import safe_callback
 from services.ui_service import UIService
 from services.permission_service import PermissionService
@@ -101,9 +101,9 @@ async def group_detail(callback: types.CallbackQuery, state: FSMContext):
 @safe_callback()
 async def add_group_init(callback: types.CallbackQuery, state: FSMContext):
     await UIService.sterile_ask(
-        state, 
-        callback, 
-        "✍️ Введи название для новой группы:", 
+        state,
+        callback,
+        "✍️ Введи название для новой группы:",
         AdminStates.waiting_for_group_name,
         reply_markup=kb.get_admin_cancel_kb("manage_groups")
     )
@@ -128,7 +128,7 @@ async def delete_group_init(callback: types.CallbackQuery, state: FSMContext):
     group_id = int(callback.data.split("_")[-1])
     text, back = UIService.get_confirmation_ui("group_del", group_id)
     await UIService.sterile_show(
-        state, callback, text, 
+        state, callback, text,
         reply_markup=kb.confirmation_kb("group_del", group_id, back)
     )
 
@@ -144,7 +144,7 @@ async def group_template_action_choose_topic(callback: types.CallbackQuery, stat
     parts = callback.data.split("_")
     action = parts[3] # apply или sync
     group_id = int(parts[4])
-    
+
     title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
     await UIService.sterile_show(state, callback, title, reply_markup=kb.template_action_topic_select_kb(group_id, action))
 
@@ -157,12 +157,12 @@ async def group_template_action_execute(callback: types.CallbackQuery, state: FS
     action = parts[3]
     group_id = int(parts[4])
     topic_id = int(parts[5])
-    
+
     if action == "apply":
         success, msg = ManagementService.apply_group_to_topic(group_id, topic_id)
     else:
         success, msg = ManagementService.sync_group_to_topic(group_id, topic_id)
-        
+
     await callback.answer(msg)
     await UIService.generic_navigator(state, callback, f"group_info_{group_id}")
 
@@ -206,7 +206,7 @@ async def add_topic_to_group_init(callback: types.CallbackQuery, state: FSMConte
     page = int(parts[1]) if len(parts) > 1 else 1
     group_id = int(parts[0].replace("add_topic_to_", ""))
     await UIService.sterile_show(
-        state, callback, 
+        state, callback,
         "📍 Выберите топик для добавления в группу:",
         reply_markup=kb.available_topics_kb(group_id, page=page)
     )
@@ -250,7 +250,7 @@ async def process_topic_name_save(message: types.Message, state: FSMContext):
         status = "\n✅ Синхронизировано с Telegram."
     except Exception as e:
         logger.warning(f"⚠️ Ошибка API: {e}")
-        status = f"\n⚠️ Только в БД (Ошибка API)"
+        status = "\n⚠️ Только в БД (Ошибка API)"
 
     await state.set_state(None)
     await UIService.clear_fsm_data_safely(state)
@@ -366,7 +366,7 @@ async def role_assign_choose_user(callback: types.CallbackQuery, state: FSMConte
     """Обработчик кнопки 'Назначить роль' из карточки пользователя."""
     user_id = int(callback.data.split("_")[-1])
     await UIService.sterile_show(
-        state, callback, 
+        state, callback,
         f"Выберите роль для пользователя {PermissionService.get_user_display_name(user_id)}:",
         reply_markup=kb.role_selection_kb(user_id)
     )
@@ -386,11 +386,11 @@ async def role_pick_handler(callback: types.CallbackQuery, state: FSMContext):
     user_id = int(parts[2])
     role_id = int(parts[3])
     role_name = PermissionService.get_role_name(role_id)
-    
+
     if role_name == 'moderator':
         await UIService.sterile_show(
-            state, callback, 
-            f"📍 Выбери топик для назначения модератором:",
+            state, callback,
+            "📍 Выбери топик для назначения модератором:",
             reply_markup=kb.topic_selection_for_role_kb(user_id)
         )
     else:
@@ -407,11 +407,11 @@ async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMCon
     user_id = int(parts[3])
     topic_id = int(parts[4])
     mod_role_id = PermissionService.get_role_id("moderator")
-    
+
     if mod_role_id == 0:
         await callback.answer("❌ Системная ошибка: роль модератора не найдена.")
         return
-        
+
     success, msg = ManagementService.grant_role(user_id, mod_role_id, topic_id)
     await callback.answer(msg)
 
@@ -426,7 +426,7 @@ async def role_revoke_init(callback: types.CallbackQuery, state: FSMContext):
     user_id, role_id = int(parts[2]), int(parts[3])
     topic_id_str = parts[4]
     extra = 0 if topic_id_str == "None" else int(topic_id_str)
-    
+
     text, back = UIService.get_confirmation_ui(f"role_rev_{role_id}", user_id, extra_id=extra)
     await UIService.sterile_show(
         state, callback, text,

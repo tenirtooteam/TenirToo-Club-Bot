@@ -1,6 +1,4 @@
 # Файл: database/announcements.py
-import sqlite3
-from datetime import datetime
 from database.connection import get_conn
 
 def create_announcement(a_type: str, target_id: int, topic_id: int, creator_id: int, chat_id: int = None, message_id: int = None) -> int:

@@ -10,14 +10,14 @@ async def global_errors_handler(event: ErrorEvent):
     exception = event.exception
     update = event.update
     logger.exception(f"🔥 Необработанное исключение: {exception} при обработке обновления {update}")
-    
+
     # Попробуем отправить уведомление пользователю, если есть контекст сообщения или колбэка
     message = None
     if update.message:
         message = update.message
     elif update.callback_query and update.callback_query.message:
         message = update.callback_query.message
-        
+
     if message:
         try:
             await message.answer(

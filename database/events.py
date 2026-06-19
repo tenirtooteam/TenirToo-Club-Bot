@@ -1,6 +1,6 @@
 import sqlite3
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from database.connection import get_conn
 from database.dtos import EventDTO
 
@@ -60,7 +60,7 @@ def delete_event(event_id: int) -> bool:
         with get_conn() as conn:
             with conn:
                 conn.execute("DELETE FROM events WHERE event_id = ?", (event_id,))
-        
+
         # Ручная зачистка анонсов (т.к. там нет FK из-за полиморфизма)
         delete_announcements_by_target("event", event_id)
         return True
@@ -116,13 +116,13 @@ def get_event_details(event_id: int) -> Optional[EventDTO]:
             row = cursor.fetchone()
             if not row:
                 return None
-                
+
             cursor.execute("SELECT user_id FROM event_leads WHERE event_id = ?", (event_id,))
             leads = [r[0] for r in cursor.fetchall()]
-            
+
             cursor.execute("SELECT user_id FROM event_participants WHERE event_id = ?", (event_id,))
             participants = [r[0] for r in cursor.fetchall()]
-            
+
             return EventDTO(
                 id=row[0],
                 title=row[1],

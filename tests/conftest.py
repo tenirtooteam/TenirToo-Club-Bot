@@ -1,14 +1,13 @@
 import pytest
 import os
-import asyncio
 import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from aiogram import Bot, types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.base import StorageKey
 
-from database import db, connection
+from database import connection
 import config
 
 # Мокаем ADMIN_ID для тестов, чтобы не было коллизий с реальным админом [CC-1]
@@ -29,18 +28,18 @@ def db_setup(tmp_path):
     """
     test_db = tmp_path / "test_bot.db"
     os.environ["BOT_DB_PATH"] = str(test_db)
-    
+
     # Сбрасываем кэш пути в модуле connection, если он уже импортирован
     connection.DB_PATH = str(test_db)
-    
+
     connection.init_db()
     yield test_db
-    
+
     # После теста можно удалить, но tmp_path сам очистится
     if os.path.exists(str(test_db)):
         try:
             os.remove(str(test_db))
-        except:
+        except Exception:
             pass
 
 @pytest.fixture
@@ -75,7 +74,7 @@ def create_context(mock_bot, storage):
         message._bot = mock_bot
         state = FSMContext(storage=storage, key=StorageKey(bot_id=mock_bot.id, chat_id=chat_id, user_id=user_id))
         return user, chat, message, state
-    
+
     return _factory
 
 @pytest.fixture
@@ -101,7 +100,7 @@ def create_callback(mock_bot, storage):
         callback._bot = mock_bot
         state = FSMContext(storage=storage, key=StorageKey(bot_id=mock_bot.id, chat_id=chat_id, user_id=user_id))
         return callback, state
-        
+
     return _factory
 
 class UserSessionSimulator:
@@ -112,7 +111,7 @@ class UserSessionSimulator:
         self.chat_id = chat_id
         self.key = StorageKey(bot_id=mock_bot.id, chat_id=chat_id, user_id=user_id)
         self.state = FSMContext(storage=storage, key=self.key)
-        
+
     async def send_message(self, handler, text: str, thread_id: int = None, chat_type: str = "private"):
         self.bot.reset_mock()
         user = types.User(id=self.user_id, is_bot=False, first_name="TestUser", last_name="Tester")
@@ -148,40 +147,40 @@ class UserSessionSimulator:
             data=callback_data
         )
         callback._bot = self.bot
-        
+
         from unittest.mock import patch
         with patch("aiogram.types.CallbackQuery.answer", new_callable=AsyncMock):
             await handler(callback, self.state)
-            
+
         self.assert_ux_integrity()
 
     def assert_ux_integrity(self):
         calls = self.bot.mock_calls
         # Допускаем до 5 вызовов (например, при рассылке анонсов админам)
         assert len(calls) <= 5, f"Anti-spam check failed: too many bot interactions ({len(calls)})"
-        
+
         for call in calls:
             method_name = call[0]
             # Игнорируем вызовы delete_webhook, start_polling и т.д.
             if method_name in ("delete_webhook", "start_polling"):
                 continue
-                
+
             kwargs = call[2]
             args = call[1]
-            
+
             text = kwargs.get("text")
             reply_markup = kwargs.get("reply_markup")
-            
+
             if not text and len(args) > 1:
                 if method_name in ("send_message", "edit_message_text"):
                     text = args[1]
             if not reply_markup and len(args) > 2:
                 if method_name == "send_message":
                     reply_markup = args[2]
-            
+
             if text:
                 assert self.is_valid_html(text), f"HTML markup validation failed for text: {text}"
-                
+
             if reply_markup and isinstance(reply_markup, types.InlineKeyboardMarkup):
                 assert self.has_navigation_footer(reply_markup), f"Navigation footer check failed for keyboard: {reply_markup}"
 

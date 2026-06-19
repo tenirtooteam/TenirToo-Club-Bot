@@ -1,12 +1,11 @@
 # Файл: web/routers/announcements.py
-import json
 import logging
-from fastapi import APIRouter, Header, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from services.event_service import EventService
 from services.management_service import ManagementService
 from services.permission_service import PermissionService
 from database import db
-from ..auth import validate_webapp_init_data, get_current_user_id
+from ..auth import get_current_user_id
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -17,9 +16,9 @@ async def get_announcement_details(ann_id: int, user_id: int = Depends(get_curre
     ann = db.get_announcement(ann_id)
     if not ann:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    
+
     ann_type, target_id, topic_id = ann[1], ann[2], ann[3]
-    
+
     # Проверка прав доступа к топику [CP-2.10]
     if not PermissionService.can_user_write_in_topic(user_id, topic_id):
          raise HTTPException(status_code=403, detail="No access to this topic")
@@ -30,9 +29,9 @@ async def get_announcement_details(ann_id: int, user_id: int = Depends(get_curre
     event = EventService.get_event_details(target_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    
+
     is_participant = EventService.is_event_participant(target_id, user_id)
-    
+
     return {
         "id": ann_id,
         "event_id": target_id,
@@ -50,9 +49,9 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
     ann = db.get_announcement(ann_id)
     if not ann:
         raise HTTPException(status_code=404, detail="Announcement not found")
-    
+
     ann_type, target_id, topic_id = ann[1], ann[2], ann[3]
-    
+
     if not PermissionService.can_user_write_in_topic(user_id, topic_id):
          raise HTTPException(status_code=403, detail="Access denied")
 
@@ -60,7 +59,7 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
          raise HTTPException(status_code=400, detail="Only event participation is supported")
 
     success, message = ManagementService.toggle_event_participation(target_id, user_id)
-    
+
     # Реактивность: обновляем сообщение в Telegram, если есть привязка [PL-5.1.18]
     if success:
         chat_id, message_id = ann[5], ann[6] # Из БД анонсов
@@ -68,7 +67,7 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
             from loader import bot
             from services.announcement_service import AnnouncementService
             from keyboards.announcements_kb import get_announcement_kb
-            
+
             try:
                 new_text = AnnouncementService.format_announcement_text(ann_id)
                 await bot.edit_message_text(
@@ -84,5 +83,5 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
     if success and "записаны" in message:
         from loader import bot
         await EventService.notify_organizers_of_direct_join(bot, target_id, user_id)
-    
+
     return {"success": success, "message": message}

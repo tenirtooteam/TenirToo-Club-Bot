@@ -14,7 +14,7 @@ async def get_dashboard_init(user_id: int = Depends(get_current_user_id)):
     """Возвращает начальные данные для дашборда (имя, роль, базовые статы)."""
     user_name = db.get_user_name(user_id) or "Путешественник"
     is_admin = PermissionService.is_global_admin(user_id)
-    
+
     # Можно расширить статистикой позже
     return {
         "user_id": user_id,
@@ -37,7 +37,7 @@ async def get_user_profile(user_id: int = Depends(get_current_user_id)):
     """Возвращает полные данные профиля пользователя."""
     user_name = db.get_user_name(user_id)
     roles = db.get_user_roles(user_id)
-    
+
     return {
         "user_id": user_id,
         "name": user_name,
@@ -68,7 +68,7 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
     details = db.get_event_details(event_id)
     if not details:
         raise HTTPException(status_code=404, detail="Event not found")
-        
+
     return {
         "id": event_id,
         "title": details["title"],
@@ -83,18 +83,18 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
 async def toggle_event_participation_direct(event_id: int, user_id: int = Depends(get_current_user_id)):
     """Переключает участие в мероприятии напрямую из списка (без анонса)."""
     success, message = ManagementService.toggle_event_participation(event_id, user_id)
-    
+
     if success and "записаны" in message:
         from loader import bot
         from services.event_service import EventService
         from services.announcement_service import AnnouncementService
-        
+
         # Уведомляем организаторов
         await EventService.notify_organizers_of_direct_join(bot, event_id, user_id)
-        
+
         # Обновляем анонс в группе [CC-2]
         await AnnouncementService.refresh_announcements(bot, "event", event_id)
-        
+
     return {"success": success, "message": message}
 
 # --- Admin Section (Mirroring Bot Start Menu) ---
@@ -104,7 +104,7 @@ async def get_all_topics_admin(user_id: int = Depends(get_current_user_id)):
     """Возвращает список ВСЕХ топиков для админа."""
     if not PermissionService.is_global_admin(user_id):
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     topic_ids = db.get_all_unique_topics()
     names_map = db.get_topic_names_by_ids(topic_ids)
     return [{"id": tid, "name": names_map.get(tid, f"ID: {tid}")} for tid in topic_ids]
@@ -114,7 +114,7 @@ async def get_all_groups_admin(user_id: int = Depends(get_current_user_id)):
     """Возвращает список всех шаблонов доступа (групп)."""
     if not PermissionService.is_global_admin(user_id):
         raise HTTPException(status_code=403, detail="Access denied")
-    
+
     groups = db.get_all_groups()
     return [{"id": g[0], "name": g[1]} for g in groups]
 

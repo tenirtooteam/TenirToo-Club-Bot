@@ -1,0 +1,31 @@
+# Configuration for Ruff Linter
+line-length = 120
+target-version = "py311"
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".pytest_cache",
+    "venv",
+    "__pycache__",
+    "obsolete_tests"
+]
+
+[lint]
+# Enable rules:
+# F - Pyflakes (typos, unused code, undefined variables)
+# E, W - pycodestyle (style guidelines)
+# ASYNC - flake8-async (missing awaits, async patterns)
+select = ["F", "E", "W", "ASYNC"]
+
+# Ignore minor styling checks that might pollute output unnecessarily
+ignore = [
+    "E501", # Line too long
+    "E701", # Multiple statements on one line (colon)
+]
+
+[lint.per-file-ignores]
+# Allow unused imports and star imports in init files for modular exports
+"**/__init__.py" = ["F401", "F403"]
+# Allow unused imports in the database facade layer for re-exports
+"database/db.py" = ["F401"]

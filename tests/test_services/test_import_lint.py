@@ -9,9 +9,8 @@ def test_import_linter():
     Verify that presentation layers (handlers, middlewares) do not directly import
     database facade or modules, using import-linter.
     """
-    try:
-        import importlinter
-    except ImportError:
+    import importlib.util
+    if importlib.util.find_spec("importlinter") is None:
         pytest.skip("import-linter is not installed (skipping dev-only check)")
 
     # Resolve cross-platform path to the lint-imports executable
@@ -30,6 +29,6 @@ def test_import_linter():
         capture_output=True,
         text=True
     )
-    
+
     # Assert that no contract violations were detected
     assert result.returncode == 0, f"Import linter contract violations:\n{result.stdout}"
