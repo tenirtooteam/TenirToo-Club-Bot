@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app
+      # Exclude the host Windows virtual environment from overriding the container's path
+      - /app/venv
+    ports:
+      - "8000:8000"
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+      - GROUP_ID=${GROUP_ID}
+    command: pytest
