@@ -233,6 +233,9 @@
 - [CP-3.58] **FEATURE ALIGNMENT RULE**: For any global or architectural features (excluding minor technical fixes), the AI MUST explicitly present and align the implementation options, system impact, and design alternatives with the user (Шэф) before creating the final RNA-Blueprint or writing code.
      > Rationale: Prevents architectural drift and ensures that UX logic matches user expectations and mental models prior to implementation planning.
 
+- [CP-3.59] **LINTER CONFIGURATION SYNC**: Whenever a new module, feature, layer, or directory is introduced, you MUST audit and update `.ruff.toml` and `.importlinter` to configure proper verification rules for it, preventing architectural erosion.
+     > Rationale: Automated rules are only as good as their configuration coverage. Ensuring config parity with directory expansion blocks developer mistakes before they are committed.
+
 ---
 
 

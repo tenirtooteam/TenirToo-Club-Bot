@@ -1,5 +1,5 @@
 import logging
-from aiogram import Router
+from aiogram import Router, types
 from aiogram.types import ErrorEvent
 
 logger = logging.getLogger(__name__)
@@ -27,3 +27,9 @@ async def global_errors_handler(event: ErrorEvent):
         except Exception as e:
             logger.warning(f"Не удалось отправить сообщение об ошибке пользователю: {e}")
     return True
+
+
+@router.callback_query()
+async def default_callback_handler(callback: types.CallbackQuery):
+    """Fallback handler for unhandled callback queries."""
+    await callback.answer("❌ Действие недоступно или не поддерживается.", show_alert=True)

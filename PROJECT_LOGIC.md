@@ -359,6 +359,7 @@ All keys stored in FSM state across the application:
 - [PL-6.22] **No N+1 Queries in UI**: Any keyboard builder iterating over a list (users, groups, topics) MUST use batch-fetching methods from `database.db` (e.g., `get_topic_names_by_ids`) and set-based lookups. Direct DB calls inside loops are strictly prohibited to maintain performance. [PL-HI]
 - [PL-6.23] **Verify Before Change (Rule 21)**: BEFORE making any code changes, it is mandatory to view the target file and all related signatures (methods, keyboards, DB tables). Writing calls without confirming their existence in the current code context is strictly prohibited.
 - [PL-6.24] **Imports boundary verification**: Direct imports of database facade or modules inside `handlers/` are strictly prohibited and checked by static AST linting test.
+- [PL-6.25] **Linter Synced Configuration**: Developers and agents must verify and update `.ruff.toml` and `.importlinter` rules whenever new packages or folders are added to enforce layers boundaries immediately.
 
 ---
 

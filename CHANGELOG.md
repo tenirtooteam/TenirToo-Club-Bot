@@ -2,6 +2,15 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.3] - 2026-06-19
+
+### Added
+- **Ruff Banned API Verification**: Integrated flake8-tidy-imports (`TID251`) rule in Ruff configuration (`.ruff.toml`) to enforce handler layer separation by banning `aiogram.Router` imports in service/database layers and `aiogram.types` in `main.py`.
+- **Architectural Rules**: Established rule `[CP-3.59]` / `[PL-6.25]` to require automatic linter configuration synchronization (`.ruff.toml`, `.importlinter`) when new features/layers are added in the future.
+
+### Changed
+- **Relocated Fallback Handler**: Decoupled catch-all `default_callback_handler` out of `main.py` into [handlers/errors.py](file:///c:/TenirTooClub_Bot/handlers/errors.py) to preserve bot entry point sterility.
+
 ## [1.1.2] - 2026-06-19
 
 ### Added

@@ -16,7 +16,8 @@ exclude = [
 # F - Pyflakes (typos, unused code, undefined variables)
 # E, W - pycodestyle (style guidelines)
 # ASYNC - flake8-async (missing awaits, async patterns)
-select = ["F", "E", "W", "ASYNC"]
+# TID251 - flake8-tidy-imports (banned-api rule only)
+select = ["F", "E", "W", "ASYNC", "TID251"]
 
 # Ignore minor styling checks that might pollute output unnecessarily
 ignore = [
@@ -29,3 +30,14 @@ ignore = [
 "**/__init__.py" = ["F401", "F403"]
 # Allow unused imports in the database facade layer for re-exports
 "database/db.py" = ["F401"]
+# Allow banned imports in presentation, test, middleware, keyboard, service, and web layers
+"handlers/**/*.py" = ["TID251"]
+"tests/**/*.py" = ["TID251"]
+"middlewares/**/*.py" = ["TID251"]
+"keyboards/**/*.py" = ["TID251"]
+"services/**/*.py" = ["TID251"]
+"web/**/*.py" = ["TID251"]
+
+[lint.flake8-tidy-imports.banned-api]
+"aiogram.Router".msg = "aiogram.Router is banned outside the presentation layer. Routers must be declared inside handlers/ directory."
+"aiogram.types".msg = "aiogram.types is banned in main.py and database to prevent UI/handler logic leakage."
