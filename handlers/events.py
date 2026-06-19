@@ -34,7 +34,7 @@ async def show_events_list(event_or_msg: CallbackQuery | Message, state: FSMCont
     events = EventService.get_active_events()
     is_admin = PermissionService.is_global_admin(user_id)
 
-    text = custom_text or "🏔 <b>Мероприятия Клуба</b>\nЗдесь вы можете записаться на походы и тренировки."
+    text = custom_text or "🏔 <b>Походы Клуба</b>\nЗдесь вы можете записаться на походы и тренировки."
     # [PL-5.1.13] Используем kb фасад
     reply_markup = kb.get_events_list_kb(events, is_admin)
 
@@ -57,7 +57,7 @@ async def show_pending_events(callback: CallbackQuery, state: FSMContext):
     await UIService.sterile_show(
         state,
         callback,
-        "⏳ <b>Мероприятия на модерации</b>\nВыберите мероприятие для проверки:",
+        "⏳ <b>Походы на модерации</b>\nВыберите поход для проверки:",
         reply_markup=reply_markup
     )
 

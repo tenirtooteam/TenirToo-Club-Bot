@@ -4,9 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 from database import db
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
 from middlewares.fsm_button_guard import FsmButtonGuardMiddleware
-from services.management_service import ManagementService
-from services.permission_service import PermissionService
-import config
 
 @pytest.mark.asyncio
 async def test_user_manager_middleware_registration(db_setup, mock_bot, create_context):
@@ -16,13 +13,13 @@ async def test_user_manager_middleware_registration(db_setup, mock_bot, create_c
     assert not db.user_exists(user_id)
 
     middleware = UserManagerMiddleware()
-    
+
     async def dummy_handler(event, data):
         return "passed"
 
     result = await middleware(dummy_handler, message, {"state": state})
     assert result == "passed"
-    
+
     # Verify user registered in DB
     assert db.user_exists(user_id)
 
@@ -43,7 +40,7 @@ async def test_forum_utility_topic_rename_sync(db_setup, mock_bot):
     message.delete = AsyncMock()
 
     middleware = ForumUtilityMiddleware()
-    
+
     async def dummy_handler(event, data):
         return "passed"
 
@@ -72,7 +69,7 @@ async def test_forum_utility_topic_deleted_cascade(db_setup, mock_bot):
     message.forum_topic_created = None
 
     middleware = ForumUtilityMiddleware()
-    
+
     async def dummy_handler(event, data):
         return "passed"
 
@@ -81,7 +78,7 @@ async def test_forum_utility_topic_deleted_cascade(db_setup, mock_bot):
 
     # Verify topic deleted from DB
     assert topic_id not in db.get_all_unique_topics()
-    
+
     # Verify moderator role Cascade Purged
     roles = db.get_user_roles(user_id)
     assert len(roles) == 0
@@ -107,7 +104,7 @@ async def test_access_guard_middleware(db_setup, mock_bot):
     message.delete = AsyncMock()
 
     middleware = AccessGuardMiddleware()
-    
+
     async def dummy_handler(event, data):
         return "passed"
 
@@ -120,11 +117,11 @@ async def test_access_guard_middleware(db_setup, mock_bot):
 @pytest.mark.asyncio
 async def test_fsm_button_guard_middleware(db_setup, mock_bot, storage):
     user_id = 999
-    
+
     from aiogram.fsm.context import FSMContext
     from aiogram.fsm.storage.base import StorageKey
     state = FSMContext(storage=storage, key=StorageKey(bot_id=mock_bot.id, chat_id=user_id, user_id=user_id))
-    
+
     # Set FSM state
     await state.set_state("SomeState:waiting")
     await state.update_data(last_menu_id=1234)
@@ -141,7 +138,7 @@ async def test_fsm_button_guard_middleware(db_setup, mock_bot, storage):
     mock_bot.delete_message = AsyncMock()
 
     middleware = FsmButtonGuardMiddleware()
-    
+
     async def dummy_handler(event, data):
         return "passed"
 

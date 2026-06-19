@@ -191,7 +191,7 @@ async def moderator_toggle_direct_access(callback: types.CallbackQuery, state: F
         success, msg = ManagementService.grant_direct_access(str(target_user_id), topic_id)
         await callback.answer(msg)
 
-    await UIService.generic_navigator(state, callback, f"mod_users_manage_{topic_id}")
+    await UIService.generic_navigator(state, callback, f"mod_topic_select_{topic_id}")
 
 
 @router.callback_query(F.data.startswith("mod_add_user_list_"))

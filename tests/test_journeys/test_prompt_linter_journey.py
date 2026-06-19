@@ -2,7 +2,6 @@ import subprocess
 import os
 import sys
 import tempfile
-import pytest
 
 def run_linter(temp_dir, stage):
     script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "local_scripts", "prompt_linter.py"))
@@ -18,7 +17,7 @@ def test_journey_plan_linter():
         plan_path = os.path.join(tmpdir, "implementation_plan.md")
         with open(plan_path, "w", encoding="utf-8") as f:
             f.write("# Short Goal\nNo headers.")
-        
+
         res = run_linter(tmpdir, "plan")
         assert res.returncode == 1
         assert "Error:" in res.stdout

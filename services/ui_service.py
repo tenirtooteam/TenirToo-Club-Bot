@@ -54,11 +54,11 @@ class UIService:
     async def clear_fsm_data_safely(state: FSMContext):
         """
         Очищает все FSM данные, кроме служебных ключей Стерильного интерфейса
-        (last_menu_ids и last_menu_id).
+        (last_menu_ids, last_menu_id и admin_onboarded).
         """
         data = await state.get_data()
         clean_data = {}
-        for key in ["last_menu_ids", "last_menu_id"]:
+        for key in ["last_menu_ids", "last_menu_id", "admin_onboarded"]:
             if key in data:
                 clean_data[key] = data[key]
         await state.set_data(clean_data)
@@ -272,8 +272,8 @@ class UIService:
             "list_users_roles": ("📋 <b>Ответственные лица</b>\nСписок всех пользователей с особыми правами:", kb.users_list_kb),
             "moderator": ("🛠 <b>Инструменты хранителя</b>\nВыбери топик для управления:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
             "templates_faq": (None, None), # Redirects to help_service logic
-            "event_list": ("📅 <b>Наши приключения</b>\nАктуальные выезды и мероприятия:", lambda: kb.get_events_list_kb(db.get_active_events())),
-            "event_pending_list": ("⏳ <b>Новые заявки</b>\nМероприятия, ожидающие одобрения:", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
+            "event_list": ("📅 <b>Наши приключения</b>\nАктуальные выезды и походы:", lambda: kb.get_events_list_kb(db.get_active_events())),
+            "event_pending_list": ("⏳ <b>Новые заявки</b>\nПоходы, ожидающие одобрения:", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
             "landing": (None, None), # Специальный вызов через get_landing_data
         }
 
@@ -408,7 +408,8 @@ class UIService:
                 "Нажмите кнопку ниже, чтобы подтвердить ознакомление и войти."
             )
             markup = types.InlineKeyboardMarkup(inline_keyboard=[
-                [types.InlineKeyboardButton(text="🏔 Начать работу", callback_data="admin_confirm_onboarding")]
+                [types.InlineKeyboardButton(text="🏔 Начать работу", callback_data="admin_confirm_onboarding")],
+                [types.InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")]
             ])
             return await UIService.sterile_show(state, event, text_onboarding, reply_markup=markup)
 

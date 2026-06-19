@@ -15,7 +15,7 @@ def main_admin_kb():
 
     builder.button(text="[ 📂 ШАБЛОНЫ ДОСТУПА ]", callback_data="manage_groups")
     builder.button(text="[ 📍 ВСЕ ТОПИКИ ]", callback_data="all_topics_list")
-    builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
+    builder.button(text="[ 🏔 ПОХОДЫ ]", callback_data="event_list")
     builder.button(text="[ 👥 ПОЛЬЗОВАТЕЛИ ]", callback_data="manage_users")
     builder.button(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard")
     builder.button(text="[ 📊 ЭКСПОРТ В GOOGLE ]", callback_data="sheets_export_all")
@@ -300,6 +300,7 @@ def search_results_kb(results, search_type, search_action, search_context=None, 
 
     static_buttons = [
         InlineKeyboardButton(text="🔎 Искать заново", callback_data=f"search_start_{search_type}_{search_action}_{search_context if search_context else ''}"),
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=str(search_context) if search_context else "landing"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
     return build_paginated_menu(item_buttons, static_buttons, page, limit, "search")

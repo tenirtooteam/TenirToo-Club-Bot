@@ -13,7 +13,7 @@ def user_main_kb():
         builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
 
     builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data="user_topics")
-    builder.button(text="[ 🏔 МЕРОПРИЯТИЯ ]", callback_data="event_list")
+    builder.button(text="[ 🏔 ПОХОДЫ ]", callback_data="event_list")
     builder.button(text="[ 👤 МОЙ ПРОФИЛЬ ]", callback_data="user_profile_view")
     builder.adjust(1)
     add_nav_footer(builder, help_key="main_menu", help_back_data="landing")

@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-from unittest.mock import AsyncMock
 from database import db
 from handlers.user import cmd_start
 import config
@@ -16,7 +15,7 @@ async def test_start_routing_unregistered(db_setup, mock_bot, user_session):
 
     calls = mock_bot.mock_calls
     assert len(calls) > 0
-    
+
     sent_text = ""
     for call in calls:
         if call[0] == "":  # direct bot() call
@@ -24,7 +23,7 @@ async def test_start_routing_unregistered(db_setup, mock_bot, user_session):
             if isinstance(method_obj, (SendMessage, EditMessageText)):
                 sent_text = method_obj.text
                 break
-    
+
     # "\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c" == "Добро пожаловать"
     assert "\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c" in sent_text
 
@@ -80,10 +79,10 @@ async def test_start_routing_moderator(db_setup, mock_bot, user_session):
 async def test_start_routing_override_admin(db_setup, mock_bot, user_session):
     admin_id = config.ADMIN_ID
     db.add_user(admin_id, "Admin", "User")
-    
+
     from services.ui_service import UIService
     text, kb_func = await UIService.get_landing_data(admin_id, role_override="admin")
-    
+
     # "\u041f\u0430\u043d\u0435\u043b\u044c \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f" == "Панель управления"
     assert "\u041f\u0430\u043d\u0435\u043b\u044c \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f" in text
     assert kb_func is not None

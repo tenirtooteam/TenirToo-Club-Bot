@@ -82,14 +82,14 @@ async def test_admin_template_sync_journey(db_setup, mock_bot, user_session):
     # 1. Create template group
     success, text = ManagementService.create_group("Dev Team")
     assert success
-    
+
     # Retrieve dynamic group ID
     groups = db.get_all_groups()
     group_id = groups[0][0] # first group id
-    
+
     # Add user to template group
     db.add_to_group_template(group_id, user_id)
-    
+
     # Link topic to group template
     db.add_topic_to_group(group_id, topic_id)
 

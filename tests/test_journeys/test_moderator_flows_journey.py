@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import pytest
-from unittest.mock import AsyncMock, patch
 from database import db
 from handlers.moderator import (
     moderator_rename_topic_start,
@@ -46,7 +45,7 @@ async def test_moderator_topic_rename_journey(db_setup, mock_bot, user_session):
     # 4. Scoped access check: another user with no rights tries to rename topic 20
     normal_id = 778899
     db.add_user(normal_id, "Normal", "User")
-    session_normal = user_session(user_id=normal_id, chat_id=normal_id)
+    _session_normal = user_session(user_id=normal_id, chat_id=normal_id)
 
     # The handler checks can_manage_topic. If it returns False, it answers callback with alert.
     # Because of IsTopicManager filter, the handler won't even be called since normal user manages 0 topics.
@@ -111,7 +110,7 @@ async def test_moderator_direct_access_and_mod_assign_journey(db_setup, mock_bot
     db.update_topic_name(topic_id, "Peak Lenin")
     db.grant_role(mod_id, db.get_role_id("moderator"), topic_id=topic_id)
 
-    # Grant direct access to mod first, so the topic is recognized as "restricted" 
+    # Grant direct access to mod first, so the topic is recognized as "restricted"
     # instead of fallback "public" (which considers all users as group-authorized)
     db.grant_direct_access(mod_id, topic_id)
 
@@ -147,7 +146,7 @@ async def test_moderator_direct_access_and_mod_assign_journey(db_setup, mock_bot
     # Assert search FSM is active
     state = await session.state.get_state()
     assert state == "SearchStates:waiting_for_query"
-    
+
     # Assert search config carries topic context
     data = await session.state.get_data()
     assert data.get("search_type") == "user"
