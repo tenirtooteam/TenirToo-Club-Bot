@@ -1,0 +1,16 @@
+[importlinter]
+root_packages =
+    handlers
+    middlewares
+    services
+    database
+
+[importlinter:contract:sterile-presentation]
+name = Sterile Presentation Layer (Handlers and Middlewares cannot import database)
+type = forbidden
+source_modules =
+    handlers
+    middlewares
+forbidden_modules =
+    database
+allow_indirect_imports = True

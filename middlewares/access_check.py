@@ -3,7 +3,6 @@ import logging
 from typing import Callable, Dict, Any, Awaitable
 from aiogram import BaseMiddleware
 from aiogram.types import Message
-from database import db
 from services.management_service import ManagementService
 from services.permission_service import PermissionService
 from services.notification_service import NotificationService
@@ -33,7 +32,7 @@ class ForumUtilityMiddleware(BaseMiddleware):
             new_name = event.forum_topic_edited.name
             topic_id = event.message_thread_id
             if new_name:
-                db.update_topic_name(topic_id, new_name)
+                ManagementService.update_topic_name(topic_id, new_name)
                 logger.info(f"🔄 Топик {topic_id} синхронизирован из Telegram: {new_name}")
             try:
                 await event.delete()
@@ -57,7 +56,7 @@ class ForumUtilityMiddleware(BaseMiddleware):
 
         # Авто-регистрация топика в БД
         topic_id = event.message_thread_id if event.message_thread_id else -1
-        db.register_topic_if_not_exists(topic_id)
+        ManagementService.register_topic_if_not_exists(topic_id)
 
         return await handler(event, data)
 
@@ -75,7 +74,7 @@ class AccessGuardMiddleware(BaseMiddleware):
 
         topic_id = event.message_thread_id if event.message_thread_id else -1
         user_fullname = f"{event.from_user.first_name} {event.from_user.last_name or ''}".strip()
-        topic_name = db.get_topic_name(topic_id)
+        topic_name = ManagementService.get_entity_name("topic", topic_id)
         log_base = f"{user_fullname} (ID: {user_id}) -> {topic_name} (ID: {topic_id})"
 
         if not PermissionService.can_user_write_in_topic(user_id, topic_id):

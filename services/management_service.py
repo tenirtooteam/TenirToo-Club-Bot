@@ -209,6 +209,12 @@ class ManagementService:
         return True, "✅ Название топика обновлено."
 
     @staticmethod
+    def register_topic_if_not_exists(topic_id: int):
+        """Регистрирует топик в БД, если его там нет."""
+        db.register_topic_if_not_exists(topic_id)
+
+
+    @staticmethod
     def handle_external_topic_deletion(topic_id: int):
         """
         [CC-1, CC-2] Реагирует на внешнее удаление топика в Telegram.
