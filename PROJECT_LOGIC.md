@@ -416,4 +416,10 @@ All keys stored in FSM state across the application:
     - Use `with patch("aiogram.types.CallbackQuery.answer", new_callable=AsyncMock)` to intercept calls.
     - Ensure `bot` is attached via `._bot = mock_bot` to satisfy the internal `.bot` property of messages/callbacks.
 
+### [PL-8.6] Dev Sandbox Environment (Docker)
+1. [PL-8.6.1] **Dev-Only Isolation**: A lightweight Docker sandbox environment is configured via `Dockerfile` and `docker-compose.yml` for isolated dev-only executions.
+2. [PL-8.6.2] **Zero Production Footprint**: The sandbox installs dev dependencies (`requirements-dev.txt`) and mounts the workspace folder, excluding the host Windows `.venv` and database files to prevent locks.
+3. [PL-8.6.3] **No Production Dependency**: The runtime production build does not use Docker and remains dependency-clean.
+
+
 

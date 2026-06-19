@@ -192,6 +192,14 @@
 4. Установите зависимости: `.\venv\Scripts\pip install -r requirements.txt`.
 5. Запустите бота через `run_bot.bat` или: `.\venv\Scripts\python main.py`.
 
+### Запуск в Docker-песочнице (Dev-only)
+Для безопасного изолированного запуска тестов и линтеров разработчиками (или ИИ-агентом) настроена Docker-песочница:
+1. Установите и запустите Docker Desktop на вашей машине.
+2. Соберите образ: `docker compose build`
+3. Запустите тесты: `docker compose run --rm app pytest`
+4. Проверьте качество кода: `docker compose run --rm app ruff check .`
+5. Проверьте границы импортов: `docker compose run --rm app lint-imports`
+
 ---
 
 ## Разработчик
