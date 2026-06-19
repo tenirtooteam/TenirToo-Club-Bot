@@ -117,7 +117,9 @@ async def process_group_add(message: types.Message, state: FSMContext):
         return
 
     await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
     await UIService.show_admin_dashboard(state, message, text=text)
+
 
 
 @router.callback_query(F.data.startswith("del_group_"))

@@ -10,13 +10,17 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 
 ### Changed
 - **Admin Default Deny Navigation**: Enhanced the default deny PM alert keyboard by replacing the generic close button with a direct link to the topic access settings interface (`all_topics_list`).
+- **Explicit Search Confirmations**: Removed implicit search auto-picking upon single matches in `handlers/common.py` to enforce explicit confirmations and prevent accidental permissions assignment.
 
 ### Fixed
-- **FSM State Hygiene**:
+- **FSM State & Data Hygiene**:
   - Added FSM state reset (`await state.set_state(None)`) in `handlers/admin.py:process_group_add` immediately after group template creation.
   - Added FSM state reset in `handlers/common.py:perform_search_pick` after role or access assignment to prevent search state hangs.
+  - Implemented `UIService.clear_fsm_data_safely` which strips user-defined context keys while retaining Sterile UI menu tracking stack.
+- **Search Picker Callback Parsing**: Fixed `search_pick_handler` parsing algorithm in `handlers/common.py` to correctly extract action names containing underscores (e.g., `dir_add` or `mod_add`).
 - **Navigator Route Fix**: Fixed a navigation routing leak in `handlers/common.py:perform_search_pick` where moderators were incorrectly routed using admin-only dashboard buttons.
 - **Pydantic Validation Error in Journey Tests**: Fixed mutating frozen Pydantic instances in journey tests by defining the test message content within the context initialization block.
+
 
 ## [1.1.1] - 2026-06-18
 

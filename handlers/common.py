@@ -180,9 +180,7 @@ async def search_query_handler(message: types.Message, state: FSMContext):
         await UIService.show_temp_message(state, message, "❓ По вашему запросу ничего не найдено.", reply_markup=kb.back_to_main_kb())
         return
 
-    if len(results) == 1:
-        await perform_search_pick(state, message, s_type, s_action, s_context, results[0][0])
-        return
+
 
     markup = kb.search_results_kb(results, s_type, s_action, s_context, page=1)
     await UIService.sterile_show(
@@ -223,12 +221,14 @@ async def search_pick_handler(callback: types.CallbackQuery, state: FSMContext):
     """Обработка выбора из результатов поиска."""
     parts = callback.data.split("_")
     s_type = parts[2]
-    s_action = parts[3]
-    item_id = int(parts[4])
+    item_id = int(parts[-1])
+    s_action = "_".join(parts[3:-1])
+    
     data = await state.get_data()
     s_context = data.get("search_context")
     
     await perform_search_pick(state, callback, s_type, s_action, s_context, item_id)
+
 
 
 async def perform_search_pick(state, event, s_type, s_action, s_context, item_id):
@@ -254,20 +254,25 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
     if s_action == "mod_add":
         success, result = ManagementService.assign_moderator_role_by_id(item_id, int(s_context))
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
         
     if s_action == "dir_add":
         success, result = ManagementService.grant_direct_access_by_id(item_id, int(s_context))
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
 
     if s_action == "admin_role_target":
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         return await UIService.generic_navigator(state, event, f"user_roles_manage_{item_id}")
 
     if s_action == "mod_select":
         await state.set_state(None)
+        await UIService.clear_fsm_data_safely(state)
         return await UIService.generic_navigator(state, event, f"mod_topic_select_{item_id}")
+
 
 
 @router.callback_query(F.data.startswith("confirm_exe_"))

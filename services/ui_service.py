@@ -51,6 +51,20 @@ class UIService:
             await state.set_state(None)
 
     @staticmethod
+    async def clear_fsm_data_safely(state: FSMContext):
+        """
+        Очищает все FSM данные, кроме служебных ключей Стерильного интерфейса
+        (last_menu_ids и last_menu_id).
+        """
+        data = await state.get_data()
+        clean_data = {}
+        for key in ["last_menu_ids", "last_menu_id"]:
+            if key in data:
+                clean_data[key] = data[key]
+        await state.set_data(clean_data)
+
+
+    @staticmethod
     async def sterile_redirect(
         message: types.Message,
         state: FSMContext,

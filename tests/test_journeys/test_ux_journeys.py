@@ -243,14 +243,14 @@ async def test_fsm_reset_after_group_creation(create_context, mock_bot):
 @pytest.mark.asyncio
 async def test_fsm_reset_after_search_pick(create_callback, mock_bot):
     """
-    TDD Test: Selection in search pick handler resets FSM state and routes appropriately.
+    TDD Test: Selection in search pick handler resets FSM state, cleans up FSM data, and routes.
     """
     from handlers.common import perform_search_pick
     from handlers.common import SearchStates
 
     callback, state = await create_callback(chat_id=123, user_id=123, data="search_pick_user_dir_add_1")
     await state.set_state(SearchStates.waiting_for_query)
-    await state.update_data(search_context=1) # topic_id = 1
+    await state.update_data(search_context=1, search_type="user", last_menu_ids=[100])
 
     with patch("services.management_service.ManagementService.grant_direct_access_by_id", return_value=(True, "Доступ выдан")), \
          patch("services.ui_service.UIService.sterile_show", new_callable=AsyncMock) as mock_show:
@@ -260,4 +260,42 @@ async def test_fsm_reset_after_search_pick(create_callback, mock_bot):
         # FSM state must be reset to None
         curr_state = await state.get_state()
         assert curr_state is None
+        
+        # FSM custom data must be cleaned while preserving last_menu_ids
+        data = await state.get_data()
+        assert "search_context" not in data
+        assert "search_type" not in data
+        assert data.get("last_menu_ids") == [100]
+        
         mock_show.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_no_auto_pick_on_single_search_result(create_context, mock_bot):
+    """
+    TDD Test: A single search result does not auto-pick/auto-assign but renders search results markup.
+    """
+    from handlers.common import search_query_handler
+    from handlers.common import SearchStates
+
+    _, _, message, state = await create_context(user_id=123, chat_id=123, chat_type="private", text="Петрова")
+    await state.set_state(SearchStates.waiting_for_query)
+    await state.update_data(search_type="user", search_action="dir_add", search_context=1)
+
+    # Mock search results returning 1 user
+    mock_results = [(33333, "Мария Петрова")]
+
+    with patch("services.management_service.ManagementService.search_entities", return_value=mock_results), \
+         patch("services.ui_service.UIService.sterile_show", new_callable=AsyncMock) as mock_show:
+         
+        await search_query_handler(message, state)
+        
+        # Verify it did not auto-call perform_search_pick but called sterile_show to render picker keyboard
+        mock_show.assert_called_once()
+        args, kwargs = mock_show.call_args
+        assert "Найдено вариантов: 1" in args[2] or "Найдено вариантов: 1" in kwargs.get("text", "")
+        
+        # State must remain waiting_for_query since user has to click explicitly
+        curr_state = await state.get_state()
+        assert curr_state == SearchStates.waiting_for_query
+
