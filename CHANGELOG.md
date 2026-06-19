@@ -2,6 +2,14 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.5] - 2026-06-19
+
+### Added
+- **Comprehensive E2E Journey Tests**: Introduced 6 new journey test files in `tests/test_journeys/` to close all 10 priority gaps: `/start` role-based routing, event lifecycle rejections/deletions/leaves, admin entity CRUD and template sync, moderator scoped flows, full middleware pipeline execution (UserManager, ForumUtility, AccessGuard, FsmButtonGuard), TMA FastAPI endpoints with bot reactivity, and UX Escape Hatch/fallback handlers.
+
+### Fixed
+- **WebApp Button AttributeError**: Fixed a bug in `build_paginated_menu` within `keyboards/pagination_util.py` where buttons using `web_app` (which have `callback_data=None`) caused an AttributeError due to missing guard checks before `callback_data.startswith("help:")` calls.
+
 ## [1.1.4] - 2026-06-19
 
 ### Added

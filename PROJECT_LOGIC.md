@@ -96,6 +96,13 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
 - [PL-2.2.57.1] **tests/test_journeys/test_event_creation_tdd.py** — E2E event creation journey test validating UI lifecycle via simulator.
 - [PL-2.2.57.2] **tests/test_journeys/test_ux_journeys.py** — TDD journey tests validating onboarding FAQ, PM deny alerts, soft close stubs, and FSM button guards.
+- [PL-2.2.57.3] **tests/test_journeys/test_start_routing_journey.py** — Journey tests for /start Traffic Controller role-based landing and overrides.
+- [PL-2.2.57.4] **tests/test_journeys/test_event_lifecycle_journey.py** — Journey tests for event rejection, deletion, leave, and participant audit resolution.
+- [PL-2.2.57.5] **tests/test_journeys/test_admin_crud_journey.py** — Journey tests for admin user management (CRUD) and templates sync.
+- [PL-2.2.57.6] **tests/test_journeys/test_moderator_flows_journey.py** — Journey tests for moderator scoped topic management, templates linking, and access toggles.
+- [PL-2.2.57.7] **tests/test_journeys/test_middleware_pipeline_journey.py** — Journey tests for UserManager, ForumUtility, AccessGuard, and FsmButtonGuard middlewares.
+- [PL-2.2.57.8] **tests/test_journeys/test_tma_bridge_journey.py** — Journey tests for TMA dashboard init and toggle reactivity with Telegram.
+- [PL-2.2.57.9] **tests/test_journeys/test_ux_fallback_journey.py** — Journey tests for FSM creation Escape Hatch, fallback callback handlers, and safe_callback.
 - [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
 
 
