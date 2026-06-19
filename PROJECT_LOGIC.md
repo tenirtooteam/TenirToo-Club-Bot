@@ -45,7 +45,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.13] **database/announcements.py** — Announcement dispatcher management: `create_announcement`, `get_announcement`, `get_announcements_by_target`, `update_announcement_metadata`, `delete_announcements_by_target`, `delete_announcements_by_topic`.
 - [PL-2.2.14] **database/db.py** — Single facade re-exporting all database functions (including announcements.py). **The only permitted import point for data operations.**
 - [PL-2.2.14.1] **database/dtos.py** — Domain data containers (EventDTO, AuditRequestDTO) with dict-like compatibility interface.
-- [PL-2.2.15] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data(user_id, role_override)` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
+- [PL-2.2.15] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `clear_fsm_data_safely`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data(user_id, role_override)` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
 - [PL-2.2.16] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
 - [PL-2.2.17] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `export_events`, `export_event_participants`, `import_users`, `import_groups`.
 - [PL-2.2.18] **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
@@ -301,6 +301,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.20] **Telegram Mini App (TMA) Bridge**: Interactive personalized UI for announcements. Uses FastAPI backend and Vanilla JS/CSS frontend with Glassmorphism aesthetics. **Cross-Layer Reactivity**: Actions performed in TMA (joining/leaving) automatically trigger an update of the physical Telegram message via the stored `chat_id`/`message_id` metadata. Includes mobile-native Haptic Feedback and fallback logic. [CC-5]
 - [PL-5.1.21] **TMA Group Constraint Pattern**: Telegram strictly forbids `web_app` buttons in inline keyboards sent to group chats (raises `BUTTON_TYPE_INVALID`). **Resolution**: Group announcements use standard Telegram buttons (`✅ Иду` / `🚶 Не иду`) for quick interaction with localized alerts. The full **Mini App Dashboard** ("Личный кабинет") is centralized as a universal component in ALL main dashboards (User, Admin, Moderator) in Private Messages, serving as the primary hub for management and search.
 - [PL-5.1.22] **Topic Lifecycle Synchronization [CC-3]**: The bot maintains strict parity with the Telegram Forum state. `ForumUtilityMiddleware` intercepts `forum_topic_deleted` service messages and triggers `ManagementService.handle_external_topic_deletion`. This ensures that hand-deleted topics are instantly removed from the database, and all associated announcements are purged to prevent `BAD_REQUEST` errors during future broadcasts.
+- [PL-5.1.23] **UIService.clear_fsm_data_safely**: Clears all user-defined FSM context variables while preserving the Sterile UI tracking keys (`last_menu_ids`, `last_menu_id`). Applied automatically in navigation routing and all major cancel/back menu flows.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:
@@ -311,9 +312,10 @@ All keys stored in FSM state across the application:
 - [PL-5.2.6] `moderator_edit_topic_id`: Set in `moderator.py` (`mod_topic_rename_` flow) to carry the target topic ID into the `waiting_for_topic_name` FSM state.
 - [PL-5.2.7] `moderator_add_target_topic`: Set in `moderator.py` (`mod_moderator_add_` flow) to carry the target topic ID into the `waiting_for_user_data` FSM state.
 - [PL-5.2.8] `moderator_current_topic`: Set in `moderator.py` (`mod_topic_select_` flow) to track the currently selected topic in the moderator session.
+- [PL-5.2.9] `search_type`, `search_action`, `search_context`, `search_query`: Used in `handlers/common.py` during global text search.
 
 ### [PL-5.3] FSM Hygiene Rule
-[PL-5.3.1] `state.clear()` is **forbidden** — it destroys all FSM data including `last_menu_id`, breaking the Sterile Interface. Always use `state.set_state(None)` to nullify state while preserving data.
+[PL-5.3.1] `state.clear()` is **forbidden** — it destroys all FSM data including `last_menu_id`, breaking the Sterile Interface. Always use `state.set_state(None)` to nullify state, and call `UIService.clear_fsm_data_safely(state)` to purge custom data keys.
 
 ### [PL-5.4] Close Menu Handler Behaviour
 [PL-5.4.1] `handlers/common.py` (`F.data == "close_menu"`) calls `UIService.delete_msg(callback.message)` directly — it deletes the message the button is attached to. It also clears the tracking state: sets both `last_menu_id=None` and `last_menu_ids=[]` via `state.update_data` to ensure protocol synchronization [CC-3].

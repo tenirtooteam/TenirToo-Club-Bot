@@ -45,6 +45,9 @@
 - [CP-2.31] **AST Import Linter**: Static code validation enforcing architectural boundaries, strictly prohibiting db imports in handlers.
 - [CP-2.32] **UserSessionSimulator**: Declarative zero-token in-memory UI simulator for E2E journey testing with automatic markup, anti-spam, and footer assertions.
 - [CP-2.33] **Type Hardening (DTOs)**: Event and Audit entities strictly typed using dataclass DTO containers (EventDTO, AuditRequestDTO) with fallback dict interface.
+- [CP-2.34] **Security Fallback Handler**: A global fallback handler catching unhandled callback queries and displaying a warning alert, preventing infinite button loading for unauthorized users.
+- [CP-2.35] **FSM Data Hygiene & Resets**: Strict FSM data sanitization via `UIService.clear_fsm_data_safely` executed during all main navigation transitions to fully purge user-defined context keys.
+
 
 
 > For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJ## [CP-3] CODING RULES AND CONSTRAINTS
