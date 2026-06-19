@@ -2,6 +2,12 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.6] - 2026-06-19
+
+### Added
+- **Artifact Prompt Linter**: Added a local command-line validation script `local_scripts/prompt_linter.py` to audit agent-developer plan structure (English language), task checklists (completion status), and walkthrough reports (Russian language).
+- **Linter Test Suites**: Added unit tests in `tests/test_prompt_linter.py` and journey/integration tests in `tests/test_journeys/test_prompt_linter_journey.py` to verify prompt linter behavior and command-line execution return codes.
+
 ## [1.1.5] - 2026-06-19
 
 ### Added

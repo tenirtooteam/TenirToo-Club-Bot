@@ -71,6 +71,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.34] **handlers/announcements.py** — Announcement flows: `cmd_quick_announcement`, `announcement_join_handler`, `event_announce_init_handler`.
 - [PL-2.2.35] **local_scripts/dev_run.py** — Developer-only hot-reload runner.
 - [PL-2.2.36] **local_scripts/Gemini_maker.py** — Developer-only AI context packager.
+- [PL-2.2.36.1] **local_scripts/prompt_linter.py** — Developer-only artifact quality control linter (plan, checklist, report).
 - [PL-2.2.37] **tests/conftest.py** — Global test infrastructure: isolated DB (`db_setup`), mock bot, and context factories (`create_context`, `create_callback`). [PL-HI]
 - [PL-2.2.38] **tests/test_database/test_event_contracts.py** — Contract tests ensuring DB-to-Dict mapping consistency.
 - [PL-2.2.40] **tests/test_database/test_integrity_suite.py** — Integrity tests for DB relations (FK Cascade and manual cleanup).
@@ -85,6 +86,8 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.47] **tests/test_services/test_ui_fuzzer.py** — Autonomous Deep-UI Fuzzer for recursive menu exploration.
 - [PL-2.2.48] **tests/test_services/test_ui_integrity.py** — UI Integrity and Hardening tests: callback length, WebApp URL safety, HelpService coverage.
 - [PL-2.2.48.1] **tests/test_services/test_import_lint.py** — Dev-only integration test executing `import-linter` as a subprocess to enforce layer boundaries (skips gracefully if not installed in production).
+- [PL-2.2.48.2] **tests/test_prompt_linter.py** — Unit tests for the developer prompt linter.
+- [PL-2.2.48.3] **tests/test_journeys/test_prompt_linter_journey.py** — Journey/integration tests verifying CLI execution of the prompt linter.
 - [PL-2.2.49] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
 - [PL-2.2.50] **[PL-HI] Declarative Testing Standard**: All tests MUST use `pytest` fixtures for setup. Direct mocking in test functions is deprecated in favor of `conftest.py` factories. Every test run MUST use an isolated temporary database (`db_setup` fixture).
 - [PL-2.2.51] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation), `get_current_user_id` (FastAPI dependency for user auth). [CC-3]
