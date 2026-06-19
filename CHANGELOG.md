@@ -2,6 +2,17 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.4] - 2026-06-19
+
+### Added
+- **Semgrep Architecture Enforcement**: Introduced 5 custom Semgrep rules in `semgrep-rules.yaml` enforcing: ban on dynamic imports, handler DB isolation, `state.clear()` prohibition, direct UI call ban in handlers, and mandatory `state: FSMContext` parameter detection. `[CP-3.60]` `[PL-6.26]`
+- **Docker Compose Semgrep Service**: Added `semgrep` service (profile: `lint`) in `docker-compose.yml` using `returntocorp/semgrep` image for containerized architecture scans. Run via: `docker-compose --profile lint run --rm semgrep`.
+- **Pytest Semgrep Wrapper**: Created `tests/test_services/test_semgrep_lint.py` with graceful skip when semgrep is not locally installed.
+
+### Changed
+- **Handler UI Sterility**: Refactored `handlers/admin.py` (sheets export/import) and `handlers/events.py` (date validation) to use `UIService.show_temp_message` instead of direct `callback.message.answer()` / `message.answer()` calls, eliminating `ban-direct-ui-calls` violations.
+- **Linter Config Sync Rule**: Updated `[CP-3.59]` / `[PL-6.25]` to include `semgrep-rules.yaml` alongside `.ruff.toml` and `.importlinter` in the mandatory synchronization checklist.
+
 ## [1.1.3] - 2026-06-19
 
 ### Added

@@ -233,8 +233,14 @@
 - [CP-3.58] **FEATURE ALIGNMENT RULE**: For any global or architectural features (excluding minor technical fixes), the AI MUST explicitly present and align the implementation options, system impact, and design alternatives with the user (Шэф) before creating the final RNA-Blueprint or writing code.
      > Rationale: Prevents architectural drift and ensures that UX logic matches user expectations and mental models prior to implementation planning.
 
-- [CP-3.59] **LINTER CONFIGURATION SYNC**: Whenever a new module, feature, layer, or directory is introduced, you MUST audit and update `.ruff.toml` and `.importlinter` to configure proper verification rules for it, preventing architectural erosion.
+- [CP-3.59] **LINTER CONFIGURATION SYNC**: Whenever a new module, feature, layer, or directory is introduced, you MUST audit and update `.ruff.toml`, `.importlinter`, and `semgrep-rules.yaml` to configure proper verification rules for it, preventing architectural erosion.
      > Rationale: Automated rules are only as good as their configuration coverage. Ensuring config parity with directory expansion blocks developer mistakes before they are committed.
+
+- [CP-3.60] **DOCKER SANDBOX & SEMGREP ENFORCEMENT**: The project uses a containerized Docker development ecosystem for reproducible testing and linting.
+   - [CP-3.60.1] **Semgrep Rules**: Custom architectural rules are defined in `semgrep-rules.yaml` at the project root. Five rules enforce: (1) ban on dynamic imports (`importlib`/`__import__`), (2) ban on direct DB imports in handlers, (3) ban on `state.clear()`, (4) ban on direct UI calls in handlers, (5) mandatory `state: FSMContext` parameter in handlers calling UIService methods.
+   - [CP-3.60.2] **Docker Compose**: The `semgrep` service (`docker-compose --profile lint run --rm semgrep`) runs standalone Semgrep scans inside an isolated container. The `app` service runs the full test suite. No virtual environment is needed inside Docker containers.
+   - [CP-3.60.3] **Exclusions**: `handlers/errors.py` and `handlers/announcements.py` are excluded from `ban-direct-ui-calls` — `errors.py` is a fallback notification layer, `announcements.py` uses persistent group messages outside the PM FSM flow.
+   > Rationale: Docker containers eliminate host-dependency issues and ensure consistent static analysis results across all development environments. Semgrep catches architectural violations that AST and import-linter cannot detect (e.g., `state.clear()` calls, missing FSM parameters).
 
 ---
 

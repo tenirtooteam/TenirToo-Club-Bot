@@ -251,7 +251,7 @@ async def process_date_add_end_start(callback: CallbackQuery, state: FSMContext)
 async def process_event_end_date(message: Message, state: FSMContext):
     human_end, iso_end, _ = DateService.parse_smart_date(message.text)
     if not iso_end:
-        return await message.answer("⚠️ Не удалось распознать дату. Попробуй еще раз (например: 20 мая):")
+        return await UIService.show_temp_message(state, message, "⚠️ Не удалось распознать дату. Попробуй еще раз (например: 20 мая):")
 
     data = await state.get_data()
     start_human = data.get("dates")

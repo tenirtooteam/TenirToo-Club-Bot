@@ -359,7 +359,8 @@ All keys stored in FSM state across the application:
 - [PL-6.22] **No N+1 Queries in UI**: Any keyboard builder iterating over a list (users, groups, topics) MUST use batch-fetching methods from `database.db` (e.g., `get_topic_names_by_ids`) and set-based lookups. Direct DB calls inside loops are strictly prohibited to maintain performance. [PL-HI]
 - [PL-6.23] **Verify Before Change (Rule 21)**: BEFORE making any code changes, it is mandatory to view the target file and all related signatures (methods, keyboards, DB tables). Writing calls without confirming their existence in the current code context is strictly prohibited.
 - [PL-6.24] **Imports boundary verification**: Direct imports of database facade or modules inside `handlers/` are strictly prohibited and checked by static AST linting test.
-- [PL-6.25] **Linter Synced Configuration**: Developers and agents must verify and update `.ruff.toml` and `.importlinter` rules whenever new packages or folders are added to enforce layers boundaries immediately.
+- [PL-6.25] **Linter Synced Configuration**: Developers and agents must verify and update `.ruff.toml`, `.importlinter`, and `semgrep-rules.yaml` rules whenever new packages or folders are added to enforce layers boundaries immediately.
+- [PL-6.26] **Docker Sandbox & Semgrep Enforcement**: The project provides a containerized development ecosystem via `docker-compose.yml`. The `semgrep` service (profile: `lint`) runs custom architecture enforcement rules from `semgrep-rules.yaml` using the `returntocorp/semgrep` image. Five rules: `ban-dynamic-imports`, `ban-db-in-handlers`, `ban-state-clear`, `ban-direct-ui-calls` (excludes `errors.py`, `announcements.py`), `missing-state-parameter`. The pytest wrapper `test_semgrep_lint.py` gracefully skips when semgrep is not locally installed. Run via: `docker-compose --profile lint run --rm semgrep`.
 
 ---
 
