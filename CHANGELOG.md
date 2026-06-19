@@ -2,6 +2,18 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.7] - 2026-06-19
+
+### Added
+- **Refinement Journey Test Suite**: Added a TDD journey test file `tests/test_journeys/test_ux_refinement_journey.py` validating onboarding loop protection, onboarding close button, search back navigation, moderator redirects, and terminology parity.
+
+### Fixed
+- **Admin Onboarding Loop**: Whitelisted `"admin_onboarded"` state key in `UIService.clear_fsm_data_safely` to prevent FSM clear from re-triggering onboarding welcome screens after entity updates.
+- **Onboarding Escape Hatch**: Added a close button with `close_menu` callback to the admin onboarding welcome screen.
+- **Search Results Escape Hatch**: Injected a back button (`⬅️ НАЗАД`) into `search_results_kb` using `search_context` (casted to string to satisfy Pydantic validations).
+- **Moderator Toggle Redirect**: Changed the target redirect path in `mod_tgl_dir_` callback query handler to return to the active topic screen (`mod_topic_select_{topic_id}`) instead of the user list dashboard.
+- **Terminology Alignment**: Replaced "Мероприятия Клуба" with "Походы Клуба" in help screens, menus, buttons, and web pages to unify terms.
+
 ## [1.1.6] - 2026-06-19
 
 ### Added

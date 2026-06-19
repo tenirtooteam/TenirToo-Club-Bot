@@ -106,6 +106,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.57.7] **tests/test_journeys/test_middleware_pipeline_journey.py** — Journey tests for UserManager, ForumUtility, AccessGuard, and FsmButtonGuard middlewares.
 - [PL-2.2.57.8] **tests/test_journeys/test_tma_bridge_journey.py** — Journey tests for TMA dashboard init and toggle reactivity with Telegram.
 - [PL-2.2.57.9] **tests/test_journeys/test_ux_fallback_journey.py** — Journey tests for FSM creation Escape Hatch, fallback callback handlers, and safe_callback.
+- [PL-2.2.57.10] **tests/test_journeys/test_ux_refinement_journey.py** — Journey tests for onboarding loop prevention, escape hatches, search back navigation, moderator redirects, and terminology alignment.
 - [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
 
 
@@ -311,7 +312,7 @@ CREATE TABLE IF NOT EXISTS audit_requests (
 - [PL-5.1.20] **Telegram Mini App (TMA) Bridge**: Interactive personalized UI for announcements. Uses FastAPI backend and Vanilla JS/CSS frontend with Glassmorphism aesthetics. **Cross-Layer Reactivity**: Actions performed in TMA (joining/leaving) automatically trigger an update of the physical Telegram message via the stored `chat_id`/`message_id` metadata. Includes mobile-native Haptic Feedback and fallback logic. [CC-5]
 - [PL-5.1.21] **TMA Group Constraint Pattern**: Telegram strictly forbids `web_app` buttons in inline keyboards sent to group chats (raises `BUTTON_TYPE_INVALID`). **Resolution**: Group announcements use standard Telegram buttons (`✅ Иду` / `🚶 Не иду`) for quick interaction with localized alerts. The full **Mini App Dashboard** ("Личный кабинет") is centralized as a universal component in ALL main dashboards (User, Admin, Moderator) in Private Messages, serving as the primary hub for management and search.
 - [PL-5.1.22] **Topic Lifecycle Synchronization [CC-3]**: The bot maintains strict parity with the Telegram Forum state. `ForumUtilityMiddleware` intercepts `forum_topic_deleted` service messages and triggers `ManagementService.handle_external_topic_deletion`. This ensures that hand-deleted topics are instantly removed from the database, and all associated announcements are purged to prevent `BAD_REQUEST` errors during future broadcasts.
-- [PL-5.1.23] **UIService.clear_fsm_data_safely**: Clears all user-defined FSM context variables while preserving the Sterile UI tracking keys (`last_menu_ids`, `last_menu_id`). Applied automatically in navigation routing and all major cancel/back menu flows.
+- [PL-5.1.23] **UIService.clear_fsm_data_safely**: Clears all user-defined FSM context variables while preserving the Sterile UI tracking keys (`last_menu_ids`, `last_menu_id`, `admin_onboarded`). Applied automatically in navigation routing and all major cancel/back menu flows.
 
 ### [PL-5.2] FSM Data Keys
 All keys stored in FSM state across the application:
