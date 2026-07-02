@@ -9,3 +9,6 @@ Chronological history of the OKF-style reference bundle. Newest entries at the b
 - 2026-07-02 — CONTEXT_PROMPT.md [CP-3.6]/[CP-3.7] — deduplicated against PROJECT_LOGIC [PL-4.5]/[PL-6.12] and [PL-6.1]/[PL-6.2]/[PL-6.18]; full rules stay in PROJECT_LOGIC, CP cites indices.
 - 2026-07-02 — CONTEXT_PROMPT.md [CP-2] — compressed feature list to one line per feature (rule CP-2.2); detail retained in PROJECT_LOGIC/bundle.
 - 2026-07-02 — features/design-system.md — extracted from CONTEXT_PROMPT.md [CP-4] (visual design tokens, reference data).
+- 2026-07-02 — rule-map.md — created (feature 002): resolves 295 legacy PL/CP anchors to R-IDs (138) or bundle files (157).
+- 2026-07-02 — subagents.md — created (feature 002): full subagent configs moved verbatim from the old AGENTS.md.
+- 2026-07-02 — architecture.md, middleware.md, fsm-protocol.md, db-patterns.md, constants.md, testing.md, features-overview.md — created (feature 002, Chunk 2): dissolution of PROJECT_LOGIC.md/CONTEXT_PROMPT.md descriptive content per research.md D6 map.

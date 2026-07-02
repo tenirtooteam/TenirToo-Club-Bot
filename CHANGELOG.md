@@ -2,6 +2,16 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.0] - 2026-07-02
+
+### Changed
+- **Governance Consolidation**: Replaced the three-file scattered governance (`GEMINI.md` + `PROJECT_LOGIC.md` + `CONTEXT_PROMPT.md`) with the industry-standard layout: a single tracked constitution at `AGENTS.md` (open agent-instructions standard; previously an ignored subagent registry), a unified rulebook `RULES.md` (60 rules across 9 domains, stable `R-<DOMAIN>-<n>` IDs, Tier A/B taxonomy with enforcement pointers, 16 duplicate rule groups merged), and full dissolution of descriptive content into `docs/knowledge/` (7 new concept files: architecture, middleware, fsm-protocol, db-patterns, constants, testing, features-overview). `PROJECT_LOGIC.md`/`CONTEXT_PROMPT.md` are now thin retired redirect indexes; `CLAUDE.md`/`GEMINI.md` are pure compatibility shims. Every historical `PL-x.y`/`CP-x.y` anchor resolves via `docs/knowledge/rule-map.md` (295 anchors). Route A pre-read reduced 89.8 → 35.1 KB (-61%) with zero rule loss.
+- **Workflow Sync**: Updated `tenirtoo-docs-update` (producer contract v2: rules → RULES.md, description → bundle, process → AGENTS.md) and `tenirtoo-proposal-analysis` (ground truth: RULES.md + docs/knowledge/) skills. Filled the spec-kit constitution (`.specify/memory/constitution.md`).
+
+### Added
+- **Governance Validation Suite**: `tests/test_governance.py` (6 contract tests: rule-ID uniqueness, no duplicated rule text, rule-map completeness, Tier-B enforcement pointer existence, shim purity, constitution filled) plus the frozen rule inventory fixture `tests/fixtures/rules_inventory_baseline.txt`.
+- **Knowledge Graph Update**: Rebuilt via `graphify --update` — 1195 nodes, 2536 edges, 135 communities (up from 1002/2309/66), now indexing governance content by rule ID.
+
 ## [1.2.0] - 2026-07-02
 
 ### Changed

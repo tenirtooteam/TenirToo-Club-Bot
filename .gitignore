@@ -24,7 +24,7 @@ env/
 # Скрипты
 local_scripts/
 # AI Local Rules & Plugins
-AGENTS.md
+# AGENTS.md is now the tracked constitution (feature 002) — intentionally NOT ignored.
 CLAUDE.md
 .agents/
 _nogit_*

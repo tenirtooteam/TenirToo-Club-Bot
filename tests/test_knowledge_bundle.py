@@ -97,9 +97,15 @@ def test_index_matches_files():
     index_text = INDEX_FILE.read_text(encoding="utf-8")
     # Concept files are listed as markdown-link targets: [label](target.md).
     # Plain prose mentions of core files (e.g. `PROJECT_LOGIC.md`) are NOT links
-    # and are intentionally excluded.
-    listed = set(re.findall(r"\]\(([^)]+\.md)\)", index_text))
-    listed = {Path(x).name for x in listed if Path(x).name not in ("index.md", "log.md")}
+    # and are intentionally excluded. Links that escape the bundle (contain "../",
+    # e.g. the RULES.md pointer) reference non-bundle files and are excluded too
+    # (feature-002 adaptation: the bundle index may point out to the rulebook).
+    raw_links = re.findall(r"\]\(([^)]+\.md)\)", index_text)
+    listed = {
+        Path(x).name
+        for x in raw_links
+        if "../" not in x and Path(x).name not in ("index.md", "log.md")
+    }
     on_disk = {p.name for p in _concept_files()}
     missing_from_index = on_disk - listed
     dangling_in_index = listed - on_disk
@@ -128,16 +134,23 @@ def test_core_bundle_references_resolve():
 
 
 def test_cp_corruption_absent():
-    """The known merge corruption fragment is gone from CONTEXT_PROMPT.md."""
+    """The known merge corruption fragment is gone from CONTEXT_PROMPT.md.
+
+    Feature 002 dissolved CONTEXT_PROMPT.md into a thin redirect index, so the
+    '[CP-3]' section this check originally guarded (feature 001) no longer exists
+    in this file at all. The heading-shape assertion only applies while that
+    section is still present; its absence is not corruption.
+    """
     cp = REPO_ROOT / "CONTEXT_PROMPT.md"
     assert cp.is_file(), "CONTEXT_PROMPT.md missing."
     text = cp.read_text(encoding="utf-8")
     assert "refer to **PROJ##" not in text, (
         "Corruption fragment 'refer to **PROJ##' still present in CONTEXT_PROMPT.md."
     )
-    assert re.search(r"^##\s+\[CP-3\]", text, re.MULTILINE), (
-        "'## [CP-3]' heading is not a standalone heading."
-    )
+    if "[CP-3]" in text:
+        assert re.search(r"^##\s+\[CP-3\]", text, re.MULTILINE), (
+            "'## [CP-3]' heading is not a standalone heading."
+        )
 
 
 def test_log_exists_nonempty():
