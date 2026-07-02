@@ -29,6 +29,8 @@ CLAUDE.md
 .agents/
 _nogit_*
 GEMINI.md
+.claude/
+.specify/
 
 # JSON
 creds.json
@@ -38,3 +40,6 @@ run_bot.bat
 
 # Scratch
 scratch/
+
+# Knowledge graph (regenerable derived artifacts — see GEMINI.md File Registry)
+graphify-out/

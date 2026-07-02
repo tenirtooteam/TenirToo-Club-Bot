@@ -13,46 +13,50 @@
 
 **Implemented features:**
 
-- [CP-2.2] **Transactional DB (WAL mode)**: High-concurrency support for SQLite, split into modular functional layers (topics, groups, roles, permissions).
-- [CP-2.3] **Static Core Roles**: Built-in static roles (`superadmin`, `admin`, `moderator`). `superadmin` is virtually mapped directly in the DB response for the configurated creator.
-- [CP-2.4] **Template-Based Access Control**: Access is governed exclusively by granular per-topic user grants (`direct_topic_access`). Global groups serve as **non-runtime templates** for bulk assignment and synchronization, decoupling runtime permissions from group membership.
-- [CP-2.5] **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses all restrictions for superadmins.
-- [CP-2.6] **Shadow Auto-Registration**: Every real user interacting with the bot is automatically registered in the database on first contact via `UserManagerMiddleware` delegating to `ManagementService.ensure_user_registered`.
-- [CP-2.7] **Sterile UI & Multi-Message Stack**: Zero "dirty chat" via stack-based message cleanup (`last_menu_ids`). The service uses a **Multi-Message Stack** to track and delete multiple system alerts/menus in a single transition. The core methods are `sterile_ask` (terminates previous menu before prompt) and `sterile_show` (terminates prompt before result). The `@UIService.sterile_command` decorator centralizes group-to-PM redirection and automatic UI cleanup. The **Unified Navigator** (`generic_navigator`) acts as a central router for all UI state transitions, eliminating hardcoded navigation paths in handlers.
-- [CP-2.8] **Help Infrastructure**: Centralized help tooltips via `HelpService` and unified routing via `generic_navigator` (using `help:{key}` pattern). Handlers are decoupled from static content.
-- [CP-2.9] **Batch-Fetching ([PL-HI])**: Optimized N+1 query elimination for list building using batch-fetch helpers.
-- [CP-2.10] **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics.
-- [CP-2.11] **Topic Name Sync**: Topic renames in Telegram are automatically propagated to the local DB via `ForumUtilityMiddleware` (unidirectional: Telegram → DB).
+> One line per feature (rule CP-2.2). Implementation detail lives in `PROJECT_LOGIC.md` (see cited `[PL-x]` indices) and the reference bundle `docs/knowledge/`.
+
+- [CP-2.2] **Transactional DB (WAL mode)**: Modular SQLite (topics, groups, roles, permissions) with high-concurrency WAL. [PL-3.1]
+- [CP-2.3] **Static Core Roles**: `superadmin` / `admin` / `moderator`; `superadmin` is virtually mapped for the configured creator. [PL-6.19]
+- [CP-2.4] **Template-Based Access Control**: Access via per-topic `direct_topic_access` grants; groups are non-runtime templates for bulk assignment. [PL-3.2]
+- [CP-2.5] **Admin Immunity**: Toggleable `IMMUNITY_FOR_ADMINS` bypasses restrictions for superadmins.
+- [CP-2.6] **Shadow Auto-Registration**: First-contact users are auto-registered via `UserManagerMiddleware` → `ManagementService.ensure_user_registered`. [PL-4.2]
+- [CP-2.7] **Sterile UI & Multi-Message Stack**: Zero dirty-chat via `last_menu_ids` stack cleanup; `sterile_ask`/`sterile_show`/`generic_navigator` gateway. [PL-5.1]
+- [CP-2.8] **Help Infrastructure**: Centralized tooltips via `HelpService`, routed through `generic_navigator` (`help:{key}`).
+- [CP-2.9] **Batch-Fetching**: N+1 elimination for list building via batch-fetch helpers. [PL-HI]
+- [CP-2.10] **Stealth Moderation**: Silent deletion of unauthorized messages in restricted topics. [PL-4.4]
+- [CP-2.11] **Topic Name Sync**: Telegram → DB topic-rename propagation via `ForumUtilityMiddleware`. [PL-4.3]
 - [CP-2.12] **Ghost Topic Deletion**: Manual removal of deleted Telegram topics from DB via Admin UI.
-- [CP-2.13] **Callback Guarding**: `safe_callback` decorator prevents crashes on double-clicks.
-- [CP-2.14] **Native Notifications**: The `@all` mention triggers a silent push notification for all authorized topic members.
-- [CP-2.15] **Private Help Command**: The `/help` command logic is offloaded to private messages to maintain group chat cleanliness, with fallback notifications if PMs are blocked.
-- [CP-2.16] **Roles Dashboard**: A dedicated informational hub (`roles_dashboard`) providing a Role FAQ and a global view of all assigned responsibilities, accessible to both Admins and Moderators.
-- [CP-2.17] **Unified Search Interface**: A hybrid selection model for all list-based menus. When a list exceeds 7 items, a `🔎 Поиск` button is automatically injected by `build_paginated_menu`. Search is handled by `SearchStates` FSM and a unified router in `handlers/common.py`. Disambiguation is fully automated via the `"SEARCH_REQUIRED"` protocol.
-- [CP-2.18] **Performance Optimization**: Zero N+1 queries in the UI layer. All keyboard builders iterating over entity lists use batch-fetching helpers (`get_topic_names_by_ids`, etc.) to ensure high responsiveness. [PL-HI]
-- [CP-2.19] **ManagementService Layer**: The single authoritative layer for all entity mutations and registration logic. It enforces a strict `(bool, str)` return contract and a **Search-Or-Action protocol**, delegating complex searches back to handlers via the `"SEARCH_REQUIRED"` signal. Consolidation includes template-based operations and **flexible name parsing** for users (supporting spaces and patronymics).
-- [CP-2.20] **Declarative Testing Infrastructure**: Full coverage for Database, Service, and Handler layers using `pytest` with a unified fixture-based architecture (`conftest.py`). Includes isolated temporary databases for every test run, automated **Registry Integrity Scanners**, and **FSM Journey Validation**.
-- [CP-2.21] **Sterile Handler Architecture**: Handlers are 100% decoupled from the database facade. All data interaction (both reads and mutations) is mediated by the appropriate service layer (`PermissionService`, `ManagementService`, `EventService`).
-- [CP-2.22] **Expedition Protocol (Events)**: A complete lifecycle for club events. Includes **Quick Announcements** (`/an`) with a **Shortened Layout [CC-2]** (hiding date for 'Rapid' events) and "📍 Топик" terminology. Supports admin moderation queue, participant tracking, and lead assignment.
-- [CP-2.23] **Audit & Notification Layer**: Asynchronous approval workflow for critical actions. Includes **Targeted Participation Alerts [CC-3]**: notifications about new joins or requests are sent ONLY to the specific event leads and creator, eliminating noise for global admins. Statuses: `pending`, `approved`, `rejected`.
-- [CP-2.24] **Armored DB Integrity Fuse**: Mandatory runtime check for SQLite Foreign Key support at startup; prevents execution if the environment is incompatible. **Schema Hardening**: All table linkages (including `audit_requests` and `event_leads`) are protected by native `ON DELETE CASCADE`. Optimized search indices on `user_id` across templates and direct access tables ensure high performance for profile lookups.
-- [CP-2.25] **Unified Role-Based Landing**: The bot uses a single public entry point (`/start`) and a "Traffic Controller" logic in `UIService.get_landing_data` to automatically route users to their respective dashboards. Supports a `role_override` parameter allowing debug aliases (`/admin`, `/mod`) to force specific interface generation while maintaining the central logic.
-- [CP-2.26] **Automated Reporting (Sheets)**: Background synchronization of club data to Google Sheets. Includes Master User List, Group Templates, and **Expedition Export**. Synchronization is **Targeted** (triggering only specific sheets for deletions/updates) to ensure performance. [PL-3.5]
-- [CP-2.27] **Topic Lifecycle Synchronization**: Automated parity with Telegram Forum. Middleware intercepts `forum_topic_deleted` events to purge orphaned data (announcements, perms, group links) from the DB, preventing `BAD_REQUEST` API errors. [PL-5.1.22]
-- [CP-2.28] **Telegram Mini Apps (TMA) Integration**: Secure, personalized Web UI serving as a full-featured **«Personal Cabinet»**. Includes **Real-time UI Reactivity**: actions in TMA (like joining an event) automatically refresh physical Telegram announcements in groups. [CC-2]
-- [CP-2.29] **Unified Configuration & Logging**: Centralized constants management in `config.py`. Unified rotation-based logging (`logs/bot.log`) for both Bot and WebApp layers with global exception handling.
-- [CP-2.30] **Error Interceptor Layer**: Global dispatcher exception router logging errors and notifying users without thread blocking.
-- [CP-2.31] **AST Import Linter**: Static code validation enforcing architectural boundaries, strictly prohibiting db imports in handlers.
-- [CP-2.32] **UserSessionSimulator**: Declarative zero-token in-memory UI simulator for E2E journey testing with automatic markup, anti-spam, and footer assertions.
-- [CP-2.33] **Type Hardening (DTOs)**: Event and Audit entities strictly typed using dataclass DTO containers (EventDTO, AuditRequestDTO) with fallback dict interface.
-- [CP-2.34] **Security Fallback Handler**: A global fallback handler catching unhandled callback queries and displaying a warning alert, preventing infinite button loading for unauthorized users.
-- [CP-2.35] **FSM Data Hygiene & Resets**: Strict FSM data sanitization via `UIService.clear_fsm_data_safely` executed during all main navigation transitions to fully purge user-defined context keys.
-- [CP-2.36] **Artifact Prompt Linter**: CLI validator ensuring structure and language standards for implementation plans (English), task checklists (completion status), and walkthrough reports (Russian).
+- [CP-2.13] **Callback Guarding**: `safe_callback` decorator prevents double-click crashes.
+- [CP-2.14] **Native Notifications**: `@all` mention triggers a silent push to authorized topic members.
+- [CP-2.15] **Private Help Command**: `/help` offloaded to PM with fallback notifications if PMs are blocked.
+- [CP-2.16] **Roles Dashboard**: Informational hub (`roles_dashboard`) with Role FAQ and global responsibility view. [PL-6.15]
+- [CP-2.17] **Unified Search Interface**: Auto-injected `🔎 Поиск` for lists over 7 items; `SearchStates` FSM + `"SEARCH_REQUIRED"` protocol. [PL-6.8]
+- [CP-2.18] **Performance Optimization**: Zero N+1 in the UI layer via batch-fetch helpers. [PL-6.22]
+- [CP-2.19] **ManagementService Layer**: Single authoritative mutation/registration layer; `(bool, str)` contract, Search-Or-Action protocol. [PL-6.7]
+- [CP-2.20] **Declarative Testing Infrastructure**: pytest fixtures, isolated DBs, Registry Integrity Scanners, FSM Journey Validation. [PL-8]
+- [CP-2.21] **Sterile Handler Architecture**: Handlers fully decoupled from the DB facade; all data via service layers. [PL-6.2]
+- [CP-2.22] **Expedition Protocol (Events)**: Full event lifecycle — Quick Announcements (`/an`), moderation queue, participant/lead tracking. [PL-5.1]
+- [CP-2.23] **Audit & Notification Layer**: Async approval workflow with Targeted Participation Alerts to leads/creator only. [PL-5.1.13]
+- [CP-2.24] **Armored DB Integrity Fuse**: Startup FK-support check + `ON DELETE CASCADE` schema hardening + search indices. [PL-3.1.1]
+- [CP-2.25] **Unified Role-Based Landing**: Single `/start` Traffic Controller (`get_landing_data`) with `role_override` debug aliases. [PL-5.6]
+- [CP-2.26] **Automated Reporting (Sheets)**: Background, targeted sync of users/groups/events to Google Sheets. [PL-3.5]
+- [CP-2.27] **Topic Lifecycle Synchronization**: `forum_topic_deleted` interception purges orphaned data to prevent API errors. [PL-5.1.22]
+- [CP-2.28] **Telegram Mini Apps (TMA)**: Secure personal-cabinet Web UI with real-time reactivity refreshing group announcements. [PL-2.2.51]
+- [CP-2.29] **Unified Configuration & Logging**: Centralized `config.py` constants; rotation-based unified logging for Bot and WebApp. [PL-7]
+- [CP-2.30] **Error Interceptor Layer**: Global dispatcher exception router with non-blocking user notification. [PL-4.6]
+- [CP-2.31] **AST Import Linter**: Static validation prohibiting db imports in handlers. [PL-6.24]
+- [CP-2.32] **UserSessionSimulator**: Zero-token in-memory UI simulator for E2E journey testing.
+- [CP-2.33] **Type Hardening (DTOs)**: EventDTO/AuditRequestDTO dataclasses with dict fallback. [PL-2.2.14.1]
+- [CP-2.34] **Security Fallback Handler**: Global fallback catching unhandled callbacks to prevent infinite button loading. [PL-5.5]
+- [CP-2.35] **FSM Data Hygiene & Resets**: `clear_fsm_data_safely` purges user context keys on main transitions. [PL-5.3]
+- [CP-2.36] **Artifact Prompt Linter**: CLI validator for plans (English), checklists, and reports (Russian). [PL-2.2.36.1]
 
 
 
 
-> For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJ## [CP-3] CODING RULES AND CONSTRAINTS
+> For the complete module registry, file responsibilities, architectural patterns, DB schema, middleware logic, and operational constraints — refer to **PROJECT_LOGIC.md** and the reference bundle index at **docs/knowledge/index.md**.
+
+## [CP-3] CODING RULES AND CONSTRAINTS
 
 1. [CP-3.1] **FULL BLOCK RULE**: Always provide the **FULL BLOCK** of a function or logic section — never partial snippets.
    > Rationale: Partial snippets create integration ambiguity — the developer cannot determine safe insertion points without seeing the full surrounding context, leading to silent logic errors.
@@ -69,14 +73,9 @@
 5. [CP-3.5] **TILDE BLOCKS**: Use ONLY tilde-based code blocks (~~~). Triple backticks (```) are forbidden.
    > Rationale: Triple backticks conflict with the output format required by internal documentation maintenance tools.
 
-5. [CP-3.6] **GROUP FILTER**: `ForumUtilityMiddleware` and `AccessGuardMiddleware` must begin with the guard: `if event.chat.type == "private": return await handler(event, data)`. `UserManagerMiddleware` is explicitly exempt from this guard — it operates on all chat types by design (registration is valid regardless of chat context). The `GROUP_ID` constant must NOT be used as a middleware guard — it is reserved exclusively for Telegram API calls. Do not add inline admin-ID checks inside handlers — use `PermissionService.is_global_admin(user_id)` or router-level filters like `IsGlobalAdmin` instead.
-   > Rationale: The `chat.type == "private"` guard ensures middleware logic executes correctly in the two middlewares that contain group-specific branching. `UserManagerMiddleware` has no group-specific logic and intentionally omits the guard. Using `GROUP_ID` as a guard would incorrectly restrict the bot. Hardcoding admin IDs into presentation layers violates MVC encapsulation.
+6. [CP-3.6] **GROUP FILTER**: Coding-rule application of the middleware guard and admin-check architecture. The authoritative rules live in `PROJECT_LOGIC.md`: the `chat.type == "private"` guard, the `UserManagerMiddleware` exemption, and the `GROUP_ID`-is-never-a-guard constraint are defined in [PL-4.5]; the prohibition on inline admin-ID checks in handlers (use `PermissionService.is_global_admin` or the `IsGlobalAdmin` router filter) is defined in [PL-6.12]. Follow those indices when coding middleware and access checks.
 
-6. [CP-3.7] **DATABASE FACADE & ISOLATION**:
-   - [CP-3.7.1] **DB Facade**: All data operations MUST pass through the `database.db` facade (`from database import db`).
-   - [CP-3.7.2] **Handler Isolation**: Handlers (`handlers/*.py`) are **strictly prohibited** from importing the database facade. They must interact with data exclusively through service layers (`services/*.py`).
-   - [CP-3.7.3] **Keyboard Exception**: Keyboard modules (`keyboards/*.py`) are permitted to import the database facade directly for dynamic rendering.
-   > Rationale: Handlers should only manage UI and routing. Moving data logic to services ensures testability, reusability, and architectural cleanliness.
+7. [CP-3.7] **DATABASE FACADE & ISOLATION**: The authoritative facade rules live in `PROJECT_LOGIC.md` — all data operations pass through the `database.db` facade ([PL-6.1] / [PL-2.4]); handlers are strictly prohibited from importing the facade and must go through service layers ([PL-6.2]); keyboard modules may import the facade directly for dynamic rendering ([PL-6.18]). Follow those indices when writing data-access code.
 
 7. [CP-3.8] **KEYBOARD FACADE**: Never import directly from internal modules like `keyboards/admin_kb.py`, etc. All keyboard builders must be accessed via `import keyboards as kb`. This prohibition covers **all project layers** — handlers, services, and even keyboard modules themselves (to avoid circular dependencies and bypass logic).
    > Rationale: `keyboards/__init__.py` is the single authoritative wildcard re-export facade. Bypassing it in any layer breaks architectural consistency.
@@ -249,24 +248,8 @@
 
 ## [CP-4] DESIGN SYSTEM (Premium Minimalist)
 
-[CP-4.1] **Core Palette**:
-- **Background**: `#050505` (Deep Black).
-- **Cards/Containers**: `rgba(20, 20, 20, 0.7)` (Glass Dark).
-- **Borders**: `rgba(255, 255, 255, 0.08)` (Subtle White).
-- **Accents**: Pure White (`#ffffff`) for primary, Dim White (`rgba(255, 255, 255, 0.6)`) for secondary.
-
-[CP-4.2] **Typography**:
-- **Font Family**: `Outfit` (Google Fonts).
-- **Headings**: Bold, tight tracking (`letter-spacing: -1px`), line-height 1.1.
-
-[CP-4.3] **Glassmorphism & Interactivity**:
-- **Blur Effect**: `backdrop-filter: blur(20px)`.
-- **Corner Radii**: Standard `20px` or `24px`.
-- **Micro-Animations**: Scale down on active state (`0.96`), slight opacity transitions.
-
-[CP-4.4] **Iconography & Layout**:
-- **System Emojis**: 🏔 (Expedition), 📍 (Topic), 👤 (Profile), 🛡️ (Admin), 🔎 (Search).
-- **Grid Layout**: Use 2-column grids for menus to maximize screen efficiency on mobile.
+[CP-4.1] The visual design tokens (palette, typography, glassmorphism, iconography, layout) are reference data.
+> Moved to docs/knowledge/features/design-system.md — read on demand when touching the WebApp frontend.
 
 ---
 

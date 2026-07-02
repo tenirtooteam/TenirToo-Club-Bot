@@ -2,6 +2,17 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-07-02
+
+### Changed
+- **Two-Tier Documentation Architecture**: Split the monolithic pre-read files into a thin normative core (`PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md` — imperative rules only) and an OKF-style reference bundle (`docs/knowledge/`). Extracted the DDL schema (`[PL-3.1]` → `db-schema.md`), the module registry (`[PL-2.2]` → `module-registry.md`), and the design system (`[CP-4]` → `features/design-system.md`) into concept files with YAML front matter, an on-demand `index.md`, and a `log.md`. Route A pre-read reduced ~23% (89.8 → 69.5 KB) with zero imperative rules removed; all 250 `PL-x.y` anchors preserved.
+- **Core Repair & Deduplication**: Fixed a merge corruption at the `[CP-2]`/`[CP-3]` boundary in `CONTEXT_PROMPT.md`, deduplicated `[CP-3.6]`/`[CP-3.7]` against their `PROJECT_LOGIC.md` homes via index citations, and compressed the `[CP-2]` feature list to one line per feature.
+- **Workflow Sync**: Updated `GEMINI.md` (Route A pre-read, File Registry, Content Ownership, graphify onboarding) and the `tenirtoo-docs-update` skill (CMD-1/CMD-2 bundle routing with atomic index/log maintenance).
+
+### Added
+- **Knowledge-Bundle Validation Suite**: `tests/test_knowledge_bundle.py` (6 contract tests: front matter, index consistency, anchor survival, no dangling references, corruption absence, non-empty log) plus the frozen anchor fixture `tests/fixtures/pl_anchors_baseline.txt`.
+- **Graphify Knowledge Graph**: Built a repository knowledge graph (1002 nodes, 2309 edges, 66 communities) into `graphify-out/` (git-ignored); onboarding now directs architecture questions to graphify queries first.
+
 ## [1.1.7] - 2026-06-19
 
 ### Added
