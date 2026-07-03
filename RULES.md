@@ -47,6 +47,11 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Rule**: Handlers importing `database/*` directly are prohibited. **Enforced by** `semgrep-rules.yaml` (`ban-db-in-handlers`), `.importlinter`, `tests/test_services/test_import_lint.py`, `tests/test_services/test_ruff_lint.py`.
 **Legacy**: PL-6.24, CP-3.57(enforcement)
 
+### R-ARCH-9 [A] Middleware pipeline order invariant
+**Rule**: The sequential middleware pipeline is registered as `outer_middleware` on `dp.message` — the order (UserManager → ForumUtility → AccessGuard) is fixed and MUST NOT be changed.
+**Why**: Later stages assume earlier guarantees (registration before access checks).
+**Legacy**: PL-4.1
+
 ---
 
 ## DB — Database & Data Integrity
@@ -132,6 +137,16 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 ### R-UI-11 [B] WebApp button & callback hardening
 **Rule**: `web_app` buttons MUST be gated on non-empty `config.WEBAPP_URL`; colon-callback parsers MUST split defensively; `sterile_show` MUST catch `BUTTON_TYPE_INVALID` and fall back to a new message. **Enforced by** `tests/test_services/test_ui_integrity.py`, `tests/test_services/test_ui_fuzzer.py`.
 **Legacy**: CP-3.53, PL-5.1.21
+
+### R-UI-12 [A] Sterile input entry points
+**Rule**: Every transition between independent FSM flows, disambiguation steps, or generation of new interactive elements MUST be preceded by `await UIService.terminate_input(state, message)`. Every FSM entry point that requires text input MUST use an isolated cancel keyboard (e.g., `get_event_cancel_kb`, `get_admin_cancel_kb`). Command-level handlers use the `@UIService.sterile_command` decorator.
+**Why**: Centralizes redirect/cleanup/tracking; isolated cancel keyboards prevent bypass via functional buttons.
+**Legacy**: CP-3.11
+
+### R-UI-13 [A] Admin-creation UX branching
+**Rule**: When an entity creation triggers an automatic audit notification to admins, the creation handler MUST NOT immediately show the final entity card to an admin creator — show a clean success message instead.
+**Why**: Prevents double-notification clutter for admins.
+**Legacy**: CP-3.47
 
 ---
 
@@ -297,9 +312,9 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: CP-3.35, CP-3.30, CP-3.58, GEMINI§Route-B, GEMINI§Route-A(align)
 
 ### R-PROC-2 [A] RNA-Blueprint before multi-file change
-**Rule**: Any feature/refactor/bugfix touching >1 file MUST have an `implementation_plan.md` in RNA-Blueprint form: Base DNA, Task RNA, Contextual Constraints (indexed), Proposed Changes, numbered Execution Steps (TDD sub-step each), Verification. Execution runs 3–5 steps, then reports and awaits approval. For bugs, the plan MUST name the reproducing test file/case.
-**Why**: Externalizing strategy before action prevents instruction drift and enforces TDD.
-**Legacy**: CP-3.28, GEMINI§RNA-BLUEPRINT
+**Rule**: Any feature/refactor/bugfix touching >1 file MUST have an RNA-Blueprint plan: Base DNA, Task RNA, Contextual Constraints (indexed), Proposed Changes, numbered Execution Steps (TDD sub-step each), Verification. The canonical artifact is the spec-kit `plan.md` (RNA-Blueprint content mapped per AGENTS.md § PLAN CONTENT); `implementation_plan.md` is accepted for historical features. Execution runs 3–5 steps per chunk, then reports and awaits approval — `tasks.md`/`task.md` MUST contain an explicit HARD-STOP gate task at each chunk boundary. For bugs, the plan MUST name the reproducing test file/case. Plans are updated incrementally: do not rewrite the entire plan for a correction; update only the affected parts.
+**Why**: Externalizing strategy before action prevents instruction drift and enforces TDD; incremental updates keep plan diffs reviewable; a gate task in the artifact itself makes the approval pause mechanical instead of relying on the plan author's memory.
+**Legacy**: CP-3.28, GEMINI§RNA-BLUEPRINT, CP-3.28.2
 
 ### R-PROC-3 [A] TDD for bug fixes
 **Rule**: A reported bug MUST first get a failing test reproducing it (verified failing), then the fix. Fixing without a reproducing test first is a process failure.
@@ -307,7 +322,7 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: GEMINI§Route-A(debugging), CP-3.28(bug)
 
 ### R-PROC-4 [B] Prompt-linter gates
-**Rule**: Plan/checklist/report artifacts MUST pass their stage. **Enforced by** `local_scripts/prompt_linter.py --stage {plan|checklist|report}`.
+**Rule**: Plan/checklist/report artifacts MUST pass their stage. Plan stage validates `plan.md` (spec-kit, preferred) or `implementation_plan.md` (legacy fallback); checklist stage validates `tasks.md` (preferred) or `task.md` (legacy fallback). **Enforced by** `local_scripts/prompt_linter.py --stage {plan|checklist|report}`.
 **Legacy**: CP-2.36, GEMINI§Route-A(linter)
 
 ### R-PROC-5 [A] Git workflow GW-1

@@ -1,5 +1,6 @@
 import sys
 import os
+import tempfile
 
 # Adjust path to find local_scripts
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -8,6 +9,9 @@ from local_scripts.prompt_linter import (
     validate_plan,
     validate_checklist,
     validate_report,
+    find_plan_file,
+    find_checklist_file,
+    PLAN_V2_REQUIRED_H2S,
 )
 
 def test_validate_plan_success():
@@ -124,6 +128,100 @@ def test_validate_report_missing_sections():
     errors, warnings = validate_report(content)
     assert len(errors) > 0
     assert any("Changes made" in e for e in errors)
+
+def test_validate_plan_v2_structure_success():
+    content = """# Implementation Plan: Feature X
+
+**Branch**: `x` | **Date**: 2026-07-03 | **Spec**: link
+
+## Summary
+Some summary.
+
+## Technical Context
+Details.
+
+## Constitution Check
+Passes.
+
+## Project Structure
+### Documentation (this feature)
+Tree.
+"""
+    errors, warnings = validate_plan(content, required_h2s=PLAN_V2_REQUIRED_H2S)
+    assert not errors
+
+def test_validate_plan_v2_structure_missing_sections():
+    content = """# Implementation Plan: Feature X
+No other headers.
+"""
+    errors, warnings = validate_plan(content, required_h2s=PLAN_V2_REQUIRED_H2S)
+    assert len(errors) > 0
+    assert any("Summary" in e for e in errors)
+    assert any("Technical Context" in e for e in errors)
+    assert any("Constitution Check" in e for e in errors)
+    assert any("Project Structure" in e for e in errors)
+
+def test_plan_v2_speckit_file():
+    """find_plan_file prefers plan.md (v2) when it is the only plan artifact present."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "plan.md"), "w", encoding="utf-8") as f:
+            f.write("# Plan\n## Summary\n")
+        path, is_v2 = find_plan_file(tmpdir)
+        assert is_v2 is True
+        assert os.path.basename(path) == "plan.md"
+
+def test_plan_legacy_fallback():
+    """find_plan_file falls back to implementation_plan.md when plan.md is absent."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "implementation_plan.md"), "w", encoding="utf-8") as f:
+            f.write("# Goal Description\n")
+        path, is_v2 = find_plan_file(tmpdir)
+        assert is_v2 is False
+        assert os.path.basename(path) == "implementation_plan.md"
+
+def test_plan_v2_wins_when_both_present():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "plan.md"), "w", encoding="utf-8") as f:
+            f.write("# Plan\n")
+        with open(os.path.join(tmpdir, "implementation_plan.md"), "w", encoding="utf-8") as f:
+            f.write("# Goal Description\n")
+        path, is_v2 = find_plan_file(tmpdir)
+        assert is_v2 is True
+        assert os.path.basename(path) == "plan.md"
+
+def test_checklist_v2_tasks_file():
+    """find_checklist_file prefers tasks.md (v2) when it is the only checklist artifact present."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "tasks.md"), "w", encoding="utf-8") as f:
+            f.write("- [x] запуск линтера-чеклиста\n")
+        path, is_v2 = find_checklist_file(tmpdir)
+        assert is_v2 is True
+        assert os.path.basename(path) == "tasks.md"
+
+def test_checklist_legacy_fallback():
+    """find_checklist_file falls back to task.md when tasks.md is absent."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "task.md"), "w", encoding="utf-8") as f:
+            f.write("- [x] запуск линтера-чеклиста\n")
+        path, is_v2 = find_checklist_file(tmpdir)
+        assert is_v2 is False
+        assert os.path.basename(path) == "task.md"
+
+def test_checklist_v2_wins_when_both_present():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        with open(os.path.join(tmpdir, "tasks.md"), "w", encoding="utf-8") as f:
+            f.write("- [x] запуск линтера-чеклиста\n")
+        with open(os.path.join(tmpdir, "task.md"), "w", encoding="utf-8") as f:
+            f.write("- [x] запуск линтера-чеклиста\n")
+        path, is_v2 = find_checklist_file(tmpdir)
+        assert is_v2 is True
+        assert os.path.basename(path) == "tasks.md"
+
+def test_find_plan_file_none_present():
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path, is_v2 = find_plan_file(tmpdir)
+        assert path is None
+        assert is_v2 is None
 
 def test_validate_report_missing_russian_warning():
     content = """# Walkthrough

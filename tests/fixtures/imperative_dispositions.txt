@@ -1,0 +1,6 @@
+PL-1.2	descriptive	Stack version fact (Python 3.11); "Required" is heuristic over-capture, not a behavioral rule
+PL-3.5.4	descriptive	Describes background-sync failure behavior; documented in docs/knowledge/db-patterns.md
+PL-4.7.1	descriptive	Describes FsmButtonGuardMiddleware behavior; documented in docs/knowledge/middleware.md
+CP-2.17	descriptive	Feature description (Unified Search Interface); not a standalone rule
+CP-3.42	descriptive	Documents the shipped /an command format; behavior guarded by existing tests, not a standalone rule
+CP-5.1	retired	CP-vs-GEMINI scope boundary died with the 002 file consolidation (CONTEXT_PROMPT.md dissolved) — see docs/knowledge/log.md

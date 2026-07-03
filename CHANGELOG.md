@@ -2,6 +2,18 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.4.0] - 2026-07-03
+
+### Added
+- **Content-level rule retention guard**: `test_imperatives_map_to_rules` in `tests/test_governance.py` — every imperative legacy anchor must resolve to a real rule ID in `RULES.md` or carry an explicit `descriptive`/`retired` disposition in the new `tests/fixtures/imperative_dispositions.txt`; catches silent rule loss during future governance consolidations automatically.
+- **Mandatory approval-gate template**: `.specify/templates/tasks-template.md` now requires a `HARD STOP` gate task at every chunk boundary (Foundational → US1, US1 → US2, etc.), citing `R-PROC-2`, so `/speckit-implement` cannot legally run past an approval point even if the plan author forgets one.
+
+### Changed
+- **Restored 3 rules lost during the 002 consolidation**, verbatim from git history (`8280d6f^`): `R-ARCH-9` (middleware pipeline order invariant, was PL-4.1), `R-UI-12` (sterile input entry points / isolated cancel keyboards, was CP-3.11), `R-UI-13` (admin-creation UX branching, was CP-3.47); `R-PROC-2` amended with the incremental plan-update principle (was CP-3.28.2).
+- **Repaired `docs/knowledge/rule-map.md`**: 30 rows fixed (24 curated dispositions + 6 additional fallback rows found during repair); zero rows now target the generic `docs/knowledge/index.md` (was 10).
+- **Prompt linter v2**: `local_scripts/prompt_linter.py` now prefers spec-kit artifacts (`plan.md`, `tasks.md`) with full backward-compatible fallback to the legacy RNA artifacts (`implementation_plan.md`, `task.md`) — kills the double-artifact-set problem for new features while historical features (001, 002) keep linting unchanged.
+- **Canonized spec-kit as the Route A engine**: `AGENTS.md` registers the `speckit-*` command chain, marks `RNA-1` as a legacy alias, and retitles § RNA-BLUEPRINT to § PLAN CONTENT with an explicit RNA-Blueprint → `plan.md` section mapping. `RULES.md` `R-PROC-2`/`R-PROC-4` updated to name the canonical artifacts.
+
 ## [1.3.1] - 2026-07-02
 
 ### Removed

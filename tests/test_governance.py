@@ -14,6 +14,7 @@ RULE_MAP = REPO / "docs" / "knowledge" / "rule-map.md"
 AGENTS = REPO / "AGENTS.md"
 CONSTITUTION = REPO / ".specify" / "memory" / "constitution.md"
 INVENTORY = REPO / "tests" / "fixtures" / "rules_inventory_baseline.txt"
+DISPOSITIONS = REPO / "tests" / "fixtures" / "imperative_dispositions.txt"
 SHIMS = [REPO / "CLAUDE.md", REPO / "GEMINI.md"]
 # PROJECT_LOGIC.md / CONTEXT_PROMPT.md deleted 2026-07-02: legacy anchors resolve
 # via docs/knowledge/rule-map.md, so the duplicate-text scan covers only the two
@@ -125,3 +126,78 @@ def test_constitution_filled():
     assert text, "constitution.md missing."
     placeholders = re.findall(r"\[[A-Z_]+(?:_NAME|_DESCRIPTION|_CONTENT|_RULES|_VERSION|_DATE)?\]", text)
     assert not placeholders, f"constitution.md still has template placeholders: {set(placeholders)}"
+
+
+def _rule_map_rows():
+    """Parse docs/knowledge/rule-map.md's '| anchor | target |' table into a dict."""
+    text = _read(RULE_MAP)
+    rows = {}
+    for line in text.splitlines():
+        m = re.match(r"^\|\s*((?:PL|CP)-\d+(?:\.\d+)*)\s*\|\s*([^|]+?)\s*\|\s*$", line)
+        if m:
+            rows[m.group(1)] = m.group(2).strip()
+    return rows
+
+
+def _dispositions():
+    """Parse tests/fixtures/imperative_dispositions.txt: anchor -> (verdict, justification)."""
+    text = _read(DISPOSITIONS)
+    out = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) >= 2:
+            out[parts[0]] = parts[1]
+    return out
+
+
+def test_imperatives_map_to_rules():
+    """Every IMP-flagged legacy anchor resolves to a real R-ID, or is dispositioned.
+
+    Content-level retention guard (feature 003, audit F-1/F-4): rule-map completeness
+    (test_rule_map_complete) only proves an anchor has SOME row; it does not prove the
+    row target actually carries the rule's content. This test closes that gap: an
+    imperative anchor's target must be a rule ID defined in RULES.md, or the anchor
+    must be explicitly dispositioned as 'descriptive'/'retired' in the curated
+    overrides file (tests/fixtures/imperative_dispositions.txt) — never silently
+    left pointing at a bundle/description file.
+    """
+    assert INVENTORY.is_file(), "frozen inventory fixture missing."
+    assert RULE_MAP.is_file(), "docs/knowledge/rule-map.md missing."
+
+    imperative_anchors = []
+    for line in INVENTORY.read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t")
+        if len(parts) >= 2 and parts[1] == "IMP":
+            imperative_anchors.append(parts[0])
+    assert imperative_anchors, "No IMP-flagged anchors found in frozen inventory."
+
+    map_rows = _rule_map_rows()
+    dispositions = _dispositions()
+    defined_rule_ids = set(re.findall(r"^### (R-[A-Z]{2,4}-\d+)\b", _read(RULES), re.MULTILINE))
+
+    unresolved = []
+    for anchor in imperative_anchors:
+        target = map_rows.get(anchor)
+        if target is None:
+            unresolved.append(f"{anchor}: no rule-map row")
+            continue
+        rid_match = re.match(r"^(R-[A-Z]{2,4}-\d+)\b", target)
+        if rid_match:
+            if rid_match.group(1) not in defined_rule_ids:
+                unresolved.append(f"{anchor}: maps to undefined {rid_match.group(1)}")
+            continue
+        verdict = dispositions.get(anchor)
+        if verdict not in ("descriptive", "retired"):
+            unresolved.append(f"{anchor}: target '{target}' is not an R-ID and has no disposition")
+
+    assert not unresolved, (
+        "Imperative anchors without a rule-ID resolution or curated disposition:\n  "
+        + "\n  ".join(unresolved)
+    )
+
+    # Map hygiene: zero rows may point at the generic bundle index (a fallback
+    # artifact of the 002 generator, not a real content destination).
+    index_rows = [a for a, t in map_rows.items() if t == "docs/knowledge/index.md"]
+    assert not index_rows, f"rule-map.md rows still fall back to index.md: {sorted(index_rows)}"

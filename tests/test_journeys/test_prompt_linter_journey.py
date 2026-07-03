@@ -69,6 +69,39 @@ pytest
         assert "Warning:" not in res.stdout
         assert "Error:" not in res.stdout
 
+def test_journey_plan_v2_linter():
+    """v2 CLI path: plan.md is preferred over implementation_plan.md end-to-end."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        plan_path = os.path.join(tmpdir, "plan.md")
+
+        # 1. v2 plan with errors (missing required H2s)
+        with open(plan_path, "w", encoding="utf-8") as f:
+            f.write("# Implementation Plan: X\nNo sections.")
+        res = run_linter(tmpdir, "plan")
+        assert res.returncode == 1
+        assert "Error:" in res.stdout
+        assert "Summary" in res.stdout
+
+        # 2. Correct v2 plan
+        with open(plan_path, "w", encoding="utf-8") as f:
+            f.write("""# Implementation Plan: X
+
+## Summary
+Text.
+
+## Technical Context
+Text.
+
+## Constitution Check
+Text.
+
+## Project Structure
+Text.
+""")
+        res = run_linter(tmpdir, "plan")
+        assert res.returncode == 0
+        assert "Plan is valid" in res.stdout
+
 def test_journey_checklist_linter():
     with tempfile.TemporaryDirectory() as tmpdir:
         checklist_path = os.path.join(tmpdir, "task.md")
@@ -97,6 +130,31 @@ def test_journey_checklist_linter():
             f.write("""- [x] Task 1
 - [x] Task 2
 - [x] запуск линтера-чеклиста
+""")
+        res = run_linter(tmpdir, "checklist")
+        assert res.returncode == 0
+        assert "Checklist is valid" in res.stdout
+
+def test_journey_checklist_v2_linter():
+    """v2 CLI path: tasks.md is preferred over task.md end-to-end."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        checklist_path = os.path.join(tmpdir, "tasks.md")
+
+        # 1. v2 checklist with incomplete task
+        with open(checklist_path, "w", encoding="utf-8") as f:
+            f.write("""- [x] Task 1
+- [ ] Task 2
+- [x] run checklist-linter
+""")
+        res = run_linter(tmpdir, "checklist")
+        assert res.returncode == 1
+        assert "Error: Incomplete task" in res.stdout
+
+        # 2. Correct v2 checklist
+        with open(checklist_path, "w", encoding="utf-8") as f:
+            f.write("""- [x] Task 1
+- [x] Task 2
+- [x] run checklist-linter
 """)
         res = run_linter(tmpdir, "checklist")
         assert res.returncode == 0

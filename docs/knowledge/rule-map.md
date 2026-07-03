@@ -2,16 +2,19 @@
 type: rule-map
 title: Legacy Anchor Resolution Map
 description: Resolves every pre-consolidation PL-x.y / CP-x.y anchor to a rule ID or a bundle file.
-timestamp: 2026-07-02
+timestamp: 2026-07-03
 ---
 
 # Rule Map — Legacy Anchor Resolution
 
 Every historical `PL-x.y` / `CP-x.y` citation resolves here. Rule anchors point to a
-`R-<DOMAIN>-<n>` entry in [RULES.md](../../RULES.md); descriptive anchors point to a
-knowledge-bundle file. Generated during the governance consolidation (feature 002).
+`R-<DOMAIN>-<n>` entry in [RULES.md](../../RULES.md); descriptive/retired anchors are
+curated exceptions cross-checked against
+[tests/fixtures/imperative_dispositions.txt](../../tests/fixtures/imperative_dispositions.txt);
+all other anchors point to a knowledge-bundle file. Generated during the governance
+consolidation (feature 002); content-integrity repaired in feature 003 (audit F-1/F-2).
 
-Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
+Total anchors: 295  ·  to rule IDs: 161  ·  descriptive/retired (curated): 7  ·  to bundle file: 127
 
 | Legacy anchor | Resolves to |
 |---|---|
@@ -34,7 +37,7 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | CP-2.14 | docs/knowledge/features-overview.md |
 | CP-2.15 | docs/knowledge/features-overview.md |
 | CP-2.16 | docs/knowledge/features-overview.md |
-| CP-2.17 | docs/knowledge/features-overview.md |
+| CP-2.17 | descriptive (see tests/fixtures/imperative_dispositions.txt) |
 | CP-2.18 | R-DATA-10 |
 | CP-2.19 | R-DATA-1 |
 | CP-2.20 | docs/knowledge/features-overview.md |
@@ -61,11 +64,11 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | CP-3.4 | R-FSM-2 |
 | CP-3.5 | R-CODE-4 |
 | CP-3.6 | R-ARCH-6 |
-| CP-3.7 | docs/knowledge/features-overview.md |
+| CP-3.7 | R-ARCH-1 |
 | CP-3.8 | R-ARCH-3 |
 | CP-3.9 | R-DATA-4 |
 | CP-3.10 | R-DB-3 |
-| CP-3.11 | docs/knowledge/features-overview.md |
+| CP-3.11 | R-UI-12 |
 | CP-3.12 | R-UI-5 |
 | CP-3.13 | R-SEC-2 |
 | CP-3.14 | R-UI-8 |
@@ -83,11 +86,11 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | CP-3.26 | R-PROC-7 |
 | CP-3.27 | R-DATA-7 |
 | CP-3.28 | R-PROC-2 |
-| CP-3.28.1 | docs/knowledge/features-overview.md |
-| CP-3.28.2 | docs/knowledge/features-overview.md |
-| CP-3.28.3 | docs/knowledge/features-overview.md |
+| CP-3.28.1 | R-PROC-2 |
+| CP-3.28.2 | R-PROC-2 |
+| CP-3.28.3 | R-PROC-2 |
 | CP-3.28.4 | docs/knowledge/features-overview.md |
-| CP-3.28.5 | docs/knowledge/features-overview.md |
+| CP-3.28.5 | R-PROC-2 |
 | CP-3.29 | R-PROC-5 |
 | CP-3.30 | R-PROC-1 |
 | CP-3.31 | R-DATA-10 |
@@ -101,21 +104,21 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | CP-3.39 | R-DATA-9 |
 | CP-3.40 | R-CODE-7 |
 | CP-3.41 | R-UI-10 |
-| CP-3.42 | docs/knowledge/features-overview.md |
+| CP-3.42 | descriptive (see tests/fixtures/imperative_dispositions.txt) |
 | CP-3.43 | R-DATA-5 |
 | CP-3.44 | R-TEST-3 |
 | CP-3.45 | R-CODE-5 |
 | CP-3.46 | R-CODE-6 |
-| CP-3.47 | docs/knowledge/features-overview.md |
+| CP-3.47 | R-UI-13 |
 | CP-3.48 | R-DATA-1 |
 | CP-3.49 | R-DATA-11 |
 | CP-3.50 | R-TEST-3 |
 | CP-3.51 | R-TEST-3 |
 | CP-3.52 | R-DB-1 |
 | CP-3.53 | R-UI-11 |
-| CP-3.53.1 | docs/knowledge/features-overview.md |
-| CP-3.53.2 | docs/knowledge/features-overview.md |
-| CP-3.53.3 | docs/knowledge/features-overview.md |
+| CP-3.53.1 | R-UI-11 |
+| CP-3.53.2 | R-UI-11 |
+| CP-3.53.3 | R-UI-11 |
 | CP-3.54 | R-PROC-6 |
 | CP-3.55 | R-PROC-7 |
 | CP-3.56 | R-DATA-8 |
@@ -123,20 +126,20 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | CP-3.58 | R-PROC-1 |
 | CP-3.59 | R-PROC-10 |
 | CP-3.60 | R-PROC-11 |
-| CP-3.60.1 | docs/knowledge/features-overview.md |
+| CP-3.60.1 | R-PROC-11 |
 | CP-3.60.2 | docs/knowledge/features-overview.md |
 | CP-3.60.3 | docs/knowledge/features-overview.md |
 | CP-4 | docs/knowledge/features/design-system.md |
 | CP-4.1 | docs/knowledge/features/design-system.md |
 | CP-5 | AGENTS.md |
-| CP-5.1 | AGENTS.md |
+| CP-5.1 | retired (scope note obsolete — see docs/knowledge/log.md) |
 | CP-6 | R-PROC-8 |
-| CP-6.1 | docs/knowledge/index.md |
-| CP-6.2 | docs/knowledge/index.md |
-| CP-6.3 | docs/knowledge/index.md |
+| CP-6.1 | R-CODE-4 |
+| CP-6.2 | R-PROC-6 |
+| CP-6.3 | R-PROC-8 |
 | PL-1 | docs/knowledge/architecture.md |
 | PL-1.1 | docs/knowledge/architecture.md |
-| PL-1.2 | docs/knowledge/architecture.md |
+| PL-1.2 | descriptive (stack fact — see tests/fixtures/imperative_dispositions.txt) |
 | PL-1.3 | R-PROC-7 |
 | PL-1.4 | docs/knowledge/architecture.md |
 | PL-1.5 | docs/knowledge/architecture.md |
@@ -158,9 +161,9 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | PL-2.2.50 | R-TEST-1 |
 | PL-2.3 | R-ARCH-4 |
 | PL-2.4 | R-ARCH-1 |
-| PL-2.4.1 | docs/knowledge/index.md |
+| PL-2.4.1 | R-ARCH-1 |
 | PL-2.5 | R-ARCH-3 |
-| PL-2.5.1 | docs/knowledge/index.md |
+| PL-2.5.1 | R-ARCH-3 |
 | PL-2.6 | docs/knowledge/architecture.md |
 | PL-2.6.1 | docs/knowledge/architecture.md |
 | PL-2.6.2 | docs/knowledge/architecture.md |
@@ -181,9 +184,9 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | PL-3.5.1 | docs/knowledge/db-patterns.md |
 | PL-3.5.2 | docs/knowledge/db-patterns.md |
 | PL-3.5.3 | docs/knowledge/db-patterns.md |
-| PL-3.5.4 | docs/knowledge/db-patterns.md |
+| PL-3.5.4 | descriptive (see tests/fixtures/imperative_dispositions.txt) |
 | PL-4 | docs/knowledge/middleware.md |
-| PL-4.1 | docs/knowledge/middleware.md |
+| PL-4.1 | R-ARCH-9 |
 | PL-4.2 | docs/knowledge/middleware.md |
 | PL-4.2.1 | docs/knowledge/middleware.md |
 | PL-4.3 | docs/knowledge/middleware.md |
@@ -194,12 +197,12 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | PL-4.4 | docs/knowledge/middleware.md |
 | PL-4.4.1 | docs/knowledge/middleware.md |
 | PL-4.5 | R-ARCH-6 |
-| PL-4.5.1 | docs/knowledge/middleware.md |
+| PL-4.5.1 | R-ARCH-6 |
 | PL-4.6 | docs/knowledge/middleware.md |
 | PL-4.6.1 | docs/knowledge/middleware.md |
-| PL-4.6.2 | docs/knowledge/middleware.md |
+| PL-4.6.2 | R-DB-5 |
 | PL-4.7 | docs/knowledge/middleware.md |
-| PL-4.7.1 | docs/knowledge/middleware.md |
+| PL-4.7.1 | descriptive (see tests/fixtures/imperative_dispositions.txt) |
 | PL-5 | docs/knowledge/fsm-protocol.md |
 | PL-5.1 | docs/knowledge/fsm-protocol.md |
 | PL-5.1.1 | docs/knowledge/fsm-protocol.md |
@@ -235,17 +238,17 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | PL-5.2.8 | docs/knowledge/fsm-protocol.md |
 | PL-5.2.9 | docs/knowledge/fsm-protocol.md |
 | PL-5.3 | R-FSM-1 |
-| PL-5.3.1 | docs/knowledge/index.md |
+| PL-5.3.1 | R-FSM-1 |
 | PL-5.4 | R-UI-6 |
-| PL-5.4.1 | docs/knowledge/index.md |
+| PL-5.4.1 | R-UI-6 |
 | PL-5.5 | R-SEC-2 |
-| PL-5.5.1 | docs/knowledge/index.md |
+| PL-5.5.1 | R-SEC-2 |
 | PL-5.6 | docs/knowledge/fsm-protocol.md |
 | PL-5.6.1 | docs/knowledge/fsm-protocol.md |
 | PL-5.6.2 | docs/knowledge/fsm-protocol.md |
 | PL-5.6.3 | docs/knowledge/fsm-protocol.md |
 | PL-5.6.4 | docs/knowledge/fsm-protocol.md |
-| PL-6 | docs/knowledge/index.md |
+| PL-6 | R-ARCH-1 |
 | PL-6.1 | R-ARCH-1 |
 | PL-6.2 | R-ARCH-2 |
 | PL-6.3 | R-UI-2 |
@@ -258,7 +261,7 @@ Total anchors: 295  ·  to rule IDs: 138  ·  to bundle/description: 157
 | PL-6.10 | R-UI-4 |
 | PL-6.11 | R-DB-3 |
 | PL-6.12 | R-ARCH-7 |
-| PL-6.13 | docs/knowledge/index.md |
+| PL-6.13 | descriptive (noop callback is intentional; no imperative) |
 | PL-6.14 | R-DATA-4 |
 | PL-6.15 | R-DATA-6 |
 | PL-6.16 | R-FSM-5 |
