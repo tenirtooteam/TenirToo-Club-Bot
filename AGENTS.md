@@ -30,7 +30,6 @@ Descriptive reference lives in [docs/knowledge/](docs/knowledge/index.md). Legac
 | `RULES.md` | Unified rulebook — every behavioral rule, once, with stable IDs. | **Public (tracked)** |
 | `docs/knowledge/` | OKF reference bundle (architecture, schema, registry, FSM, constants, testing, features, design, subagents, rule-map). `index.md` = on-demand entry. | **Public (tracked)** |
 | `.specify/memory/constitution.md` | Spec-kit constitution — top principles mirroring RULES.md. | Local |
-| `PROJECT_LOGIC.md`, `CONTEXT_PROMPT.md` | Redirect indexes (dissolved 2026-07-02) → RULES.md + bundle. Kept for legacy citations. | **Public (tracked)** |
 | `CHANGELOG.md` | Version history. Read on onboarding/debugging, not pre-read. | **Public (tracked)** |
 | `CLAUDE.md`, `GEMINI.md` | Compatibility shims → this file. | Local |
 | `graphify-out/` | Local knowledge-graph artifacts (regenerable). | Local |

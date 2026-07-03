@@ -13,7 +13,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 BUNDLE_DIR = REPO_ROOT / "docs" / "knowledge"
 INDEX_FILE = BUNDLE_DIR / "index.md"
 LOG_FILE = BUNDLE_DIR / "log.md"
-CORE_FILES = [REPO_ROOT / "PROJECT_LOGIC.md", REPO_ROOT / "CONTEXT_PROMPT.md"]
+# PROJECT_LOGIC.md / CONTEXT_PROMPT.md deleted 2026-07-02 (governance cleanup):
+# the always-preread core is now RULES.md + AGENTS.md; legacy PL/CP anchors
+# resolve via docs/knowledge/rule-map.md (a bundle concept file, so the
+# anchor-survival union below covers them automatically).
+CORE_FILES = [REPO_ROOT / "RULES.md", REPO_ROOT / "AGENTS.md"]
 ANCHOR_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "pl_anchors_baseline.txt"
 
 REQUIRED_FRONTMATTER_FIELDS = ("type", "title", "description", "timestamp")
@@ -131,26 +135,6 @@ def test_core_bundle_references_resolve():
     for ref in _bundle_paths_referenced_by_core():
         target = REPO_ROOT / ref
         assert target.is_file(), f"Core file references missing bundle path: {ref}"
-
-
-def test_cp_corruption_absent():
-    """The known merge corruption fragment is gone from CONTEXT_PROMPT.md.
-
-    Feature 002 dissolved CONTEXT_PROMPT.md into a thin redirect index, so the
-    '[CP-3]' section this check originally guarded (feature 001) no longer exists
-    in this file at all. The heading-shape assertion only applies while that
-    section is still present; its absence is not corruption.
-    """
-    cp = REPO_ROOT / "CONTEXT_PROMPT.md"
-    assert cp.is_file(), "CONTEXT_PROMPT.md missing."
-    text = cp.read_text(encoding="utf-8")
-    assert "refer to **PROJ##" not in text, (
-        "Corruption fragment 'refer to **PROJ##' still present in CONTEXT_PROMPT.md."
-    )
-    if "[CP-3]" in text:
-        assert re.search(r"^##\s+\[CP-3\]", text, re.MULTILINE), (
-            "'## [CP-3]' heading is not a standalone heading."
-        )
 
 
 def test_log_exists_nonempty():

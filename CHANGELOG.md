@@ -2,6 +2,11 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.3.1] - 2026-07-02
+
+### Removed
+- **Legacy redirect files deleted**: `PROJECT_LOGIC.md` and `CONTEXT_PROMPT.md` (kept as thin redirect indexes in 1.3.0) are removed entirely — no industry convention defines these names, and legacy `PL-x.y`/`CP-x.y` anchor resolution is already fully served by `docs/knowledge/rule-map.md`. The obsolete `test_cp_corruption_absent` test (guarding a file that no longer exists) is removed; the governance duplicate-text scan and the bundle anchor-survival test now target `RULES.md` + `AGENTS.md`. README directory tree and AI Quick Start updated to the standard entry points (`AGENTS.md`, `RULES.md`, `docs/knowledge/`).
+
 ## [1.3.0] - 2026-07-02
 
 ### Changed

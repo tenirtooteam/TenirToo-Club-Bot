@@ -15,7 +15,10 @@ AGENTS = REPO / "AGENTS.md"
 CONSTITUTION = REPO / ".specify" / "memory" / "constitution.md"
 INVENTORY = REPO / "tests" / "fixtures" / "rules_inventory_baseline.txt"
 SHIMS = [REPO / "CLAUDE.md", REPO / "GEMINI.md"]
-GOV_TEXT_FILES = [RULES, AGENTS, REPO / "PROJECT_LOGIC.md", REPO / "CONTEXT_PROMPT.md"]
+# PROJECT_LOGIC.md / CONTEXT_PROMPT.md deleted 2026-07-02: legacy anchors resolve
+# via docs/knowledge/rule-map.md, so the duplicate-text scan covers only the two
+# living governance files.
+GOV_TEXT_FILES = [RULES, AGENTS]
 
 RULE_ID_RE = re.compile(r"\bR-[A-Z]{2,4}-\d+\b")
 LEGACY_ANCHOR_RE = re.compile(r"\b(?:PL|CP)-\d+(?:\.\d+)*\b")
