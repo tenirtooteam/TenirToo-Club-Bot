@@ -19,8 +19,9 @@ Descriptive reference lives in [docs/knowledge/](docs/knowledge/index.md). Legac
 3. **Skills**: to use `tenirtoo-proposal-analysis` or `tenirtoo-docs-update`, first read the
    skill's `SKILL.md`.
 4. **Roadmap**: future plans live in `_nogit_roadmap.md` / `_nogit_*` (local).
-5. **Knowledge graph**: if `graphify-out/` exists, answer architecture/relationship questions
-   via graphify queries before re-reading source.
+5. **Knowledge graph**: when `graphify-out/` exists, `R-PROC-12` governs it — query the graph
+   first for structural questions; see [docs/knowledge/graph.md](docs/knowledge/graph.md) for
+   commands, the freshness channels, and the CLI-absent fallback.
 
 ## § FILE REGISTRY
 
@@ -54,12 +55,12 @@ Silently determine the route before acting.
 - **Trigger**: code changes, features, fixes.
 - **Pre-read**: the always-set (AGENTS.md + RULES.md + `docs/knowledge/index.md`); open
   relevant bundle concept files on demand.
-- **Engine**: the spec-kit chain is the canonical Route A process (`RNA-1` is a legacy
-  alias — see § COMMAND REGISTRY): `[PA-1 if architectural]` → `/speckit-specify` →
-  `/speckit-clarify` (if requirements are underspecified) → `/speckit-plan` →
-  `/speckit-tasks` → **approval** → `/speckit-implement`.
+- **Engine**: the spec-kit chain is the sole Route A process: `[PA-1 if architectural]` →
+  `/speckit-specify` → `/speckit-clarify` (if requirements are underspecified) →
+  `/speckit-plan` → `/speckit-tasks` → **approval** → `/speckit-implement`. (The legacy
+  `RNA-1`/`implementation_plan.md` path was retired in feature 004 — see § INDEXING.)
 - **Process rules**: align global/architectural options with Шэф first (`R-PROC-1`); the
-  spec-kit `plan.md` carries the RNA-Blueprint content (`R-PROC-2`, see § PLAN CONTENT);
+  spec-kit `plan.md` carries the plan-content blueprint (`R-PROC-2`, see § PLAN CONTENT);
   bugs get a failing reproducing test first (`R-PROC-3`); run the prompt-linter gate after
   `/speckit-plan` (plan stage) and after `/speckit-tasks` completion (checklist stage)
   (`R-PROC-4`); TDD sub-step per execution step; `/speckit-implement` MUST stop at every
@@ -92,20 +93,18 @@ Silently determine the route before acting.
 | `PA-1` / `APA-1` | B | Project / Abstract mode audit |
 | `/speckit-specify` | A | Create the feature spec (`spec.md`) from a description |
 | `/speckit-clarify` | A | Resolve underspecified requirements in an existing spec |
-| `/speckit-plan` | A | Generate `plan.md` (RNA-Blueprint content — see § PLAN CONTENT) |
+| `/speckit-plan` | A | Generate `plan.md` (plan-content blueprint — see § PLAN CONTENT) |
 | `/speckit-tasks` | A | Generate `tasks.md` (chunked, with HARD-STOP gates) |
 | `/speckit-implement` | A | Execute `tasks.md`, honoring approval gates |
 | `/speckit-analyze` | A | Cross-artifact consistency check (spec/plan/tasks) |
-| `RNA-1` | A | **Legacy alias** — for features not using spec-kit, creates/updates
-  `implementation_plan.md` directly (`R-PROC-2`); superseded by `/speckit-plan` |
 | `GW-1` | Git | Local commit at a milestone (`R-PROC-5`) |
 | `CMD-1..4` | C | Update RULES/bundle · knowledge · README · CHANGELOG via docs-update |
 
-## § PLAN CONTENT (RNA-Blueprint inside plan.md)
+## § PLAN CONTENT (blueprint inside plan.md)
 
 Required for any change touching >1 file (`R-PROC-2`). The spec-kit `plan.md` template
-already carries this content under its own headings — no separate RNA artifact is needed
-for features built with spec-kit. Mapping: **Base DNA** (OS/stack) → `Technical Context`;
+carries this content under its own headings — it is the only plan artifact. Mapping:
+**Base DNA** (OS/stack) → `Technical Context`;
 **Task RNA** (logic, risks, edge cases) → `Summary` + `Technical Context`; **Contextual
 Constraints** (cite rule IDs) → `Constitution Check`; **Proposed Changes**
 (`[NEW]`/`[MODIFY]`/`[DELETE]`) → `Project Structure`; **Execution Steps** (numbered, 3–5
@@ -125,6 +124,10 @@ at milestones are allowed; **`git push` requires explicit user request** (`R-PRO
 
 `R-<DOMAIN>-<n>` → rule in `RULES.md`. Legacy `PL-x.y`/`CP-x.y` → `docs/knowledge/rule-map.md`.
 Cite IDs in plans; never copy full rule text (`R-CODE-7`).
+
+**Retired**: `RNA-1` (and its `implementation_plan.md`/`task.md` artifacts) — superseded by
+`/speckit-plan` + `/speckit-tasks`; retired in feature 004. Historical specs 001–003 keep
+their legacy artifacts as read-only records; the prompt-linter no longer accepts them.
 
 ## § SUBAGENTS
 

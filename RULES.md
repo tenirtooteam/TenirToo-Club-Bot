@@ -268,7 +268,7 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: CP-3.46
 
 ### R-CODE-7 [A] Universal indexing protocol
-**Rule**: Every rule/pattern in governance files MUST carry a stable ID (`R-<DOMAIN>-<n>`; legacy `PL-x`/`CP-x` resolve via rule-map). IDs are used in `implementation_plan.md` and as in-code markers for traceability.
+**Rule**: Every rule/pattern in governance files MUST carry a stable ID (`R-<DOMAIN>-<n>`; legacy `PL-x`/`CP-x` resolve via rule-map). IDs are used in the spec-kit `plan.md`/`tasks.md` and as in-code markers for traceability.
 **Why**: Indexing lets plans cite by ID instead of copying text, saving context and enabling lookups.
 **Legacy**: CP-3.40, PL-2.1.7, PL-2.1.8(index)
 
@@ -307,12 +307,12 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 *(Full process narrative lives in AGENTS.md; these are the imperative rules it cites.)*
 
 ### R-PROC-1 [A] Route discipline (no conversational architecture)
-**Rule**: Architectural/logic proposals MUST trigger Route B (PA-1/APA-1) and MUST NOT be answered conversationally. Implementation planning (RNA-Blueprint) starts only after an explicit RNA-1 following an approved audit. For any global/architectural feature, options and system impact MUST be aligned with the user (Шэф) before planning.
+**Rule**: Architectural/logic proposals MUST trigger Route B (PA-1/APA-1) and MUST NOT be answered conversationally. Implementation planning starts only via `/speckit-plan` following an approved audit (the legacy RNA-1 trigger was retired in feature 004). For any global/architectural feature, options and system impact MUST be aligned with the user (Шэф) before planning.
 **Why**: Prevents protocol drift and unvetted changes to the Optimality Standard.
 **Legacy**: CP-3.35, CP-3.30, CP-3.58, GEMINI§Route-B, GEMINI§Route-A(align)
 
 ### R-PROC-2 [A] RNA-Blueprint before multi-file change
-**Rule**: Any feature/refactor/bugfix touching >1 file MUST have an RNA-Blueprint plan: Base DNA, Task RNA, Contextual Constraints (indexed), Proposed Changes, numbered Execution Steps (TDD sub-step each), Verification. The canonical artifact is the spec-kit `plan.md` (RNA-Blueprint content mapped per AGENTS.md § PLAN CONTENT); `implementation_plan.md` is accepted for historical features. Execution runs 3–5 steps per chunk, then reports and awaits approval — `tasks.md`/`task.md` MUST contain an explicit HARD-STOP gate task at each chunk boundary. For bugs, the plan MUST name the reproducing test file/case. Plans are updated incrementally: do not rewrite the entire plan for a correction; update only the affected parts.
+**Rule**: Any feature/refactor/bugfix touching >1 file MUST have a blueprint plan: Base DNA, Task RNA, Contextual Constraints (indexed), Proposed Changes, numbered Execution Steps (TDD sub-step each), Verification. The sole canonical plan artifact is the spec-kit `plan.md` (blueprint content mapped per AGENTS.md § PLAN CONTENT) and the sole canonical checklist is `tasks.md`; the legacy `implementation_plan.md`/`task.md` were retired in feature 004 (historical specs 001–003 keep theirs as read-only records only). Execution runs 3–5 steps per chunk, then reports and awaits approval — `tasks.md` MUST contain an explicit HARD-STOP gate task at each chunk boundary. For bugs, the plan MUST name the reproducing test file/case. Plans are updated incrementally: do not rewrite the entire plan for a correction; update only the affected parts.
 **Why**: Externalizing strategy before action prevents instruction drift and enforces TDD; incremental updates keep plan diffs reviewable; a gate task in the artifact itself makes the approval pause mechanical instead of relying on the plan author's memory.
 **Legacy**: CP-3.28, GEMINI§RNA-BLUEPRINT, CP-3.28.2
 
@@ -322,7 +322,7 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: GEMINI§Route-A(debugging), CP-3.28(bug)
 
 ### R-PROC-4 [B] Prompt-linter gates
-**Rule**: Plan/checklist/report artifacts MUST pass their stage. Plan stage validates `plan.md` (spec-kit, preferred) or `implementation_plan.md` (legacy fallback); checklist stage validates `tasks.md` (preferred) or `task.md` (legacy fallback). **Enforced by** `local_scripts/prompt_linter.py --stage {plan|checklist|report}`.
+**Rule**: Plan/checklist/report artifacts MUST pass their stage. Plan stage validates `plan.md`; checklist stage validates `tasks.md`; report stage validates `walkthrough.md`. The legacy `implementation_plan.md`/`task.md` fallbacks were removed in feature 004 — the linter now rejects them. **Enforced by** `local_scripts/prompt_linter.py --stage {plan|checklist|report}`.
 **Legacy**: CP-2.36, GEMINI§Route-A(linter)
 
 ### R-PROC-5 [A] Git workflow GW-1
@@ -357,6 +357,11 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 ### R-PROC-11 [B] Architecture enforcement ruleset
 **Rule**: Five semgrep rules enforce architecture: `ban-dynamic-imports`, `ban-db-in-handlers`, `ban-state-clear`, `ban-direct-ui-calls` (excludes `errors.py`, `announcements.py`), `missing-state-parameter`. **Enforced by** `semgrep-rules.yaml` via `docker-compose --profile lint run --rm semgrep` and `tests/test_services/test_semgrep_lint.py`.
 **Legacy**: PL-6.26, CP-3.60
+
+### R-PROC-12 [A] Graph-first for structural questions
+**Rule**: When `graphify-out/` exists, questions about architecture, file relationships, call graphs, or data flow MUST be answered with a `graphify query`/`path`/`explain` first; opening source files is for verifying and detailing what the graph returned, not for first-pass discovery. If the graphify CLI is unavailable, fall back to reading source directly and STATE that degradation explicitly. Graph currency rides on two channels — code via the post-commit git hook, documentation/semantic layer via the docs-update skill (see `docs/knowledge/graph.md`); do not trust the graph when you have reason to believe both are stale.
+**Why**: The graph is the cheapest correct map of the repository — querying first saves context and surfaces cross-module links a source dive misses; the explicit fallback keeps the rule from becoming a hazard when the tool is missing.
+**Legacy**: —
 
 ---
 

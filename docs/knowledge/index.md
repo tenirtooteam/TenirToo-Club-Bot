@@ -29,6 +29,7 @@ For the change history of this bundle, see [log.md](log.md).
 | [constants.md](constants.md) | constants | Environment-sourced constants — types, sources, usage (from [PL-7]). |
 | [testing.md](testing.md) | testing | conftest fixtures, test-category map, Docker dev sandbox (from [PL-8.1], [PL-8.2], [PL-8.4], [PL-8.6]). |
 | [features-overview.md](features-overview.md) | feature-detail | Full descriptive feature list (from [CP-2]). |
+| [graph.md](graph.md) | graph-guide | Knowledge-graph usage: query/rebuild commands, the two freshness channels, CLI-absent fallback (cites `R-PROC-12`). |
 
 ## Feature details
 

@@ -2,6 +2,18 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.5.0] - 2026-07-04
+
+### Added
+- **R-PROC-12 graph-first rule**: `RULES.md` gains a governed mandate — when `graphify-out/` exists, architecture/relationship/data-flow questions are answered via `graphify query`/`path`/`explain` before source reads, with an explicit CLI-absent fallback and the two-channel freshness contract.
+- **`docs/knowledge/graph.md`**: knowledge-graph concept file (query/rebuild commands, freshness channels, model configuration, auth note) — future sessions of any assistant need nothing beyond the repository. Registered in `index.md`/`log.md` (bundle atomicity).
+- **Graphify native integration**: `graphify claude install` (a `## graphify` section in `CLAUDE.md` + PreToolUse hooks in `.claude/settings.json`, `@AGENTS.md` shim intact) and `graphify hook install` (post-commit/post-checkout auto-rebuild of the code layer). Semantic extraction pinned to Haiku via `GRAPHIFY_CLAUDE_CLI_MODEL=haiku` (`env` block in `.claude/settings.json`).
+- **Docs-update graph refresh step**: the `tenirtoo-docs-update` skill now ends CMD-1/CMD-2 with `graphify extract . --backend claude-cli` (semantic layer on Haiku) and its Output Validation checklist gained a "graph refreshed" item; Route C stays git-free.
+
+### Changed
+- **Spec-kit is the sole Route A**: the legacy RNA path is fully retired — `RNA-1` removed from `AGENTS.md` § COMMAND REGISTRY (recorded as retired in § INDEXING and `rule-map.md`), `R-PROC-1`/`R-PROC-2`/`R-PROC-4` name `plan.md`/`tasks.md` as the only canonical artifacts, and historical specs 001–003 keep their legacy artifacts as read-only records.
+- **Prompt linter v3 (spec-kit-only)**: `PLAN_LEGACY_REQUIRED_H2S` and the `implementation_plan.md`/`task.md` fallbacks removed from `local_scripts/prompt_linter.py`; legacy filenames are now rejected. Linter unit/journey tests rewritten TDD-first (legacy-rejection red → green); code-layer graph rebuilt (1796 nodes, 3151 edges, 174 communities).
+
 ## [1.4.0] - 2026-07-03
 
 ### Added

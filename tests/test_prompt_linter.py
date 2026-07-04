@@ -15,57 +15,54 @@ from local_scripts.prompt_linter import (
 )
 
 def test_validate_plan_success():
-    content = """# Goal Description
-Some description here.
+    # Default structure is now the spec-kit plan.md (v2) — legacy RNA headers removed.
+    content = """# Implementation Plan: Feature X
 
-## User Review Required
-None.
+## Summary
+Some summary here.
 
-## Open Questions
-None.
+## Technical Context
+Details.
 
-## Proposed Changes
-### Component
-#### [MODIFY] file.py
+## Constitution Check
+Passes.
 
-## Verification Plan
-### Automated Tests
-pytest
+## Project Structure
+### Documentation (this feature)
+Tree.
 """
     errors, warnings = validate_plan(content)
     assert not errors
     assert not warnings
 
 def test_validate_plan_missing_sections():
-    content = """# Goal Description
+    content = """# Implementation Plan: Feature X
 No other headers.
 """
     errors, warnings = validate_plan(content)
     assert len(errors) > 0
-    assert any("User Review Required" in e for e in errors)
-    assert any("Open Questions" in e for e in errors)
-    assert any("Proposed Changes" in e for e in errors)
-    assert any("Verification Plan" in e for e in errors)
+    assert any("Summary" in e for e in errors)
+    assert any("Technical Context" in e for e in errors)
+    assert any("Constitution Check" in e for e in errors)
+    assert any("Project Structure" in e for e in errors)
 
 def test_validate_plan_cyrillic_warning():
-    content = """# Goal Description
+    content = """# Implementation Plan: Feature X
+
+## Summary
 This is English text.
 
-## User Review Required
+## Technical Context
 Русский текст вызывает варнинг.
 Но слово Шэф в вайтлисте.
 И слово Теңир-Тоо тоже.
 
-## Open Questions
-None.
+## Constitution Check
+Passes.
 
-## Proposed Changes
-### Component
-#### [MODIFY] file.py
-
-## Verification Plan
-### Automated Tests
-pytest
+## Project Structure
+### Documentation (this feature)
+Tree.
 """
     errors, warnings = validate_plan(content)
     assert not errors
@@ -170,16 +167,15 @@ def test_plan_v2_speckit_file():
         assert is_v2 is True
         assert os.path.basename(path) == "plan.md"
 
-def test_plan_legacy_fallback():
-    """find_plan_file falls back to implementation_plan.md when plan.md is absent."""
+def test_plan_legacy_rejected():
+    """Legacy implementation_plan.md is no longer accepted — spec-kit-only Route A."""
     with tempfile.TemporaryDirectory() as tmpdir:
         with open(os.path.join(tmpdir, "implementation_plan.md"), "w", encoding="utf-8") as f:
             f.write("# Goal Description\n")
         path, is_v2 = find_plan_file(tmpdir)
-        assert is_v2 is False
-        assert os.path.basename(path) == "implementation_plan.md"
+        assert path is None
 
-def test_plan_v2_wins_when_both_present():
+def test_plan_ignores_legacy_when_both_present():
     with tempfile.TemporaryDirectory() as tmpdir:
         with open(os.path.join(tmpdir, "plan.md"), "w", encoding="utf-8") as f:
             f.write("# Plan\n")
@@ -198,16 +194,15 @@ def test_checklist_v2_tasks_file():
         assert is_v2 is True
         assert os.path.basename(path) == "tasks.md"
 
-def test_checklist_legacy_fallback():
-    """find_checklist_file falls back to task.md when tasks.md is absent."""
+def test_checklist_legacy_rejected():
+    """Legacy task.md is no longer accepted — spec-kit-only Route A."""
     with tempfile.TemporaryDirectory() as tmpdir:
         with open(os.path.join(tmpdir, "task.md"), "w", encoding="utf-8") as f:
             f.write("- [x] запуск линтера-чеклиста\n")
         path, is_v2 = find_checklist_file(tmpdir)
-        assert is_v2 is False
-        assert os.path.basename(path) == "task.md"
+        assert path is None
 
-def test_checklist_v2_wins_when_both_present():
+def test_checklist_ignores_legacy_when_both_present():
     with tempfile.TemporaryDirectory() as tmpdir:
         with open(os.path.join(tmpdir, "tasks.md"), "w", encoding="utf-8") as f:
             f.write("- [x] запуск линтера-чеклиста\n")

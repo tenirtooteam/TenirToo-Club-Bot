@@ -16,6 +16,12 @@ consolidation (feature 002); content-integrity repaired in feature 003 (audit F-
 
 Total anchors: 295  ·  to rule IDs: 161  ·  descriptive/retired (curated): 7  ·  to bundle file: 127
 
+**Retired commands** (not PL/CP anchors — recorded here for traceability):
+
+| Command | Resolves to |
+|---|---|
+| RNA-1 | retired (superseded by `/speckit-plan` + `/speckit-tasks`; feature 004, 2026-07-04) |
+
 | Legacy anchor | Resolves to |
 |---|---|
 | CP-1 | AGENTS.md |

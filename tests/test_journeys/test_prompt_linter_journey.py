@@ -11,63 +11,27 @@ def run_linter(temp_dir, stage):
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result
 
-def test_journey_plan_linter():
+def test_journey_plan_legacy_rejected():
+    """Spec-kit-only: a dir with only implementation_plan.md is rejected (no plan.md)."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        # 1. Plan with errors (missing headers)
-        plan_path = os.path.join(tmpdir, "implementation_plan.md")
-        with open(plan_path, "w", encoding="utf-8") as f:
-            f.write("# Short Goal\nNo headers.")
+        legacy_path = os.path.join(tmpdir, "implementation_plan.md")
+        with open(legacy_path, "w", encoding="utf-8") as f:
+            f.write("""# Goal Description
+Some description.
 
+## User Review Required
+None.
+
+## Proposed Changes
+### Component
+#### [MODIFY] file.py
+
+## Verification Plan
+pytest
+""")
         res = run_linter(tmpdir, "plan")
         assert res.returncode == 1
-        assert "Error:" in res.stdout
-
-        # 2. Plan with warnings (Cyrillic) but correct structure
-        with open(plan_path, "w", encoding="utf-8") as f:
-            f.write("""# Goal Description
-Some description.
-
-## User Review Required
-Привет мир.
-
-## Open Questions
-None.
-
-## Proposed Changes
-### Component
-#### [MODIFY] file.py
-
-## Verification Plan
-### Automated Tests
-pytest
-""")
-        res = run_linter(tmpdir, "plan")
-        assert res.returncode == 0
-        assert "Warning:" in res.stdout
-
-        # 3. Plan with no warnings/errors
-        with open(plan_path, "w", encoding="utf-8") as f:
-            f.write("""# Goal Description
-Some description.
-
-## User Review Required
-None.
-
-## Open Questions
-None.
-
-## Proposed Changes
-### Component
-#### [MODIFY] file.py
-
-## Verification Plan
-### Automated Tests
-pytest
-""")
-        res = run_linter(tmpdir, "plan")
-        assert res.returncode == 0
-        assert "Warning:" not in res.stdout
-        assert "Error:" not in res.stdout
+        assert "no plan.md" in res.stdout
 
 def test_journey_plan_v2_linter():
     """v2 CLI path: plan.md is preferred over implementation_plan.md end-to-end."""
@@ -102,38 +66,17 @@ Text.
         assert res.returncode == 0
         assert "Plan is valid" in res.stdout
 
-def test_journey_checklist_linter():
+def test_journey_checklist_legacy_rejected():
+    """Spec-kit-only: a dir with only task.md is rejected (no tasks.md)."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        checklist_path = os.path.join(tmpdir, "task.md")
-
-        # 1. Checklist with incomplete task
-        with open(checklist_path, "w", encoding="utf-8") as f:
+        legacy_path = os.path.join(tmpdir, "task.md")
+        with open(legacy_path, "w", encoding="utf-8") as f:
             f.write("""- [x] Task 1
-- [ ] Task 2
 - [x] запуск линтера-чеклиста
 """)
         res = run_linter(tmpdir, "checklist")
         assert res.returncode == 1
-        assert "Error: Incomplete task" in res.stdout
-
-        # 2. Checklist missing linter step
-        with open(checklist_path, "w", encoding="utf-8") as f:
-            f.write("""- [x] Task 1
-- [x] Task 2
-""")
-        res = run_linter(tmpdir, "checklist")
-        assert res.returncode == 1
-        assert "Error: Last item must be" in res.stdout
-
-        # 3. Correct checklist
-        with open(checklist_path, "w", encoding="utf-8") as f:
-            f.write("""- [x] Task 1
-- [x] Task 2
-- [x] запуск линтера-чеклиста
-""")
-        res = run_linter(tmpdir, "checklist")
-        assert res.returncode == 0
-        assert "Checklist is valid" in res.stdout
+        assert "no tasks.md" in res.stdout
 
 def test_journey_checklist_v2_linter():
     """v2 CLI path: tasks.md is preferred over task.md end-to-end."""
