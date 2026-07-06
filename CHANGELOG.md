@@ -2,6 +2,18 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.6.0] - 2026-07-06
+
+### Added
+- **Canonical pytest invocation** (`pytest.ini`): `pythonpath = .` + `testpaths = tests` make the bare `.\venv\Scripts\pytest` form work from the repo root (previously only `python -m pytest` collected — `tests/conftest.py` failed to import `database`). A subprocess collection smoke test (`tests/test_services/test_collection_smoke.py`) guards it (failing-first per `R-PROC-3`). `docs/knowledge/testing.md` gains a "Running the Suite" section.
+- **`tenirtoo-plugin` registration**: the workspace engines are now a real Claude Code plugin (`.claude-plugin/plugin.json` manifest, repo-root `.claude-plugin/marketplace.json` `tenirtoo-local`, `enabledPlugins` in `.claude/settings.json`). Route B/C skills (`tenirtoo-proposal-analysis`, `tenirtoo-docs-update`) and the three subagents (`proposal-auditor`, `test-runner-and-debugger`, `cognitive-ux-auditor`, generated from `docs/knowledge/subagents.md`) are discoverable/delegable in fresh sessions. All Local-tier.
+- **Semgrep SAST gate verified**: `docker compose --profile lint run --rm semgrep` runs green (5 rules, 46 files, 0 findings); `docs/knowledge/testing.md` documents the Docker channel as canonical and the host-side Windows skip as intended.
+
+### Changed
+- **Prompt linter false-positive fix** (`local_scripts/prompt_linter.py`): the plan-stage Cyrillic check now flags a token only when it contains ≥1 Cyrillic letter, so hyphens/dashes in `spec-kit`/`2026-07-04` no longer warn. Three regression cases added to `tests/test_prompt_linter.py`.
+- **`requirements-dev.txt`**: `semgrep` pinned with `; sys_platform != "win32"` (no native Windows wheels) so dev-deps install cleanly on the Windows dev host.
+- **Dead reference removed**: the `graphify-out/wiki/index.md` bullet dropped from `CLAUDE.md` (graphify CLI 0.8.49 produces no wiki). `AGENTS.md` § FILE REGISTRY row updated for the plugin.
+
 ## [1.5.0] - 2026-07-04
 
 ### Added

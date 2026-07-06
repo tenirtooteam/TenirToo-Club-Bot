@@ -16,6 +16,22 @@ tags: [testing, infrastructure, docker]
 Comprehensive automated testing suite using `pytest`; tests are an integral part of the
 codebase.
 
+## Running the Suite (Canonical Invocation)
+
+Run the full suite from the repository root with the bare venv binary:
+
+```powershell
+.\venv\Scripts\pytest          # full suite (canonical form)
+.\venv\Scripts\pytest tests/test_services/test_x.py::test_y   # targeted
+```
+
+`pytest.ini` at the repo root pins this form: `pythonpath = .` puts the project root on
+`sys.path` during collection (so `tests/conftest.py` can import `database`, `services`,
+…), and `testpaths = tests` scopes discovery to `tests/` (excluding the git-ignored
+`scratch/` and `_nogit_*` areas). The `python -m pytest` form remains equivalent and
+non-regressing. The Docker channel (`docker compose run --rm app pytest`) mirrors the same
+suite inside the dev sandbox.
+
 ## Configuration (`tests/conftest.py`)
 
 - **Database Isolation**: `db_setup` redirects `connection.DB_PATH` to a temporary file in
@@ -50,6 +66,21 @@ isolated dev-only executions. The sandbox installs dev dependencies
 (`requirements-dev.txt`) and mounts the workspace, excluding the host Windows `.venv` and
 database files to prevent locks. The production runtime does not use Docker and remains
 dependency-clean.
+
+### Architecture SAST gate (semgrep)
+
+The five architecture-enforcement rules (`R-PROC-11`, `semgrep-rules.yaml`) run through the
+**Docker** channel — this is the canonical way to execute the gate:
+
+```powershell
+docker compose --profile lint run --rm semgrep   # requires Docker Desktop running
+```
+
+`semgrep` has no native Windows wheels, so it is pinned in `requirements-dev.txt` with the
+marker `; sys_platform != "win32"` (it installs on Linux/WSL, is skipped on native
+Windows). Accordingly, the host-side `tests/test_services/test_semgrep_lint.py` **auto-skips
+when semgrep is not installed** — this skip on Windows is intended behavior, not a gap; the
+authoritative check is the Docker command above.
 
 ## Subagent Configurations
 

@@ -35,7 +35,7 @@ Descriptive reference lives in [docs/knowledge/](docs/knowledge/index.md). Legac
 | `CLAUDE.md`, `GEMINI.md` | Compatibility shims → this file. | Local |
 | `graphify-out/` | Local knowledge-graph artifacts (regenerable). | Local |
 | `_nogit_*` | Local scratch/roadmap. | Local |
-| Skills `tenirtoo-*` | Audit engine / docs-sync engine under `.agents/plugins/`. | Local |
+| `tenirtoo-plugin` | Local Claude Code plugin at `.agents/plugins/tenirtoo-plugin/` (manifest `.claude-plugin/plugin.json`). Bundles the Route B/C engine **skills** (`tenirtoo-proposal-analysis`, `tenirtoo-docs-update`) and the three **subagents** (`proposal-auditor`, `test-runner-and-debugger`, `cognitive-ux-auditor`). Registered via repo-root `.claude-plugin/marketplace.json` (`tenirtoo-local`) + `enabledPlugins` in `.claude/settings.json`. Subagent configs are mirrored from [subagents.md](docs/knowledge/subagents.md) (descriptive source). | Local |
 
 ## § CONTENT OWNERSHIP
 

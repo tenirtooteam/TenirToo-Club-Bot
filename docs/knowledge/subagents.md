@@ -13,6 +13,14 @@ tags: [subagents, process, testing]
 > (feature 002). AGENTS.md now carries a one-line summary per subagent; the operational
 > detail lives here (reference data).
 
+> **Operational mirror (feature 005)**: this file remains the **descriptive source of
+> truth**. The delegable agent definitions are generated from the configs below and live in
+> the `tenirtoo-plugin` plugin at `.agents/plugins/tenirtoo-plugin/agents/*.md` (Local tier,
+> discovered by the harness). Keep the two in sync: when a config here changes, update the
+> corresponding plugin file. The mirror is faithful with two intentional infra alignments —
+> (a) the canonical test invocation `.\venv\Scripts\pytest` (now working via `pytest.ini`),
+> and (b) a one-line graphify-first pointer per `R-PROC-12` on agents that explore code.
+
 ## 1. proposal-auditor
 * **Role**: System Architect & Dialectic Auditor
 * **Invocation Trigger**: Route B (Architectural Proposal / Expert Opinion).

@@ -1,4 +1,7 @@
 -r requirements.txt
 import-linter==2.1
 ruff==0.3.4
-semgrep>=1.65.0
+# semgrep has no native Windows wheels — the architecture SAST gate runs via the Docker
+# service (`docker compose --profile lint run --rm semgrep`, R-PROC-11). The host-side
+# tests/test_services/test_semgrep_lint.py auto-skips when semgrep is absent (e.g. on win32).
+semgrep>=1.65.0; sys_platform != "win32"

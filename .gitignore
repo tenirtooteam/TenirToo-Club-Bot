@@ -27,6 +27,7 @@ local_scripts/
 # AGENTS.md is now the tracked constitution (feature 002) — intentionally NOT ignored.
 CLAUDE.md
 .agents/
+.claude-plugin/
 _nogit_*
 GEMINI.md
 .claude/

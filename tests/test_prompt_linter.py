@@ -71,6 +71,70 @@ Tree.
     assert not any("Шэф" in w for w in warnings)
     assert not any("Теңир-Тоо" in w for w in warnings)
 
+def test_validate_plan_hyphenated_latin_no_false_positive():
+    """[feature 005] Дефисы между латиницей/цифрами не должны флагаться как кириллица."""
+    content = """# Implementation Plan: Feature X
+
+## Summary
+Use spec-kit on 2026-07-04 for the Route-A pipeline.
+
+## Technical Context
+Details id-42 and a-b-c ranges.
+
+## Constitution Check
+Passes.
+
+## Project Structure
+### Documentation (this feature)
+Tree.
+"""
+    errors, warnings = validate_plan(content)
+    assert not errors
+    assert not any("Cyrillic" in w for w in warnings)
+
+
+def test_validate_plan_punctuation_only_no_warning():
+    """[feature 005] Обособленные дефисы/тире не флагуются."""
+    content = """# Implementation Plan: Feature X
+
+## Summary
+List: a - b -- c and range 1-2-3.
+
+## Technical Context
+Details.
+
+## Constitution Check
+Passes.
+
+## Project Structure
+### Documentation (this feature)
+Tree.
+"""
+    errors, warnings = validate_plan(content)
+    assert not any("Cyrillic" in w for w in warnings)
+
+
+def test_validate_plan_mixed_cyrillic_latin_flagged():
+    """[feature 005] Смешанный токен с кириллицей (спек-kit) должен флагаться."""
+    content = """# Implementation Plan: Feature X
+
+## Summary
+Avoid спек-kit hybrids.
+
+## Technical Context
+Details.
+
+## Constitution Check
+Passes.
+
+## Project Structure
+### Documentation (this feature)
+Tree.
+"""
+    errors, warnings = validate_plan(content)
+    assert any("Cyrillic" in w for w in warnings)
+
+
 def test_validate_checklist_success():
     content = """- [x] task 1
 - [x] task 2
