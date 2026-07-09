@@ -52,11 +52,14 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
 
     ann_type, target_id, topic_id = ann[1], ann[2], ann[3]
 
-    if not PermissionService.can_user_write_in_topic(user_id, topic_id):
-         raise HTTPException(status_code=403, detail="Access denied")
-
     if ann_type != "event":
          raise HTTPException(status_code=400, detail="Only event participation is supported")
+
+    # Единый гард прямой записи [feature 006, FR-001/002] — топик анонса + проверка одобрения.
+    allowed, reason = EventService.check_direct_join_allowed(user_id, target_id, topic_id=topic_id)
+    if not allowed:
+         logger.warning(f"[FR-011] Web announcement join denied: user={user_id} event={target_id} topic={topic_id} reason={reason}")
+         raise HTTPException(status_code=403, detail=reason)
 
     success, message = ManagementService.toggle_event_participation(target_id, user_id)
 

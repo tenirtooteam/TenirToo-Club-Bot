@@ -67,15 +67,17 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
     target_id = ann[2]
     topic_id = ann[3]
 
-    # 2. Проверка прав доступа (Только члены топика [RA-2])
-    if not PermissionService.can_user_write_in_topic(user_id, topic_id):
-        await callback.answer("🚫 У вас нет доступа к этому разделу клуба.", show_alert=True)
-        return
+    # 2. Единый гард прямой записи [feature 006, FR-001/002/011]: топик анонса + одобрение.
+    if ann_type == "event":
+        allowed, reason = EventService.check_direct_join_allowed(user_id, target_id, topic_id=topic_id)
+        if not allowed:
+            logger.warning(f"[FR-011] Announcement join denied: user={user_id} event={target_id} topic={topic_id} reason={reason}")
+            await callback.answer(reason, show_alert=True)
+            return
 
     # 3. Выполняем действие в зависимости от типа
     if ann_type == "event":
         from services.management_service import ManagementService
-        from services.event_service import EventService
 
         # Получаем код действия (1 - иду, 0 - не иду)
         action_code = callback.data.split(":")[-1]

@@ -1,6 +1,7 @@
 # Файл: tests/test_web/test_auth.py
 import hmac
 import hashlib
+import time
 import urllib.parse
 from web.auth import validate_webapp_init_data
 from config import BOT_TOKEN
@@ -8,7 +9,9 @@ from config import BOT_TOKEN
 def test_validate_webapp_init_data_success():
     # Имитируем корректные данные от Telegram
     user_data = '{"id":12345,"first_name":"Test"}'
-    auth_date = "1714220000"
+    # Свежая метка времени [feature 006]: фиксированная дата из прошлого теперь корректно
+    # отклоняется anti-replay проверкой auth_date.
+    auth_date = str(int(time.time()))
 
     # Собираем строку для хэширования (без hash)
     # Ключи должны быть отсортированы по алфавиту

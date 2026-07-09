@@ -31,3 +31,7 @@ WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")
 WEBAPP_PORT = int(os.getenv("WEBAPP_PORT", "8000"))
 WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 WEBAPP_CORS_ORIGINS = ["*"]
+
+# Anti-replay: макс. возраст сессии Telegram WebApp (auth_date). [feature 006, FR-006]
+# <= 0 отключает проверку свежести.
+WEBAPP_SESSION_TTL_SECONDS = int(os.getenv("WEBAPP_SESSION_TTL_SECONDS", "86400"))

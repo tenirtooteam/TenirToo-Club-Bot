@@ -231,13 +231,22 @@ async def search_pick_handler(callback: types.CallbackQuery, state: FSMContext):
 
 
 
-async def perform_search_pick(state, event, s_type, s_action, s_context, item_id):
+async def perform_search_pick(state, event_or_msg, s_type, s_action, s_context, item_id):
     """Универсальный роутер результатов поиска: делегирует навигацию системному роутеру."""
     if s_action == "info":
-        return await UIService.generic_navigator(state, event, f"{s_type}_info_{item_id}")
+        return await UIService.generic_navigator(state, event_or_msg, f"{s_type}_info_{item_id}")
 
     # Определяем ID пользователя, совершившего действие
-    user_id = event.from_user.id
+    user_id = event_or_msg.from_user.id
+
+    # [feature 006, FR-010] Defense-in-depth: выдача прав требует прав на управление топиком,
+    # не полагаемся на то, что кнопка «досталась» только уполномоченному (R-ARCH-7).
+    if s_action in ("mod_add", "dir_add"):
+        if not PermissionService.can_manage_topic(user_id, int(s_context)):
+            logger.warning(f"🛡 [FR-011] search_pick grant denied: user={user_id} action={s_action} topic={s_context}")
+            await event_or_msg.answer("❌ Доступ запрещён.", show_alert=True)
+            return
+
     from aiogram.utils.keyboard import InlineKeyboardBuilder
     from keyboards.pagination_util import add_nav_footer
 
@@ -255,24 +264,42 @@ async def perform_search_pick(state, event, s_type, s_action, s_context, item_id
         success, result = ManagementService.assign_moderator_role_by_id(item_id, int(s_context))
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
+        return await UIService.sterile_show(state, event_or_msg, result, reply_markup=reply_markup)
 
     if s_action == "dir_add":
         success, result = ManagementService.grant_direct_access_by_id(item_id, int(s_context))
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.sterile_show(state, event, result, reply_markup=reply_markup)
+        return await UIService.sterile_show(state, event_or_msg, result, reply_markup=reply_markup)
 
     if s_action == "admin_role_target":
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.generic_navigator(state, event, f"user_roles_manage_{item_id}")
+        return await UIService.generic_navigator(state, event_or_msg, f"user_roles_manage_{item_id}")
 
     if s_action == "mod_select":
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.generic_navigator(state, event, f"mod_topic_select_{item_id}")
+        return await UIService.generic_navigator(state, event_or_msg, f"mod_topic_select_{item_id}")
 
+
+
+def _confirm_action_authorized(user_id: int, action: str, target_id: int, extra_id: int) -> bool:
+    """
+    [feature 006, FR-009] Проверка полномочий на подтверждённую деструктивную операцию.
+    Права через PermissionService (R-ARCH-7), без inline-сравнений с ADMIN_ID.
+    - Модераторские действия — по праву на управление соответствующим топиком.
+    - Удаление похода — по праву на редактирование (автор или админ).
+    - Остальное (группы/топики/пользователи/роли) — только глобальный админ.
+    """
+    from services.event_service import EventService
+    if action == "mod_topic_del":
+        return PermissionService.can_manage_topic(user_id, target_id)  # target_id = топик
+    if action == "mod_rem":
+        return PermissionService.can_manage_topic(user_id, extra_id)   # extra_id = топик
+    if action == "event_del":
+        return EventService.can_edit_event(user_id, target_id)
+    return PermissionService.is_global_admin(user_id)
 
 
 @router.callback_query(F.data.startswith("confirm_exe_"))
@@ -285,6 +312,12 @@ async def confirm_execution(callback: types.CallbackQuery, state: FSMContext):
     action = main_parts[0].replace("confirm_exe_", "")
     target_id = int(main_parts[1])
     extra_id = int(main_parts[2])
+
+    # [feature 006, FR-009] Defense-in-depth: проверяем права на сервере до мутации.
+    if not _confirm_action_authorized(callback.from_user.id, action, target_id, extra_id):
+        logger.warning(f"🛡 [FR-011] confirm_execution denied: user={callback.from_user.id} action={action} target={target_id}")
+        await callback.answer("❌ Доступ запрещён.", show_alert=True)
+        return
 
     # 1. Логирование для аудита (Security Audit)
     logger.warning(f"🛡 [AUDIT] Админ {callback.from_user.id} подтвердил удаление: {action} (Target: {target_id}, Extra: {extra_id})")

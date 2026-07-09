@@ -1,9 +1,14 @@
 # Файл: web/auth.py
 import hmac
 import hashlib
+import time
 import urllib.parse
+import config
 from config import BOT_TOKEN
 from fastapi import Header
+
+# Допуск на перекос часов (сессия «из будущего») [feature 006, FR-005]
+_AUTH_DATE_FUTURE_SKEW = 300
 
 def validate_webapp_init_data(init_data: str) -> dict | None:
     """
@@ -31,6 +36,20 @@ def validate_webapp_init_data(init_data: str) -> dict | None:
         computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
 
         if computed_hash != data_hash:
+            return None
+
+        # Anti-replay: проверка свежести auth_date [feature 006, FR-005/007]
+        auth_date_raw = vals.get("auth_date", [None])[0]
+        try:
+            auth_date = int(auth_date_raw)
+        except (TypeError, ValueError):
+            return None
+
+        now = int(time.time())
+        ttl = getattr(config, "WEBAPP_SESSION_TTL_SECONDS", 86400)
+        if ttl > 0 and now - auth_date > ttl:
+            return None
+        if auth_date - now > _AUTH_DATE_FUTURE_SKEW:
             return None
 
         # Возвращаем распарсенные данные (для удобства)

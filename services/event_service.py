@@ -79,6 +79,30 @@ class EventService:
                 logger.warning(f"Не удалось отправить уведомление админу {adm_id}: {e}")
 
     @staticmethod
+    def check_direct_join_allowed(user_id: int, event_id: int, topic_id: Optional[int] = None) -> tuple[bool, str]:
+        """
+        Единое правило допуска к ПРЯМОЙ записи на поход [feature 006, FR-001/002/003].
+        Используется всеми прямыми каналами (кнопка анонса в боте, анонс и общий
+        список в Личном кабинете). Карточка бота (модель заявки/аудита) не вызывает.
+
+        Правила:
+        1. Поход существует и одобрен (is_approved) — иначе отказ.
+        2. Если есть топик-контекст (записи через анонс) — пользователь должен иметь
+           право писать в топик анонса (Default-Deny, R-DB-1).
+        Возвращает (allowed, reason). При allowed=True reason == "".
+        """
+        from services.permission_service import PermissionService
+
+        event = db.get_event_details(event_id)
+        if not event:
+            return False, "❌ Поход не найден."
+        if not event["is_approved"]:
+            return False, "❌ Запись закрыта. Поход на модерации."
+        if topic_id is not None and not PermissionService.can_user_write_in_topic(user_id, topic_id):
+            return False, "🚫 У вас нет доступа к этому разделу клуба."
+        return True, ""
+
+    @staticmethod
     def can_edit_event(user_id: int, event_id: int) -> bool:
         """
         [Admin Override]

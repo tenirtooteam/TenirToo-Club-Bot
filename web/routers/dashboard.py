@@ -82,6 +82,13 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
 @router.post("/events/{event_id}/toggle")
 async def toggle_event_participation_direct(event_id: int, user_id: int = Depends(get_current_user_id)):
     """Переключает участие в мероприятии напрямую из списка (без анонса)."""
+    # Единый гард прямой записи [feature 006, FR-001/002]. Дашборд без топик-контекста.
+    from services.event_service import EventService
+    allowed, reason = EventService.check_direct_join_allowed(user_id, event_id, topic_id=None)
+    if not allowed:
+        logger.warning(f"[FR-011] Direct dashboard join denied: user={user_id} event={event_id} reason={reason}")
+        raise HTTPException(status_code=403, detail=reason)
+
     success, message = ManagementService.toggle_event_participation(event_id, user_id)
 
     if success and "записаны" in message:

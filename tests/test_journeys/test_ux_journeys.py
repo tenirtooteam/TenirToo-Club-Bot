@@ -243,8 +243,11 @@ async def test_fsm_reset_after_search_pick(create_callback, mock_bot):
     """
     from handlers.common import perform_search_pick
     from handlers.common import SearchStates
+    import config
 
-    callback, state = await create_callback(chat_id=123, user_id=123, data="search_pick_user_dir_add_1")
+    # [feature 006, FR-010] The actor must be authorized to grant access; use an admin
+    # so this test exercises the FSM-reset path (not the new authorization gate).
+    callback, state = await create_callback(chat_id=123, user_id=config.ADMIN_ID, data="search_pick_user_dir_add_1")
     await state.set_state(SearchStates.waiting_for_query)
     await state.update_data(search_context=1, search_type="user", last_menu_ids=[100])
 

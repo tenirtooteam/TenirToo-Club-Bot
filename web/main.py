@@ -1,7 +1,8 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from config import WEBAPP_CORS_ORIGINS
 from .routers import announcements, dashboard
@@ -12,7 +13,8 @@ logger = logging.getLogger("web")
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):
     logger.error(f"Unhandled exception on {request.url}: {exc}", exc_info=True)
-    return HTTPException(status_code=500, detail="Internal Server Error")
+    # [feature 006, FR-008] Возвращаем корректный Response, а не объект HTTPException.
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 # Настройка CORS [PL-2.1]
 app.add_middleware(

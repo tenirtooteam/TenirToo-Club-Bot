@@ -2,6 +2,21 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.7.0] - 2026-07-09
+
+### Security (feature 006 — API Security Hardening, Phase 1)
+- **Unified direct-join guard** (`EventService.check_direct_join_allowed`): all direct participation paths — web dashboard (`POST /api/dashboard/events/{id}/toggle`), web announcement toggle, and the bot `ann_join` button — now enforce a single rule (event approved + topic access where a topic context exists, reusing the Default-Deny gate `R-DB-1`). Closes the exploitable gap where any member with a valid session could join a *pending* event or one in a topic they cannot write to. The bot-card audit/request flow is intentionally unchanged.
+- **WebApp anti-replay** (`web/auth.py`): `validate_webapp_init_data` now enforces `auth_date` freshness after the HMAC check — missing/unparseable or stale sessions (older than `config.WEBAPP_SESSION_TTL_SECONDS`, default 86400) are rejected, with a 300 s future clock-skew tolerance. A captured `initData` string is no longer valid indefinitely.
+- **Callback defense-in-depth** (`handlers/common.py`): `confirm_execution` (delete group/topic/user/event, revoke role) and `perform_search_pick` (`mod_add`/`dir_add`) now re-check authority server-side before mutating — per-action via `PermissionService.is_global_admin` / `can_manage_topic` / `EventService.can_edit_event` (`R-ARCH-7`, no inline `ADMIN_ID`) — instead of trusting button delivery.
+
+### Fixed
+- **FastAPI global exception handler** (`web/main.py`): now returns a proper `JSONResponse(500, …)` instead of *returning* an `HTTPException` instance (which would itself raise during error handling).
+
+### Changed
+- **New config** `WEBAPP_SESSION_TTL_SECONDS` (env, default 86400; `<= 0` disables the freshness check).
+- `perform_search_pick` parameter renamed `event` → `event_or_msg` (aligns with the `ban-direct-ui-calls` semgrep whitelist and the codebase convention).
+- Two pre-existing tests updated to reflect the new (correct) behavior: `test_fsm_reset_after_search_pick` (actor made authorized) and `test_web/test_auth.py` (dynamic fresh `auth_date`). Suite: 146 passed, semgrep SAST gate green.
+
 ## [1.6.0] - 2026-07-06
 
 ### Added

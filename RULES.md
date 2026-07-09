@@ -368,14 +368,19 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 ## SEC — Security
 
 ### R-SEC-1 [A] WebApp init-data validation
-**Rule**: TMA requests MUST validate Telegram init data via `web/auth.py::validate_webapp_init_data` (HMAC-SHA256); user identity comes from `get_current_user_id` (FastAPI dependency), never from client-supplied fields.
-**Why**: HMAC validation is the only trust boundary for Mini App requests.
+**Rule**: TMA requests MUST validate Telegram init data via `web/auth.py::validate_webapp_init_data` (HMAC-SHA256); user identity comes from `get_current_user_id` (FastAPI dependency), never from client-supplied fields. Validation MUST additionally enforce `auth_date` freshness (reject sessions older than `config.WEBAPP_SESSION_TTL_SECONDS`, default 24h, with a small future clock-skew tolerance) — a valid HMAC alone is NOT sufficient (anti-replay).
+**Why**: HMAC validation is the trust boundary for Mini App requests; without a freshness bound a captured init-data string is replayable forever.
 **Legacy**: PL-2.2.51(auth), CP-2.28(secure)
 
 ### R-SEC-2 [A] Security fallback for unhandled callbacks
 **Rule**: A global fallback handler MUST catch unhandled callback queries and show a warning alert, preventing infinite button loading for unauthorized users.
 **Why**: Avoids stuck UI and information leakage on unrouted callbacks.
 **Legacy**: CP-2.34, PL-5.5(resilience), CP-3.13
+
+### R-SEC-3 [A] Single guarded write-path & server-side callback authority
+**Rule**: Direct participation (event join/leave outside the audit-request flow) MUST pass through the single guard `EventService.check_direct_join_allowed` (event approved + topic-write access where an announcement topic exists, reusing `R-DB-1`); the direct channels (bot `ann_join`, web announcement toggle, web dashboard toggle) MUST NOT re-implement divergent checks. The bot event-card join stays a request/audit flow and is exempt. Destructive/grant callbacks that live on unfiltered routers (`handlers/common.py::confirm_execution`, `perform_search_pick`) MUST re-verify authority server-side via `PermissionService` (`is_global_admin`/`can_manage_topic`) or `EventService.can_edit_event` before mutating — never trusting which user received the button (`R-ARCH-7`).
+**Why**: One guarded write-path prevents approval/access bypass drifting across channels; a button reaching a client is not proof of authority, so the mutation site must re-check.
+**Legacy**: —
 
 ---
 
