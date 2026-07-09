@@ -15,7 +15,7 @@ services:
     command: pytest
 
   semgrep:
-    image: returntocorp/semgrep
+    image: semgrep/semgrep:1.65.0
     volumes:
       - .:/src
     working_dir: /src
