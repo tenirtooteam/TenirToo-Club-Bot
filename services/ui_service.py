@@ -112,9 +112,6 @@ class UIService:
     @staticmethod
     async def show_temp_message(state: FSMContext, event: types.Message | types.CallbackQuery, text: str, reply_markup=None):
         """Отображает временное сообщение БЕЗ удаления предыдущего (добавляет в стек)."""
-        event.bot if isinstance(event, types.Message) else event.message.bot
-        event.chat.id if isinstance(event, types.Message) else event.message.chat.id
-
         if isinstance(event, types.Message):
             await UIService.delete_msg(event)
 

@@ -2,6 +2,19 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.8.0] - 2026-07-09
+
+### Fixed (feature 007 — Bot Correctness, Phase 2)
+- **Date-range corruption** (`handlers/events.py`): confirming a multi-day hike like "10-15 июня" no longer truncates the stored start to a fragment ("10"). Decomposition of a human range into start/end parts now lives in `DateService.split_human_range` (month-inheritance, `R-CODE-5/6`) and is applied on both the create and edit confirmation paths. The edit path previously computed the split into throwaway variables and discarded it (dead branch removed).
+- **Active-hikes list order & filtering** (`database/events.py`): `get_active_events(today=None)` now sorts by `start_iso` (ISO date) instead of raw human text, and excludes fully-past hikes (`COALESCE(end_iso, start_iso) >= today`), while keeping ongoing (started/not-ended) and undated (`start_iso IS NULL`) hikes visible. `EventService.get_active_events` forwards the optional `today`.
+- **Non-text input crash** (`handlers/moderator.py`, `handlers/common.py`, `handlers/events.py`): five FSM input handlers (topic rename, direct-access search, entity search, hike editing title/dates) now guard `message.text` before `.strip()` — a photo/sticker/voice reply yields a graceful "введите текст" prompt instead of `AttributeError`.
+- **Leave-hike audit bypass** (`services/management_service.py`, `handlers/events.py`): "Leave" now uses remove-only semantics via `ManagementService.leave_event_action` — a non-participant tapping a stale "Leave" button is no longer silently enrolled in bypass of the request→approval flow (`R-DATA-1`, `R-SEC-3`). The bot `ann_join` toggle channel is unchanged.
+- **Request-resolution race (TOCTOU)** (`database/audit.py`, `services/management_service.py`): `resolve_audit_request` is now an atomic compare-and-swap (`UPDATE … WHERE id=? AND status='pending'`, returns `rowcount>0`); `resolve_request` gates all side effects and the user notification on the winning transition, so two concurrent admin resolutions produce exactly one action + one notification (idempotent; fails closed if the request vanished mid-flight).
+- **Dead code & anonymous-sender guard**: removed no-effect expressions in `handlers/events.py` and `services/ui_service.py`; `AccessGuardMiddleware` now guards `event.from_user is None` (channel/anonymous posts) instead of crashing on `.id`.
+
+### Tests
+- TDD per bug (`R-PROC-3`): failing reproducing tests written first. New `tests/test_services/test_audit_cas.py`, `tests/test_handlers/test_fsm_nontext_guard.py`; extended `test_date_logic.py`, `test_event_edit_collision.py`, `test_event_contracts.py`, `test_participation_guard.py`, `test_middleware_pipeline_journey.py`. Suite: 165 passed (was 146).
+
 ## [1.7.0] - 2026-07-09
 
 ### Security (feature 006 — API Security Hardening, Phase 1)

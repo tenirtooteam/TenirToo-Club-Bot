@@ -61,7 +61,9 @@ tags: [features, overview]
   admin moderation queue, participant tracking, lead assignment.
 - **Audit & Notification Layer**: asynchronous approval workflow for critical actions;
   targeted participation alerts sent only to event leads and creator, eliminating noise for
-  global admins. Statuses: `pending`, `approved`, `rejected`.
+  global admins. Statuses: `pending`, `approved`, `rejected`. Resolution is an atomic
+  compare-and-swap (`resolve_audit_request` flips `pending` only), so concurrent admin
+  approvals are idempotent — exactly one side effect and one notification.
 - **Armored DB Integrity Fuse**: mandatory runtime SQLite Foreign Key check at startup;
   schema hardening via native `ON DELETE CASCADE` on all table linkages including
   `audit_requests` and `event_leads`; optimized search indices on `user_id`.

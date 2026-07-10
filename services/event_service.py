@@ -121,9 +121,9 @@ class EventService:
         return event["creator_id"] == user_id
 
     @staticmethod
-    def get_active_events() -> List[EventDTO]:
-        """Возвращает список активных мероприятий."""
-        return db.get_active_events()
+    def get_active_events(today: Optional[str] = None) -> List[EventDTO]:
+        """Возвращает список активных мероприятий (сорт. по ISO, без прошедших)."""
+        return db.get_active_events(today=today)
 
     @staticmethod
     def get_pending_events() -> List[EventDTO]:

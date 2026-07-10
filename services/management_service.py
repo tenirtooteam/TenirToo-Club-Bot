@@ -515,6 +515,20 @@ class ManagementService:
         return "Ваша запись отменена!"
 
     @staticmethod
+    def leave_event_action(event_id: int, user_id: int) -> tuple[bool, str]:
+        """[BUG-4] Выход из похода: ТОЛЬКО удаление, никогда не запись.
+
+        Не-участник получает no-op — так «Выйти» не может стать обходной записью
+        в обход заявки/аудита (R-DATA-1, R-SEC-3).
+        """
+        if not db.is_event_participant(event_id, user_id):
+            return False, "Вы не участвуете в этом походе."
+
+        db.remove_event_participant(event_id, user_id)
+        ManagementService._trigger_sheets_sync("event_participants", event_id)
+        return True, "❌ Вы больше не участвуете."
+
+    @staticmethod
     def toggle_event_participation(event_id: int, user_id: int) -> tuple[bool, str]:
         """Логика записи/отписки от мероприятия."""
         if db.is_event_participant(event_id, user_id):
@@ -569,8 +583,11 @@ class ManagementService:
 
         logger.info(f"🛡 [AUDIT] Резолв заявки {request_id}: {status} (Тип: {request['entity_type']}, ID: {request['entity_id']})")
 
+        # [BUG-5] Атомарный CAS — авторитетные ворота. Проигравший гонку (или пропавшая
+        # заявка) не выполняет НИ сайд-эффектов, НИ уведомления ниже.
         if not db.resolve_audit_request(request_id, status, comment):
-            return False, "❌ Ошибка при обновлении статуса в БД."
+            logger.warning(f"⚠️ Заявка {request_id} уже обработана параллельно (CAS проигран).")
+            return False, "⚠️ Эта заявка уже была обработана."
 
         # Выполняем действие в БД в зависимости от статуса [CC-1]
         if status == "approved":

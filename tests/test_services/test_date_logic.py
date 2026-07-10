@@ -69,3 +69,20 @@ def test_range_with_spaces():
     h2, s2, e2 = DateService.parse_smart_date("10 - 12 мая")
     assert s2 == "2026-05-10"
     assert e2 == "2026-05-12"
+
+
+# --- BUG-1 [US1] Декомпозиция human-диапазона (R-CODE-5/6) ---
+
+@pytest.mark.parametrize("text, expected", [
+    ("10-15 июня", ("10 июня", "15 июня")),       # месяц наследуется в start
+    ("10 - 15 мая", ("10 мая", "15 мая")),        # разделитель с пробелами
+    ("10 июня - 15 июня", ("10 июня", "15 июня")),# оба несут месяц
+    ("15 мая", ("15 мая", None)),                 # одиночная дата
+    ("Завтра", ("Завтра", None)),                 # не-диапазон
+])
+def test_split_human_range(text, expected):
+    """
+    split_human_range должен возвращать ПОЛНЫЕ human-части (не обрезок '10').
+    Корень BUG-1: наивный split('-') в хендлере терял месяц у start.
+    """
+    assert DateService.split_human_range(text) == expected

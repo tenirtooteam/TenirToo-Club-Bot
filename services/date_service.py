@@ -11,6 +11,10 @@ class DateService:
     # Русские названия дней недели
     WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
 
+    # Корни названий месяцев — единый источник для распознавания диапазонов [CC-2]
+    MONTH_STEMS = ["янв", "фев", "мар", "апр", "май", "июн",
+                   "июл", "авг", "сен", "окт", "ноя", "дек"]
+
     @staticmethod
     def get_weekday_suffix(iso_date: str) -> str:
         """Возвращает строку вида ' (Пн)' для ISO даты."""
@@ -36,7 +40,7 @@ class DateService:
             start_p = parts[0].strip()
             end_p = parts[1].strip()
 
-            if not any(m in start_p.lower() for m in ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"]):
+            if not any(m in start_p.lower() for m in DateService.MONTH_STEMS):
                 month_part = "".join([c for c in end_p if not c.isdigit()]).strip()
                 start_p = f"{start_p} {month_part}"
 
@@ -53,6 +57,41 @@ class DateService:
             return text, dt.strftime("%Y-%m-%d"), None
 
         return text, None, None
+
+    @staticmethod
+    def split_human_range(text: str) -> Tuple[str, Optional[str]]:
+        """
+        Декомпозирует human-строку диапазона в (start_human, end_human).
+        Использует ту же логику распознавания разделителя и наследования месяца,
+        что и parse_smart_date, поэтому start НИКОГДА не теряет месяц [BUG-1, R-CODE-5/6]:
+          "10-15 июня"        -> ("10 июня", "15 июня")
+          "10 - 15 мая"       -> ("10 мая",  "15 мая")
+          "10 июня - 15 июня" -> ("10 июня", "15 июня")
+          "15 мая"            -> ("15 мая",  None)
+        Не-диапазон / нераспознанное -> (text, None).
+        """
+        text = text.strip()
+
+        # Приоритет явного разделителя с пробелами (так строится период в
+        # process_event_end_date: f"{start} - {end}", где start может быть "Завтра").
+        # Иначе — слитный "-" РОВНО один раз (ISO YYYY-MM-DD с двумя "-" не диапазон).
+        if " - " in text:
+            sep = " - "
+        elif text.count("-") == 1:
+            sep = "-"
+        else:
+            return text, None
+
+        start_p, end_p = (p.strip() for p in text.split(sep, 1))
+
+        # Наследуем месяц в start ТОЛЬКО когда start — голый номер дня ("10" из
+        # "10-15 июня"); "Завтра"/"10 июня" не трогаем.
+        if start_p.isdigit():
+            month_part = "".join(c for c in end_p if not c.isdigit()).strip()
+            if month_part:
+                start_p = f"{start_p} {month_part}"
+
+        return start_p, end_p
 
     @staticmethod
     def get_quick_date_buttons() -> List[InlineKeyboardButton]:

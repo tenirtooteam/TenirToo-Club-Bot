@@ -115,6 +115,29 @@ async def test_access_guard_middleware(db_setup, mock_bot):
 
 
 @pytest.mark.asyncio
+async def test_access_guard_none_sender_passthrough(db_setup, mock_bot):
+    """
+    C2 [tail]: сообщение без отправителя (пост канала / анонимный админ →
+    from_user is None) не должно ронять AccessGuardMiddleware — проходит дальше.
+    """
+    message = MagicMock()
+    message.chat = MagicMock()
+    message.chat.type = "supergroup"
+    message.from_user = None  # нет отправителя
+    message.bot = mock_bot
+    message.message_thread_id = 77
+
+    middleware = AccessGuardMiddleware()
+
+    async def dummy_handler(event, data):
+        return "passed"
+
+    # Сейчас: event.from_user.id → AttributeError. После фикса — сквозной проход.
+    result = await middleware(dummy_handler, message, {})
+    assert result == "passed"
+
+
+@pytest.mark.asyncio
 async def test_fsm_button_guard_middleware(db_setup, mock_bot, storage):
     user_id = 999
 

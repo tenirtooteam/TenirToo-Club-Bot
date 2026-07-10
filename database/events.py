@@ -140,11 +140,27 @@ def get_event_details(event_id: int) -> Optional[EventDTO]:
         logger.error(f"❌ Ошибка получения деталей {event_id}: {e}")
         return None
 
-def get_active_events() -> List[EventDTO]:
+def get_active_events(today: Optional[str] = None) -> List[EventDTO]:
+    """[BUG-2] Одобренные не-прошедшие походы, сортировка по ISO-дате.
+
+    today: 'YYYY-MM-DD'; по умолчанию — сегодня. Поход прошедший, если его
+    конец (COALESCE(end_iso, start_iso)) строго раньше today. Бездатные
+    (start_iso IS NULL) всегда видимы.
+    """
+    if today is None:
+        import datetime
+        today = datetime.date.today().isoformat()
     try:
         with get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url, start_iso, end_iso FROM events WHERE is_approved = 1 ORDER BY start_date ASC")
+            cursor.execute(
+                "SELECT event_id, title, start_date, end_date, creator_id, is_approved, sheet_url, start_iso, end_iso "
+                "FROM events "
+                "WHERE is_approved = 1 "
+                "AND (COALESCE(end_iso, start_iso) >= ? OR start_iso IS NULL) "
+                "ORDER BY start_iso ASC",
+                (today,)
+            )
             return [
                 EventDTO(
                     id=r[0],

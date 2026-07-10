@@ -167,6 +167,8 @@ async def search_start_handler(callback: types.CallbackQuery, state: FSMContext)
 @router.message(SearchStates.waiting_for_query)
 async def search_query_handler(message: types.Message, state: FSMContext):
     """Обработка поискового запроса."""
+    if not message.text:  # [BUG-3] не-текст (фото/стикер/голос)
+        return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текст</b>.")
     query = message.text.strip()
     data = await state.get_data()
     s_type = data.get("search_type")

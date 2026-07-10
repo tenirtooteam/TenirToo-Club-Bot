@@ -186,12 +186,8 @@ async def process_date_confirm(callback: CallbackQuery, state: FSMContext):
     dates = data.get("dates")
 
     if iso_end:
-        if " - " in dates:
-            s_human, e_human = dates.split(" - ", 1)
-        elif "-" in dates:
-            s_human, e_human = dates.split("-", 1)
-        else:
-            s_human, e_human = dates, None
+        # [BUG-1] Декомпозиция диапазона делегирована DateService (R-CODE-5)
+        s_human, e_human = DateService.split_human_range(dates)
     else:
         s_human = dates
         e_human = None
@@ -325,6 +321,8 @@ async def edit_event_init(callback: CallbackQuery, state: FSMContext):
 
 @router.message(EventCreation.editing_title)
 async def process_editing_title(message: Message, state: FSMContext):
+    if not message.text:  # [BUG-3] не-текст (фото/стикер/голос)
+        return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текст</b>.")
     title = message.text.strip()
     if title.startswith("/"): return # Игнорируем команды
 
@@ -343,33 +341,24 @@ async def process_editing_title(message: Message, state: FSMContext):
 
 @router.message(EventCreation.editing_dates)
 async def process_editing_dates(message: Message, state: FSMContext):
+    if not message.text:  # [BUG-3] не-текст (фото/стикер/голос)
+        return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текст</b>.")
     dates_input = message.text.strip()
     if dates_input.startswith("/") and dates_input != "/skip":
         return
 
     data = await state.get_data()
     event_id = data['edit_event_id']
-    data['new_title']
 
     if dates_input == "/skip":
         event = EventService.get_event_details(event_id)
         dates = event['start_date']
         start_iso = event['start_iso']
         end_iso = event['end_iso']
-
     else:
+        # [BUG-1] Храним полный human; декомпозиция start/end — в process_date_confirm
         human, start_iso, end_iso = DateService.parse_smart_date(dates_input)
         dates = human
-
-    if end_iso:
-        if " - " in dates:
-            s_human, e_human = dates.split(" - ", 1)
-        elif "-" in dates:
-            s_human, e_human = dates.split("-", 1)
-        else:
-            _s_human, _e_human = dates, None
-    else:
-        pass
 
     await state.update_data(dates=dates, start_iso=start_iso, end_iso=end_iso)
 
@@ -442,8 +431,8 @@ async def leave_event(callback: CallbackQuery, state: FSMContext):
     if not event['is_approved'] and not is_admin and not is_creator:
         return await callback.answer("❌ Действие недоступно. Поход на модерации.", show_alert=True)
 
-    # [PL-6.7] Мутация через ManagementService
-    success, msg = ManagementService.toggle_event_participation(event_id, user_id)
+    # [BUG-4] Выход — только удаление (remove-only), не toggle (R-DATA-1, R-SEC-3)
+    success, msg = ManagementService.leave_event_action(event_id, user_id)
 
     # Обновляем анонсы [CC-2]
     from services.announcement_service import AnnouncementService

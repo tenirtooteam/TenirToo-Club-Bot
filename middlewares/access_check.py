@@ -65,7 +65,8 @@ class AccessGuardMiddleware(BaseMiddleware):
     """Финальный щит — стелс-модерация сообщений в топиках."""
     async def __call__(self, handler: Callable[[Message, Dict[str, Any]], Awaitable[Any]],
                        event: Message, data: Dict[str, Any]) -> Any:
-        if event.chat.type == "private" or event.from_user.id == event.bot.id:
+        # [tail] from_user None у постов каналов/анонимных админов — пропускаем
+        if event.from_user is None or event.chat.type == "private" or event.from_user.id == event.bot.id:
             return await handler(event, data)
 
         user_id = event.from_user.id

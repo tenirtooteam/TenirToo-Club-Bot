@@ -1,7 +1,10 @@
 # Tests for the unified direct-join guard EventService.check_direct_join_allowed (US1, feature 006).
 # R-PROC-3: these reproduce the FR-001/FR-002 gap before the guard exists.
+from unittest.mock import patch
+
 from database import db
 from services.event_service import EventService
+from services.management_service import ManagementService
 
 TOPIC_ID = 555
 OWNER_ID = 111       # a user who holds access (makes the topic "restricted")
@@ -61,3 +64,33 @@ def test_missing_event_denied():
     allowed, reason = EventService.check_direct_join_allowed(JOINER_ID, 999999, topic_id=None)
     assert allowed is False
     assert reason != ""
+
+
+# --- BUG-4 [US4] leave_event_action: только удаление, никогда не запись ---
+
+def test_leave_non_participant_does_not_enroll(db_setup):
+    """
+    BUG-4: не-участник, нажавший «Выйти» (устаревшая клавиатура), НЕ должен быть
+    доварен в участники в обход заявки/аудита.
+    """
+    event_id = _make_event(is_approved=1)
+    assert not db.is_event_participant(event_id, JOINER_ID)
+
+    ok, msg = ManagementService.leave_event_action(event_id, JOINER_ID)
+
+    assert ok is False
+    assert not db.is_event_participant(event_id, JOINER_ID), "leave не должен создавать участие"
+
+
+def test_leave_participant_removes(db_setup):
+    """BUG-4: настоящий участник по «Выйти» — удаляется."""
+    event_id = _make_event(is_approved=1)
+    db.add_event_participant(event_id, JOINER_ID)
+    assert db.is_event_participant(event_id, JOINER_ID)
+
+    # Фоновый Google-Sheets sync — не предмет теста (R-DATA-7)
+    with patch.object(ManagementService, "_trigger_sheets_sync"):
+        ok, msg = ManagementService.leave_event_action(event_id, JOINER_ID)
+
+    assert ok is True
+    assert not db.is_event_participant(event_id, JOINER_ID)

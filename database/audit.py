@@ -45,15 +45,20 @@ def get_audit_request(request_id: int) -> Optional[AuditRequestDTO]:
 
 
 def resolve_audit_request(request_id: int, status: str, comment: str = None) -> bool:
-    """Обновляет статус заявки (approve/reject)."""
+    """[BUG-5] Атомарный compare-and-swap статуса: pending -> {approved|rejected}.
+
+    Возвращает True ТОЛЬКО если именно этот вызов выполнил переход (rowcount > 0);
+    False — если заявка уже не pending (проиграла гонку) или отсутствует.
+    """
     try:
         with get_conn() as conn:
             with conn:
-                conn.execute(
-                    "UPDATE audit_requests SET status = ?, comment = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                cursor = conn.execute(
+                    "UPDATE audit_requests SET status = ?, comment = ?, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = ? AND status = 'pending'",
                     (status, comment, request_id)
                 )
-        return True
+                return cursor.rowcount > 0
     except sqlite3.Error as e:
         logger.error(f"❌ Ошибка разрешения audit_request {request_id}: {e}")
         return False

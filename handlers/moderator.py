@@ -94,6 +94,8 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
 @router.message(ModeratorStates.waiting_for_topic_name)
 async def moderator_rename_topic_finish(message: types.Message, state: FSMContext):
     """Сохранение нового имени топика."""
+    if not message.text:  # [BUG-3] не-текст (фото/стикер/голос)
+        return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текст</b>.")
     data = await state.get_data()
     topic_id = data.get("moderator_edit_topic_id")
     new_name = message.text.strip()
@@ -217,6 +219,8 @@ async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMConte
 
 @router.message(ModeratorStates.waiting_for_direct_access_user)
 async def process_direct_access_user_search(message: types.Message, state: FSMContext):
+    if not message.text:  # [BUG-3] не-текст (фото/стикер/голос)
+        return await UIService.show_temp_message(state, message, "⚠️ Пожалуйста, введите <b>текст</b>.")
     text = message.text.strip()
     data = await state.get_data()
     topic_id = data.get("moderator_direct_access_topic")
