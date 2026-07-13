@@ -9,25 +9,70 @@ logger = logging.getLogger(__name__)
 # Путь к БД можно переопределить через переменную окружения для тестов
 DB_PATH = os.environ.get("BOT_DB_PATH", os.path.join(os.path.dirname(__file__), "bot.db"))
 
+# [Feature 008 / US1] Единое переиспользуемое соединение на процесс.
+# Под однопоточным циклом asyncio синхронные операции db.* не переплетаются в
+# середине транзакции (внутри `with get_conn()` нет await), поэтому одно общее
+# соединение потокобезопасно и не требует пула/блокировки. Это убирает churn
+# ~6 connect+PRAGMA-циклов на сообщение до ≤1 (SC-001, FR-001).
+_shared_conn = None
+
+
+def _new_connection():
+    """Создаёт соединение с однократным применением WAL + Foreign Keys (FR-002)."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA foreign_keys = ON;")
+    return conn
+
+
+def _get_shared_conn():
+    """Лениво создаёт и возвращает общее соединение (FR-001, FR-007)."""
+    global _shared_conn
+    if _shared_conn is None:
+        _shared_conn = _new_connection()
+    return _shared_conn
+
+
+def close_shared_conn():
+    """
+    Закрывает и сбрасывает общее соединение.
+    Вызывается при переинициализации БД (смена DB_PATH в тестах — FR-006) и при
+    остановке бота. Следующий вызов get_conn() лениво создаст новое соединение.
+    """
+    global _shared_conn
+    if _shared_conn is not None:
+        try:
+            _shared_conn.close()
+        except sqlite3.Error:
+            pass
+        _shared_conn = None
+
 
 @contextmanager
 def get_conn():
     """
     Контекстный менеджер соединения.
-    Гарантирует закрытие соединения и ВКЛЮЧАЕТ поддержку Foreign Keys.
+    Отдаёт ОБЩЕЕ переиспользуемое соединение и НЕ закрывает его на выходе
+    (FR-001). Семантика транзакций сохранена: вызывающий код использует
+    `with conn:` для commit/rollback (FR-003). При исключении откатываем
+    возможную незавершённую транзакцию, чтобы не «отравить» общее соединение.
     """
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    # Включаем WAL для производительности и FK для целостности данных
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA foreign_keys = ON;")
+    conn = _get_shared_conn()
     try:
         yield conn
-    finally:
-        conn.close()
+    except Exception:
+        try:
+            conn.rollback()
+        except sqlite3.Error:
+            pass
+        raise
 
 
 def init_db():
     """Создает таблицы и проверяет поддержку Foreign Keys."""
+    # [Feature 008 / FR-006] Сбрасываем общее соединение перед (пере)инициализацией,
+    # чтобы после смены DB_PATH (тесты) get_conn() привязался к актуальной БД.
+    close_shared_conn()
     try:
         with get_conn() as conn:
             # Строгая проверка поддержки FK

@@ -1,6 +1,7 @@
 # Файл: services/management_service.py
 import logging
 import html
+import time
 from typing import Optional
 from aiogram.types import User
 from aiogram import Bot
@@ -10,6 +11,27 @@ from services.notification_service import NotificationService
 
 
 logger = logging.getLogger(__name__)
+
+# [Feature 008 / US2] Кэш регистрации с ограниченным TTL.
+# Убирает повторные обращения к БД на регистрацию пользователя/топика для
+# повторяющегося трафика (SC-002, FR-004). Staleness ограничен окном: изменения
+# (напр. смена имени, удаление/переименование) переприменяются не позднее TTL
+# (FR-005). Ключ по time.monotonic() — устойчив к скачкам системных часов.
+REGISTRATION_TTL_SECONDS = 300
+
+_user_reg_memo: dict[int, float] = {}
+_topic_reg_memo: dict[int, float] = {}
+
+
+def _memo_is_fresh(memo: dict[int, float], key: int) -> bool:
+    ts = memo.get(key)
+    return ts is not None and (time.monotonic() - ts) < REGISTRATION_TTL_SECONDS
+
+
+def reset_registration_cache():
+    """Очищает оба мемо (переинициализация БД / изоляция тестов)."""
+    _user_reg_memo.clear()
+    _topic_reg_memo.clear()
 
 
 class ManagementService:
@@ -52,6 +74,9 @@ class ManagementService:
     async def ensure_user_registered(user: User):
         """Проверяет наличие пользователя и регистрирует при необходимости."""
         user_id = user.id
+        # [Feature 008 / US2] Свежая запись в мемо → пропускаем обращение к БД.
+        if _memo_is_fresh(_user_reg_memo, user_id):
+            return
         if not db.user_exists(user_id):
             f_name = user.first_name
             l_name = user.last_name or ""
@@ -66,6 +91,8 @@ class ManagementService:
             db.add_user(user_id, f_name, l_name)
             logger.info(f"🆕 Авто-регистрация: {f_name} {l_name} (ID: {user_id})")
             ManagementService._trigger_sheets_sync("users")
+        # Пользователь подтверждён/зарегистрирован — фиксируем в мемо.
+        _user_reg_memo[user_id] = time.monotonic()
 
     @staticmethod
     def _parse_and_validate_id(user_input: str) -> tuple[int, str]:
@@ -210,7 +237,11 @@ class ManagementService:
     @staticmethod
     def register_topic_if_not_exists(topic_id: int):
         """Регистрирует топик в БД, если его там нет."""
+        # [Feature 008 / US2] Свежая запись в мемо → пропускаем обращение к БД.
+        if _memo_is_fresh(_topic_reg_memo, topic_id):
+            return
         db.register_topic_if_not_exists(topic_id)
+        _topic_reg_memo[topic_id] = time.monotonic()
 
 
     @staticmethod

@@ -33,6 +33,11 @@ def db_setup(tmp_path):
     connection.DB_PATH = str(test_db)
 
     connection.init_db()
+
+    # [Feature 008 / US2] Холодные мемо регистрации на каждый тест (изоляция).
+    from services.management_service import reset_registration_cache
+    reset_registration_cache()
+
     yield test_db
 
     # После теста можно удалить, но tmp_path сам очистится

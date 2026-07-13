@@ -2,6 +2,34 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.9.0] - 2026-07-13
+
+### Changed (feature 008 — DB Connection Reuse & Registration Caching, Phase 3)
+- **Persistent DB connection** (`database/connection.py`): `get_conn()` now yields one
+  process-wide reusable `sqlite3` connection (`_shared_conn`, lazily created) instead of
+  opening + `PRAGMA journal_mode=WAL` + `PRAGMA foreign_keys=ON` + closing on every call. WAL
+  and FK pragmas are applied once at creation; `get_conn()` no longer closes on exit and rolls
+  back any dangling transaction if the body raises. Safe because all `db.*` operations are
+  synchronous with no `await` inside a transaction — under the single-threaded asyncio loop no
+  pool or lock is required. Cuts connection churn from ≈6 `connect`+PRAGMA cycles per incoming
+  message to ≤1 (measured 5 → 1). New `close_shared_conn()` (shutdown / reinit); `init_db()`
+  resets the shared connection first so a `DB_PATH` switch (tests) rebinds cleanly. The
+  `database.db` facade signatures and all 77 call-sites are unchanged.
+- **Registration cache** (`services/management_service.py`): `ensure_user_registered` and
+  `register_topic_if_not_exists` consult a short-TTL in-memory memo
+  (`REGISTRATION_TTL_SECONDS = 300`, `time.monotonic`) before hitting the DB, so a repeat
+  message from an already-registered user/topic performs 0 registration lookups (was 2).
+  Staleness is bounded by the TTL (name changes / external deletions re-applied within the
+  window). `reset_registration_cache()` clears both memos; the `db_setup` fixture calls it for
+  per-test isolation. Out of scope (PA-1 Ф3 verdict, gated behind profiling): `aiosqlite`
+  migration and thread-pool offload.
+
+### Tests
+- TDD per `R-PROC-3`: failing reproducing tests written first. New
+  `tests/test_database/test_connection_reuse.py` (connect-count per message ≤1) and
+  `tests/test_services/test_registration_cache.py` (repeat-skip, TTL expiry re-hit, reset).
+  Suite: 170 passed (was 165); semgrep / import-linter / ruff / governance gates green.
+
 ## [1.8.0] - 2026-07-09
 
 ### Fixed (feature 007 — Bot Correctness, Phase 2)
