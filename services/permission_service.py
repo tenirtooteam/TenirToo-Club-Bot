@@ -1,10 +1,7 @@
 # Файл: services/permission_service.py
-import logging
 from typing import Optional
 from database import db
 from config import ADMIN_ID
-
-logger = logging.getLogger(__name__)
 
 
 class PermissionService:
@@ -12,18 +9,12 @@ class PermissionService:
     def is_superadmin(user_id: int) -> bool:
         """
         Проверяет, является ли пользователь суперадмином.
-        Суперадмин определяется по ADMIN_ID из .env и дополнительно проверяется наличие роли 'superadmin' в БД.
+        Единственный авторитетный источник истины — ADMIN_ID из .env: суперадмин
+        определяется по совпадению ID. (Проверка роли 'superadmin' в БД избыточна —
+        db.get_user_roles сам синтезирует эту роль для ADMIN_ID, поэтому результат
+        всегда определялся ID; мёртвая БД-ветвь удалена, feature 008 №20.)
         """
-        if user_id != ADMIN_ID:
-            return False
-        # Дополнительная проверка в БД (на случай ручного вмешательства)
-        roles = db.get_user_roles(user_id)
-        for role_name, topic_id in roles:
-            if role_name == 'superadmin':
-                return True
-        # Если по какой-то причине записи нет, но ID совпадает, считаем суперадмином
-        logger.warning(f"⚠️ ADMIN_ID {user_id} не имеет роли 'superadmin' в БД. Доступ разрешён по ID.")
-        return True
+        return user_id == ADMIN_ID
 
     @staticmethod
     def is_global_admin(user_id: int) -> bool:

@@ -71,12 +71,6 @@ def get_direct_access_users(topic_id: int) -> list:
         """, (topic_id,))
         return c.fetchall()
 
-def has_direct_access(user_id: int, topic_id: int) -> bool:
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("SELECT 1 FROM direct_topic_access WHERE user_id = ? AND topic_id = ? LIMIT 1", (user_id, topic_id))
-        return c.fetchone() is not None
-
 def can_write(user_id: int, topic_id: int) -> bool:
     with get_conn() as conn:
         c = conn.cursor()

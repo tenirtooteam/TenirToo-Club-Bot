@@ -2,6 +2,29 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.10.0] - 2026-07-14
+
+### Changed (feature 008 №20 — Dedup Permission Layer, Phase 3)
+- **Single point of direct-access check** (`database/permissions.py`, `database/db.py`):
+  removed the dead duplicate `has_direct_access` — an identical
+  `SELECT 1 FROM direct_topic_access WHERE user_id=? AND topic_id=?` to `can_write` with zero
+  live callers (only an unused re-export in the `database.db` facade). `can_write` is now the
+  sole direct-access predicate; the facade import and the `module-registry.md` entry were
+  updated to match. Behavior of `can_write` is unchanged.
+- **Honest `is_superadmin` semantics** (`services/permission_service.py`): the method now
+  returns `user_id == ADMIN_ID` directly. The previous DB role loop was dead-by-result — for
+  `ADMIN_ID` it always returned `True` (and its `logger.warning` + fallback `return True` were
+  unreachable, since `database/roles.py::get_user_roles` synthesizes the `superadmin` role for
+  `ADMIN_ID`). ADMIN_ID is the authoritative source of truth; the misleading docstring and the
+  now-unused `logging` import/logger were removed. Observable result (`True` for `ADMIN_ID` /
+  `False` otherwise) is preserved.
+
+### Tests
+- Characterization tests (`tests/test_permission_layer_dedup.py`, `R-PROC-3`): `can_write`
+  access/no-access, duplicate-removed invariant, and `is_superadmin` (admin+role / admin
+  without role / non-admin) — green before and after the cleanup (no behavior change).
+  Suite: 176 passed; semgrep / import-linter / ruff / governance gates green.
+
 ## [1.9.0] - 2026-07-13
 
 ### Changed (feature 008 — DB Connection Reuse & Registration Caching, Phase 3)

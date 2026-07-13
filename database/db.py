@@ -24,7 +24,7 @@ from .roles import (
 )
 from .permissions import (
     can_write, is_topic_restricted, get_topic_authorized_users,
-    grant_direct_access, revoke_direct_access, has_direct_access,
+    grant_direct_access, revoke_direct_access,
     get_direct_access_users, grant_direct_access_bulk, revoke_all_direct_access,
     get_user_available_topics, get_direct_access_user_ids, get_topic_authorized_user_ids
 )
