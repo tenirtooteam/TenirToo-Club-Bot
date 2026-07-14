@@ -29,9 +29,28 @@ def _host_semgrep_cmd(project_root, rules_path):
     return [semgrep_path, "scan", "--config", rules_path, "--error", project_root]
 
 
-def _docker_semgrep_cmd():
-    """Команда для контейнеризированного semgrep (R-PROC-11), либо None если Docker недоступен."""
+def _docker_daemon_up() -> bool:
+    """True только если Docker-демон реально отвечает.
+
+    Наличие бинаря (`which docker`) ≠ запущенный демон: Docker Desktop часто
+    установлен, но выключен. Без этой пробы `docker compose run` падает
+    connection-ошибкой, и SAST-гейт выглядит как «нарушение архитектуры».
+    """
     if shutil.which("docker") is None:
+        return False
+    try:
+        probe = subprocess.run(
+            ["docker", "info"],
+            capture_output=True, text=True, timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
+
+
+def _docker_semgrep_cmd():
+    """Команда для контейнеризированного semgrep (R-PROC-11), либо None если Docker-демон недоступен."""
+    if not _docker_daemon_up():
         return None
     return [
         "docker", "compose", "--profile", "lint",
@@ -56,7 +75,11 @@ def test_semgrep_linter():
 
     cmd = _host_semgrep_cmd(project_root, rules_path) or _docker_semgrep_cmd()
     if cmd is None:
-        pytest.skip("neither native semgrep nor Docker is available (skipping SAST gate)")
+        pytest.skip(
+            "SAST-ГЕЙТ НЕ ПРОГНАН: нет ни нативного semgrep, ни запущенного Docker-демона. "
+            "CI-бэкстопа нет — подними Docker (SessionStart-хук стартует его в фоне) и "
+            "прогони этот тест ПЕРЕД коммитом."
+        )
 
     # Запускаем сканирование Semgrep выбранным движком
     result = subprocess.run(
