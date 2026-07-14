@@ -35,10 +35,21 @@ the only function in the codebase using this pattern; all other mutations use st
 
 ## Background Sync Pattern
 
-To keep the bot responsive during Google Sheets network I/O, synchronization tasks run in the
-background via `asyncio.create_task`. **Trigger**: any data mutation in `ManagementService` —
-user/topic name updates, deletions, template mutations, participation changes. **Mechanism**:
-`_trigger_sheets_sync(mode)` calls `GoogleSheetsService` asynchronously; targeted modes
-(`"users"`, `"groups"`, `"events"`) are prioritized over `"all"` for performance. **Error
-Handling**: failures in background tasks are logged but do not interrupt the main execution
-flow.
+To keep the bot responsive during Google Sheets network I/O, synchronization runs in owned
+background tasks. **Trigger**: any data mutation in `ManagementService` — user/topic name
+updates, deletions, template mutations, participation changes. **Mechanism**:
+`_trigger_sheets_sync(mode, entity_id)` (signature unchanged across ~77 call-sites) computes a
+per-type sync key (`mode`, or `event_participants:{entity_id}`) and schedules an owned
+`asyncio.Task` held in the module-level `_pending_syncs` registry — never a bare
+fire-and-forget `create_task`. **Debounce/coalescing**: each task waits
+`SHEETS_SYNC_DEBOUNCE_SECONDS` before exporting; a new trigger for the same key cancels the
+prior pending task, so a burst of edits collapses into a single export reading fresh DB state
+at export time. **Ownership**: the task reference is retained for the whole lifecycle and
+removed via `add_done_callback` (no GC race, no lost errors — resolves the historical
+"Task was destroyed" warnings). **Roles fetch**: user export uses the batched
+`db.get_roles_for_users(user_ids)` (one query) instead of an N+1 per-user loop. **Shutdown**:
+`ManagementService.flush_pending_syncs()` is registered as a `dp.shutdown` hook and runs all
+pending exports immediately so the last coalesced change is not lost on stop. **Error
+Handling**: failures inside the task are logged and never interrupt the main flow. Making the
+in-task `db.*` calls non-blocking (`to_thread`) is intentionally out of scope, gated behind
+profiling like the feature-008 DB work.

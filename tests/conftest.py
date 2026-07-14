@@ -1,4 +1,6 @@
 import pytest
+import pytest_asyncio
+import asyncio
 import os
 import datetime
 from unittest.mock import AsyncMock
@@ -35,8 +37,10 @@ def db_setup(tmp_path):
     connection.init_db()
 
     # [Feature 008 / US2] Холодные мемо регистрации на каждый тест (изоляция).
-    from services.management_service import reset_registration_cache
+    from services.management_service import reset_registration_cache, reset_sheets_sync_state
     reset_registration_cache()
+    # [Feature 010 / №17] Чистый реестр pending-задач Sheets-синка на каждый тест.
+    reset_sheets_sync_state()
 
     yield test_db
 
@@ -46,6 +50,25 @@ def db_setup(tmp_path):
             os.remove(str(test_db))
         except Exception:
             pass
+
+@pytest_asyncio.fixture(autouse=True)
+async def _drain_sheets_sync_tasks():
+    """[Feature 010 / №17] Дренаж фоновых sync-задач в конце async-теста.
+
+    Fire-and-forget тесты, реально дёргающие _trigger_sheets_sync, оставляют
+    debounce-задачу спящей на прод-окне. Отменяем её, пока event loop ещё жив,
+    иначе при закрытии loop CPython печатает «Task was destroyed but it is
+    pending» (нарушает SC-006). В проде loop один и долгоживущий — не касается.
+    """
+    yield
+    from services.management_service import _pending_syncs
+    tasks = [t for t in _pending_syncs.values() if not t.done()]
+    for t in tasks:
+        t.cancel()
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    _pending_syncs.clear()
+
 
 @pytest.fixture
 def mock_bot():

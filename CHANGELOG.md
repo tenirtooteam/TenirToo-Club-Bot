@@ -2,6 +2,40 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.11.0] - 2026-07-14
+
+### Changed (feature 010 №17 — Sheets Sync Debounce & Task Ownership, Phase 3)
+- **Owned, debounced background sync** (`services/management_service.py`): `_trigger_sheets_sync`
+  no longer fires a bare `asyncio.create_task` (which could be GC'd mid-flight and swallow
+  errors — the root cause behind the historical "Task was destroyed" test warnings and the
+  007 test-patch). It now computes a per-type sync key (`mode`, or
+  `event_participants:{entity_id}`), schedules an owned `asyncio.Task` held in the module-level
+  `_pending_syncs` registry, and removes it via `add_done_callback`. A per-key debounce
+  (`SHEETS_SYNC_DEBOUNCE_SECONDS = 2.0`) coalesces a burst of mutations into a single export:
+  a new trigger for the same key cancels the prior pending task during its wait phase; the
+  surviving task reads fresh DB state at export time. Export logic was extracted into
+  `_run_sheets_export`. The `_trigger_sheets_sync(mode, entity_id)` signature and all ~77
+  call-sites are unchanged.
+- **Graceful shutdown flush** (`main.py`, `services/management_service.py`): new
+  `ManagementService.flush_pending_syncs()` runs every pending export immediately (cancelling
+  the wait phase) and is registered as a `dp.shutdown` hook, so the last coalesced change is
+  not lost when the bot stops.
+- **N+1 roles fetch removed** (`database/roles.py`, `database/db.py`): user export now uses the
+  new batched facade method `get_roles_for_users(user_ids)` (single `WHERE user_id IN (...)`
+  query, preserving the `superadmin` synthesis for `ADMIN_ID`) instead of a per-user
+  `get_user_roles` loop.
+
+### Out of scope (gated behind profiling, as in feature 008)
+- Making the in-task `db.*` calls non-blocking (`to_thread`); full broadcast rate-limiting (№18).
+
+### Tests
+- New `tests/test_sheets_sync_debounce.py` (`R-PROC-3` TDD, RED→GREEN): batched roles fetch,
+  task ownership + error logging, burst coalescing (one export per key), independent keys /
+  distinct `event_participants` entities, and shutdown flush. Added
+  `reset_sheets_sync_state()` and an async autouse drain fixture in `tests/conftest.py` for
+  registry isolation and zero "Task was destroyed" warnings suite-wide (SC-006).
+  Suite: 187 passed; semgrep / import-linter / ruff / governance gates green.
+
 ## [1.10.0] - 2026-07-14
 
 ### Changed (feature 008 №20 — Dedup Permission Layer, Phase 3)

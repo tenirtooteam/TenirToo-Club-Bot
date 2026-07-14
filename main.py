@@ -8,6 +8,7 @@ from database import db
 from handlers import admin, user, common, moderator, events, announcements, errors
 from middlewares.access_check import UserManagerMiddleware, ForumUtilityMiddleware, AccessGuardMiddleware
 from middlewares.fsm_button_guard import FsmButtonGuardMiddleware
+from services.management_service import ManagementService
 import uvicorn
 from config import WEBAPP_HOST, WEBAPP_PORT, LOG_MAX_BYTES, LOG_BACKUP_COUNT
 from web.main import app as web_app
@@ -67,6 +68,9 @@ async def main():
     dp.include_router(announcements.router)
     dp.include_router(errors.router)
 
+    # [Feature 010 / №17] На штатной остановке немедленно прогнать отложенные
+    # выгрузки Sheets, чтобы не потерять последнее изменение из окна дебаунса (FR-005).
+    dp.shutdown.register(ManagementService.flush_pending_syncs)
 
     logging.info("🚀 Запуск систем...")
 

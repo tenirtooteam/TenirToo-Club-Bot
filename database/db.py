@@ -18,7 +18,7 @@ from .topics import (
     get_topic_names_by_ids
 )
 from .roles import (
-    get_role_id, grant_role, revoke_role, get_user_roles,
+    get_role_id, grant_role, revoke_role, get_user_roles, get_roles_for_users,
     get_moderators_of_topic, is_global_admin, is_moderator_of_topic,
     get_all_roles, get_role_name_by_id, get_global_admin_ids
 )

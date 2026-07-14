@@ -1,4 +1,5 @@
 # Файл: services/management_service.py
+import asyncio
 import logging
 import html
 import time
@@ -22,6 +23,22 @@ REGISTRATION_TTL_SECONDS = 300
 _user_reg_memo: dict[int, float] = {}
 _topic_reg_memo: dict[int, float] = {}
 
+# [Feature 010 / №17] Реестр owned-задач фоновой синхронизации Google Sheets.
+# Ключ: mode ("users"/"groups"/"events"/"all") либо f"event_participants:{entity_id}".
+# Удержание ссылки на задачу исключает GC-гонку и потерю ошибок (FR-003/FR-004).
+# Окно коалесценции (дебаунс) склеивает всплеск триггеров в одну выгрузку (FR-001).
+SHEETS_SYNC_DEBOUNCE_SECONDS = 2.0
+_pending_syncs: dict[str, asyncio.Task] = {}
+
+
+def _discard_sync_task(key: str, task: asyncio.Task) -> None:
+    """done-callback: снять ключ из реестра только если это всё ещё та же задача.
+
+    Защищает от гонки, когда новый триггер (US1) уже заменил задачу под ключом.
+    """
+    if _pending_syncs.get(key) is task:
+        _pending_syncs.pop(key, None)
+
 
 def _memo_is_fresh(memo: dict[int, float], key: int) -> bool:
     ts = memo.get(key)
@@ -32,6 +49,16 @@ def reset_registration_cache():
     """Очищает оба мемо (переинициализация БД / изоляция тестов)."""
     _user_reg_memo.clear()
     _topic_reg_memo.clear()
+
+
+def reset_sheets_sync_state():
+    """Сбрасывает реестр pending-задач синка (изоляция тестов).
+
+    [Feature 010 / №17] `_pending_syncs` — глобальное состояние; между тестами
+    (каждый со своим event loop) его нужно чистить, иначе отмена «протухшей»
+    задачи из закрытого loop падает RuntimeError. В проде loop один и долгоживущий.
+    """
+    _pending_syncs.clear()
 
 
 class ManagementService:
@@ -384,65 +411,133 @@ class ManagementService:
         return True, status
 
     @staticmethod
-    def _trigger_sheets_sync(mode: str = "all", entity_id: int = None):
-        """Запускает синхронизацию с Google Sheets в фоновом режиме."""
-        import asyncio
+    def _sheets_sync_key(mode: str, entity_id: int = None) -> str:
+        """Ключ коалесценции: участники события изолируются по entity_id."""
+        if mode == "event_participants":
+            return f"event_participants:{entity_id}"
+        return mode
+
+    @staticmethod
+    def _parse_sync_key(key: str) -> tuple:
+        """Инверсия _sheets_sync_key → (mode, entity_id) для flush."""
+        if key.startswith("event_participants:"):
+            return "event_participants", int(key.split(":", 1)[1])
+        return key, None
+
+    @staticmethod
+    async def flush_pending_syncs():
+        """[Feature 010 / №17] Немедленно прогнать все отложенные выгрузки.
+
+        Регистрируется как shutdown-хук: при остановке бота отменяет фазу
+        ожидания каждой pending-задачи и выполняет её выгрузку сразу, чтобы не
+        потерять последнее изменение из окна коалесценции (FR-005/SC-004).
+        Пустой реестр → немедленный возврат без выгрузок.
+        """
+        keys = list(_pending_syncs.keys())
+        for key in keys:
+            task = _pending_syncs.get(key)
+            if task is not None and not task.done():
+                task.cancel()  # прервать фазу ожидания (экспорт запустим сами)
+            mode, entity_id = ManagementService._parse_sync_key(key)
+            await ManagementService._run_sheets_export(mode, entity_id)
+        _pending_syncs.clear()
+
+    @staticmethod
+    async def _run_sheets_export(mode: str, entity_id: int = None):
+        """Фактическая выгрузка одного типа данных в Google Sheets.
+
+        Читает БД в момент вызова (FR-009 — всегда свежие данные). Ошибки
+        логируются, а не всплывают наружу (FR-004).
+        """
         from services.google_sheets_service import GoogleSheetsService
         from services.event_service import EventService
 
-        async def _task():
-            try:
-                if mode in ["all", "users"]:
-                    users = db.get_all_users()
-                    users_with_roles = []
-                    for u in users:
-                        roles = db.get_user_roles(u[0])
-                        roles_str = ", ".join([f"{r[0]}({r[1]})" if r[1] else r[0] for r in roles])
-                        users_with_roles.append((u[0], u[1], u[2], roles_str))
-                    await GoogleSheetsService.export_users(users_with_roles)
+        try:
+            if mode in ["all", "users"]:
+                users = db.get_all_users()
+                # [Feature 010 / №17] Пакетный фетч ролей вместо N+1-цикла (FR-006).
+                roles_map = db.get_roles_for_users([u[0] for u in users])
+                users_with_roles = []
+                for u in users:
+                    roles = roles_map.get(u[0], [])
+                    roles_str = ", ".join([f"{r[0]}({r[1]})" if r[1] else r[0] for r in roles])
+                    users_with_roles.append((u[0], u[1], u[2], roles_str))
+                await GoogleSheetsService.export_users(users_with_roles)
 
-                if mode in ["all", "groups"]:
-                    groups = db.get_all_groups()
-                    groups_data = []
-                    for g_id, g_name in groups:
-                        topics = db.get_topics_of_group(g_id)
-                        topics_str_list = [str(t) for t in topics]
-                        groups_data.append({'id': g_id, 'name': g_name, 'topics': topics_str_list})
-                    await GoogleSheetsService.export_groups(groups_data)
+            if mode in ["all", "groups"]:
+                groups = db.get_all_groups()
+                groups_data = []
+                for g_id, g_name in groups:
+                    topics = db.get_topics_of_group(g_id)
+                    topics_str_list = [str(t) for t in topics]
+                    groups_data.append({'id': g_id, 'name': g_name, 'topics': topics_str_list})
+                await GoogleSheetsService.export_groups(groups_data)
 
-                if mode in ["all", "events"]:
-                    events = db.get_active_events()
-                    events_data = []
-                    for e in events:
-                        # Получаем детали с участниками [PL-HI]
-                        details = EventService.get_event_details(e['event_id'])
-                        events_data.append(details)
-                    await GoogleSheetsService.export_events(events_data)
+            if mode in ["all", "events"]:
+                events = db.get_active_events()
+                events_data = []
+                for e in events:
+                    # Получаем детали с участниками [PL-HI]
+                    details = EventService.get_event_details(e['event_id'])
+                    events_data.append(details)
+                await GoogleSheetsService.export_events(events_data)
 
-                if mode == "event_participants" and entity_id:
-                    details = EventService.get_event_details(entity_id)
-                    if details:
-                        # Разрешаем имена участников для экспорта
-                        p_ids = details['participants']
-                        l_ids = set(details['leads'])
-                        names = db.get_user_names_by_ids(p_ids)
+            if mode == "event_participants" and entity_id:
+                details = EventService.get_event_details(entity_id)
+                if details:
+                    # Разрешаем имена участников для экспорта
+                    p_ids = details['participants']
+                    l_ids = set(details['leads'])
+                    names = db.get_user_names_by_ids(p_ids)
 
-                        full_participants = []
-                        for p_id in p_ids:
-                            full_participants.append({
-                                'user_id': p_id,
-                                'name': names.get(p_id, f"ID:{p_id}"),
-                                'role': "Организатор" if p_id in l_ids else "Участник",
-                                'join_date': "" # В БД пока нет даты вступления
-                            })
+                    full_participants = []
+                    for p_id in p_ids:
+                        full_participants.append({
+                            'user_id': p_id,
+                            'name': names.get(p_id, f"ID:{p_id}"),
+                            'role': "Организатор" if p_id in l_ids else "Участник",
+                            'join_date': "" # В БД пока нет даты вступления
+                        })
 
-                        await GoogleSheetsService.export_event_participants(
-                            entity_id, details['title'], full_participants
-                        )
-            except Exception as e:
-                logger.error(f"Фоновая синхронизация Google Sheets провалилась ({mode}): {e}")
+                    await GoogleSheetsService.export_event_participants(
+                        entity_id, details['title'], full_participants
+                    )
+        except Exception as e:
+            logger.error(f"Фоновая синхронизация Google Sheets провалилась ({mode}): {e}")
 
-        asyncio.create_task(_task())
+    @staticmethod
+    async def _debounced_export(mode: str, entity_id: int, delay: float):
+        """Ждёт окно коалесценции, затем выполняет выгрузку.
+
+        Отмена в фазе ожидания (новый триггер того же ключа) — штатная замена:
+        CancelledError гасится и до экспорта не доходит (FR-001).
+        """
+        try:
+            await asyncio.sleep(delay)
+        except asyncio.CancelledError:
+            return
+        await ManagementService._run_sheets_export(mode, entity_id)
+
+    @staticmethod
+    def _trigger_sheets_sync(mode: str = "all", entity_id: int = None):
+        """Планирует фоновую синхронизацию с Google Sheets (owned + debounce).
+
+        Сигнатура неизменна (FR-007). Повторный триггер того же ключа в окне
+        коалесценции отменяет прежнюю pending-задачу и создаёт новую (FR-001),
+        поэтому всплеск правок даёт одну итоговую выгрузку. Задача хранится в
+        реестре на всё время жизни (FR-003) и снимается через add_done_callback.
+        """
+        key = ManagementService._sheets_sync_key(mode, entity_id)
+
+        prior = _pending_syncs.get(key)
+        if prior is not None and not prior.done():
+            prior.cancel()
+
+        task = asyncio.create_task(
+            ManagementService._debounced_export(mode, entity_id, SHEETS_SYNC_DEBOUNCE_SECONDS)
+        )
+        _pending_syncs[key] = task
+        task.add_done_callback(lambda t: _discard_sync_task(key, t))
 
     # --- НОВЫЕ ОПЕРАЦИИ ШАБЛОНОВ (ЭТАП 2) ---
 

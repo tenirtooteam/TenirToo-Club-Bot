@@ -69,6 +69,35 @@ def get_user_roles(user_id: int) -> list:
 
     return roles
 
+def get_roles_for_users(user_ids: list) -> dict:
+    """[Feature 010 / №17] Пакетный аналог get_user_roles (устранение N+1, FR-006).
+
+    Возвращает {user_id: [(role_name, topic_id), ...]} для каждого переданного
+    user_id (ключ присутствует всегда, пустой список — если ролей нет).
+    Синтез 'superadmin' для ADMIN_ID сохранён — паритет с get_user_roles.
+    """
+    if not user_ids:
+        return {}
+
+    result = {uid: [] for uid in user_ids}
+    placeholders = ",".join("?" for _ in user_ids)
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute(f"""
+            SELECT ur.user_id, r.name, ur.topic_id
+            FROM user_roles ur
+            JOIN roles r ON ur.role_id = r.id
+            WHERE ur.user_id IN ({placeholders})
+        """, tuple(user_ids))
+        for uid, name, topic_id in c.fetchall():
+            result[uid].append((name, topic_id))
+
+    from config import ADMIN_ID
+    if ADMIN_ID in result and not any(r[0] == 'superadmin' for r in result[ADMIN_ID]):
+        result[ADMIN_ID].append(('superadmin', None))
+
+    return result
+
 def get_moderators_of_topic(topic_id: int) -> list:
     with get_conn() as conn:
         c = conn.cursor()
