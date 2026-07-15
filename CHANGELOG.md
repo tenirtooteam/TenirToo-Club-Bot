@@ -2,6 +2,90 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.12.0] - 2026-07-14
+
+### Changed (feature 011 №19 — Typed Callback Routing, Phase 3)
+- **Single source of truth for callback format** (`callbacks.py`, new root module, `R-UI-14`):
+  every parameterized callback route is now declared exactly once as an aiogram `CallbackData`
+  factory. Keyboards build via `.pack()`, handlers match via `Factory.filter()`, and
+  `UIService.generic_navigator` resolves via an exact-match registry — all three read the same
+  declaration. Previously the format lived in two hand-written copies: `keyboards/*` assembled
+  strings with f-strings while the navigator took them apart with substring checks, and nothing
+  detected drift between them until a user clicked. The module is a leaf node (`R-ARCH-4`):
+  it imports only `aiogram` and `enum`.
+- **Declarative navigator dispatch** (`services/ui_service.py`, `R-UI-3`): the ~139-line chain of
+  substring branches (`if "user_info" in cmd`) and positional extraction (`int(p[-1])`,
+  `int(p[3])`) is replaced by an 89-line resolution path over a
+  `{prefix: (Factory, render_fn)}` registry — serving 22 routes where the chain served ~15.
+  Route lookup is exact `dict` access; parameters are read by field name. Signature widened to
+  `generic_navigator(state, event, callback_data: str | CallbackData)`; the parameter name is
+  unchanged.
+- **Pagination is a declared field, not a string suffix** (`R-UI-14`, FR-005):
+  `build_paginated_menu` now takes a `page_cb: CallbackData` instead of an opaque
+  `callback_prefix: str`, building arrows via `page_cb.model_copy(update={"page": n}).pack()`.
+  The parallel `UIService.PAGINATED_CMDS` name registry — a second source of truth for which
+  routes "support" a page — was deleted; paginability now follows from a factory owning a `page`
+  field.
+- **Callback overflow fails loudly** (`keyboards/pagination_util.py`, `R-UI-11`): the manual
+  `cb_data[:64]` truncation was removed. Telegram's 64-byte limit is enforced by `pack()`, which
+  raises at keyboard-build time. Truncating mid-string used to emit a syntactically valid but
+  semantically broken route that silently fell through to the navigation-error fallback; the
+  overflow is now a test-time failure instead of a user-facing surprise. The realistic worst case
+  measures 49 bytes of 64.
+- **Defensive parsing moved into the filter** (`handlers/common.py`, `R-UI-11`): the hand-rolled
+  `split(":")` ladder in `universal_help_handler`, which guessed among three legacy formats, is
+  gone. `HelpCB.filter()` rejects malformed data via `(TypeError, ValueError)` — the same tuple
+  aiogram's own `CallbackQueryFilter` catches, so "the filter accepted it but the navigator
+  choked" is structurally impossible.
+
+### Fixed (feature 011 — three live defects found while planning №19)
+- **Paginated routes took the page number as the entity ID**: `p = callback_data.split("_")` ran
+  over the full string including the `_pg_{n}` tail, so `int(p[-1])` returned the page. Clicking
+  "next page" on the group list of topic 55 opened **topic 3**. Affected `mod_topic_groups`,
+  `mod_gr_addlist`, `mod_users_manage`, `mod_topic_moderators`, `group_topics_list`. Two sibling
+  routes had been silently patched around this with hardcoded positional indices (`p[3]`, `p[4]`)
+  — inconsistently, 2 of 7.
+- **The role-assignment topic picker was unroutable**: the prefix `topic_assign_pg_` itself
+  contained `_pg`, which `split("_pg_")[0]` ate, so the route matched nothing and threw the admin
+  back to the main menu. Its prefix is now `topic_assign`; the route name no longer carries a
+  paginability marker.
+- **Topic cards opened the wrong topic**: buttons were built as
+  `topic_in_group_{t_id}_{group_id}` but consumed as
+  `show_topic_detail(int(p[-1]), int(p[-2]))` against a `(topic_id, group_id)` signature —
+  inverted. A topic opened from a group's list showed the card of whichever topic's ID matched
+  the group's.
+- **Pagination silently ignored on three screens**: "Мои топики" (`user_topics`), the moderator
+  panel (`moderator`) and topic moderators (`mod_topic_moderators`) emitted page arrows whose
+  page number was discarded — the list re-rendered page 1 forever. All three now honor it.
+
+### Added (feature 011)
+- `tests/test_services/test_callback_contract.py` — format invariants: registry completeness,
+  prefix uniqueness, `pack()` inside 64 bytes at maximum field values, `unpack(pack(x)) == x`.
+- `tests/test_services/test_callback_routing_characterization.py` — behavior lock for
+  "button → screen", deliberately format-agnostic (drives real keyboards, never hardcodes a wire
+  string). It caught a real `R-FSM-1` regression mid-migration: six top-level list screens lost
+  their FSM reset when moving from the old `simple` dict into the registry.
+- `tests/test_services/test_callback_routing_defects.py` — reproducing tests for the three
+  defects above (`R-PROC-3`): red before, green after.
+- `tests/test_services/test_callback_static_guard.py` — AST gate preventing the old mechanism
+  from returning: no substring route matching, no positional extraction, no hand-built
+  parameterized `callback_data`.
+- `tests/test_journeys/test_callback_routing_journey.py` — the three scenarios end-to-end through
+  a real `Dispatcher`, exercising the full keyboard → filter → navigator → screen chain.
+
+### Notes (feature 011)
+- **Scope**: the `event_*` / `ann_*` / `date_*` families and the `search_start_*` /
+  `search_pick_*` parsing are **not** migrated — same defect class, tracked separately. The
+  boundary is enforced by a test, not by convention.
+- **`HelpCB` uses `sep="|"`, not the default `:`** — deliberately. It stores a *packed* return
+  route in `back_data` (e.g. `group_topics_list:5:1`), and `pack()` forbids a factory's own
+  separator inside a value; with `:` it would raise on every parameterized return. Do not unify
+  the separator.
+- The roadmap's claim that this work "removes a class of permission bugs" **was not substantiated**
+  and was cut from scope. Value delivered is parse-safety; authority re-verification (`R-SEC-3`,
+  `R-ARCH-7`) is untouched and remains mandatory. Typing guarantees `topic_id` is an integer, not
+  that the user may see it.
+
 ## [1.11.0] - 2026-07-14
 
 ### Changed (feature 010 №17 — Sheets Sync Debounce & Task Ownership, Phase 3)

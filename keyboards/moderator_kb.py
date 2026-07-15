@@ -3,6 +3,9 @@ from aiogram.types import InlineKeyboardMarkup
 from database import db
 from keyboards.pagination_util import add_nav_footer
 
+import callbacks as cb
+
+
 def get_mod_cancel_kb(back_data: str) -> InlineKeyboardMarkup:
     """Универсальная клавиатура отмены для сценариев модерации."""
     builder = InlineKeyboardBuilder()
@@ -23,7 +26,7 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
         topic_name = names_map.get(topic_id, f"ID: {topic_id}")
         item_buttons.append(InlineKeyboardButton(
             text=f"📍 {topic_name} (ID: {topic_id})",
-            callback_data=f"mod_topic_select_{topic_id}"
+            callback_data=cb.ModTopicSelectCB(topic_id=topic_id).pack()
         ))
 
     from aiogram.types import WebAppInfo
@@ -38,9 +41,9 @@ def moderator_topics_list_kb(topics: list, page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ])
     return build_paginated_menu(
-        item_buttons, static_buttons, page, limit, "moderator",
+        item_buttons, static_buttons, page, limit, cb.ModeratorCB(page=page),
         search_type="topic", search_action="mod_select",
-        help_key="moderator_tools", help_back_data="moderator"
+        help_key="moderator_tools", help_back_data=cb.ModeratorCB().pack()
     )
 
 
@@ -53,18 +56,18 @@ def moderator_topic_menu_kb(topic_id: int):
     )
     builder.button(
         text="📂 Управление группами доступа",
-        callback_data=f"mod_topic_groups_{topic_id}"
+        callback_data=cb.ModTopicGroupsCB(topic_id=topic_id).pack()
     )
     builder.button(
         text="👥 Управление пользователями",
-        callback_data=f"mod_users_manage_{topic_id}"
+        callback_data=cb.ModUsersManageCB(topic_id=topic_id).pack()
     )
     builder.button(
         text="👑 Модераторы топика",
-        callback_data=f"mod_topic_moderators_{topic_id}"
+        callback_data=cb.ModTopicModeratorsCB(topic_id=topic_id).pack()
     )
     builder.adjust(1)
-    add_nav_footer(builder, back_data=f"mod_topic_select_{topic_id}", help_key="moderator_tools", help_back_data=f"mod_topic_select_{topic_id}")
+    add_nav_footer(builder, back_data=cb.ModTopicSelectCB(topic_id=topic_id).pack(), help_key="moderator_tools", help_back_data=cb.ModTopicSelectCB(topic_id=topic_id).pack())
     return builder.as_markup()
 
 
@@ -87,10 +90,10 @@ def moderator_group_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     static_buttons = [
         InlineKeyboardButton(
             text="➕ Привязать существующую группу",
-            callback_data=f"mod_gr_addlist_{topic_id}"
+            callback_data=cb.ModGroupAddListCB(topic_id=topic_id).pack()
         ),
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_topic_groups_{topic_id}", help_key="templates")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.ModTopicGroupsCB(topic_id=topic_id, page=page), help_key="templates")
 
 
 def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
@@ -110,7 +113,7 @@ def moderator_available_groups_kb(topic_id: int, page: int = 1, limit: int = 7):
             ))
 
     static_buttons = []
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_gr_addlist_{topic_id}", help_key="templates")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.ModGroupAddListCB(topic_id=topic_id, page=page), help_key="templates")
 
 
 
@@ -141,15 +144,15 @@ def moderator_users_list_kb(topic_id: int, page: int = 1, limit: int = 7):
     static_buttons = [
         InlineKeyboardButton(
             text="➕ Выдать доступ",
-            callback_data=f"mod_add_user_list_{topic_id}"
+            callback_data=cb.ModAddUserListCB(topic_id=topic_id).pack()
         ),
         InlineKeyboardButton(
             text="⬅️ Назад",
-            callback_data=f"mod_topic_select_{topic_id}"
+            callback_data=cb.ModTopicSelectCB(topic_id=topic_id).pack()
         ),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_users_manage_{topic_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.ModUsersManageCB(topic_id=topic_id, page=page))
 
 
 def moderator_users_to_add_kb(topic_id: int, page: int = 1, limit: int = 7):
@@ -172,11 +175,11 @@ def moderator_users_to_add_kb(topic_id: int, page: int = 1, limit: int = 7):
     static_buttons = [
         InlineKeyboardButton(
             text="⬅️ Назад",
-            callback_data=f"mod_users_manage_{topic_id}"
+            callback_data=cb.ModUsersManageCB(topic_id=topic_id).pack()
         ),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_add_user_list_{topic_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.ModAddUserListCB(topic_id=topic_id, page=page))
 
 
 def moderator_topic_moderators_kb(topic_id: int, page: int = 1, limit: int = 7):
@@ -199,8 +202,8 @@ def moderator_topic_moderators_kb(topic_id: int, page: int = 1, limit: int = 7):
         ),
         InlineKeyboardButton(
             text="⬅️ Назад",
-            callback_data=f"mod_topic_select_{topic_id}"
+            callback_data=cb.ModTopicSelectCB(topic_id=topic_id).pack()
         ),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"mod_topic_moderators_{topic_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.ModTopicModeratorsCB(topic_id=topic_id, page=page))

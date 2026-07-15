@@ -7,6 +7,8 @@ from services.ui_service import UIService
 from services.callback_guard import safe_callback
 from services.notification_service import NotificationService
 
+import callbacks as cb
+
 logger = logging.getLogger(__name__)
 router = Router()
 
@@ -33,18 +35,18 @@ async def user_profile_callback(callback: types.CallbackQuery, state: FSMContext
     await UIService.generic_navigator(state, callback, callback.data)
 
 
-@router.callback_query(F.data == "user_topics")
+@router.callback_query(cb.UserTopicsCB.filter())
 @safe_callback()
 async def show_user_topics(callback: types.CallbackQuery, state: FSMContext):
     """Список топиков, к которым у юзера есть доступ."""
     await UIService.generic_navigator(state, callback, callback.data)
 
 
-@router.callback_query(F.data.startswith("u_topic_info_"))
+@router.callback_query(cb.UserTopicInfoCB.filter())
 @safe_callback()
-async def user_topic_detail(callback: types.CallbackQuery, state: FSMContext):
+async def user_topic_detail(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.UserTopicInfoCB):
     """Информация о любом топике в системе."""
-    await UIService.generic_navigator(state, callback, callback.data)
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.message(F.chat.type != "private", F.text.startswith("@all"))

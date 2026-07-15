@@ -3,7 +3,7 @@ type: fsm-protocol
 title: FSM Data Keys, Sterile Interface Mechanics, Callback Resilience & Traffic Controller
 description: UIService method mechanics, full inventory of FSM state keys, and descriptive behavior of the callback-resilience decorator and the unified /start entry point.
 source_anchor: PL-5.1, PL-5.2, PL-5.5, PL-5.6
-timestamp: 2026-07-02
+timestamp: 2026-07-14
 tags: [fsm, ui, routing]
 ---
 
@@ -35,11 +35,28 @@ tags: [fsm, ui, routing]
   input) — calls `terminate_input(reset_state=False)`, removing the prompt and the user's
   message, then sends a fresh menu. Hardening: catches `BUTTON_TYPE_INVALID` and falls back to
   `answer` (a new message) if editing is impossible.
-- **`UIService.generic_navigator`**: unified entry point for UI transitions (`R-UI-3`). Maps
-  callback-data strings to specific show methods or keyboard builders. Supports global panels
-  (Admin, Moderator, User), profile views, topic details, and Help Infrastructure (prefix
-  `help:`, `help:{key}:{back_data}` format via `HelpService`). Uses the `PAGINATED_CMDS` class
-  constant to determine whether a keyboard requires the `page` argument; logs unknown commands.
+- **`UIService.generic_navigator`**: unified entry point for UI transitions (`R-UI-3`, `R-UI-14`).
+  Signature: `generic_navigator(state, event, callback_data: str | CallbackData)`. Resolution order:
+  1. a `CallbackData` object → module-level registry `_ROUTE_REGISTRY {prefix: (Factory, render_fn)}`,
+     already parsed;
+  2. a `str` without a separator → `simple` dict of parameterless routes;
+  3. a `str` with a separator → prefix via `callbacks.route_prefix()` → **exact** registry lookup →
+     `Factory.unpack()`;
+  4. registry miss or `(TypeError, ValueError)` from `unpack()` → warning + return to main menu.
+
+  The `(TypeError, ValueError)` tuple is deliberate: it is the same one aiogram's own
+  `CallbackQueryFilter` catches, so "filter accepted it but the navigator choked" is impossible.
+  Route lookup is exact `dict` access and parameters are read by field name — the substring chain
+  and positional `p[-1]`/`p[3]` extraction were removed in feature 011 (they were the DEF-1/2/3
+  defects). `PAGINATED_CMDS` was removed with them: pagination now follows from a factory owning a
+  `page` field.
+
+  **FSM-reset asymmetry** (`R-FSM-1`, characterized and locked): top-level list/panel screens
+  (`manage_groups`, `manage_users`, `all_topics_list`, `list_users_roles`, `moderator`,
+  `user_topics`, plus the `simple` routes) call `state.set_state(None)` + `clear_fsm_data_safely`
+  before showing; detail-card screens (`user_info`, `group_info`, topic cards…) do **not**. This is
+  intentional and predates 011 — do not "even it out": extending the reset would be a behavior
+  change.
 - **`UIService.show_admin_dashboard` / `show_moderator_dashboard`**: wrappers for main panels
   supporting optional custom feedback text while preserving layout integrity and superadmin
   visibility.

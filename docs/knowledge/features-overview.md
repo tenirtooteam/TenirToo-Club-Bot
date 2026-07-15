@@ -3,7 +3,7 @@ type: feature-detail
 title: Implemented Features — Full Overview
 description: Full descriptive list of shipped bot features; CONTEXT_PROMPT.md keeps only the one-line index.
 source_anchor: CP-2
-timestamp: 2026-07-02
+timestamp: 2026-07-14
 tags: [features, overview]
 ---
 
@@ -98,3 +98,14 @@ tags: [features, overview]
 - **Artifact Prompt Linter**: CLI validator ensuring structure and language standards for
   implementation plans (English), task checklists (completion status), and walkthrough
   reports (Russian).
+- **Typed Callback Routing** *(feature 011)*: every parameterized callback route is declared once
+  as a `CallbackData` factory in `callbacks.py` and consumed from that single declaration by
+  keyboards (`.pack()`), handlers (`Factory.filter()`) and the navigator (exact-match registry).
+  Route selection is exact and parameters are read by field name, replacing ~139 lines of
+  substring matching and positional parsing with an 89-line declarative registry serving more
+  routes than before. Pagination became a declared field, retiring the parallel `PAGINATED_CMDS`
+  name registry. The refactor closed three live defects: paginated routes taking the page number
+  as an entity ID, a route whose `_pg` infix made it unroutable, and inverted topic/group
+  arguments opening the wrong topic's card. Value delivered is **parse-safety, not
+  permission-safety** — authority re-verification (`R-SEC-3`, `R-ARCH-7`) is unchanged and remains
+  mandatory.

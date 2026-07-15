@@ -3,7 +3,7 @@ type: testing
 title: Testing Infrastructure — Configuration, Categories & Dev Sandbox
 description: conftest.py fixtures, test-category directory map, and the Docker dev sandbox environment.
 source_anchor: PL-8.1, PL-8.2, PL-8.4, PL-8.6
-timestamp: 2026-07-02
+timestamp: 2026-07-14
 tags: [testing, infrastructure, docker]
 ---
 
@@ -50,6 +50,21 @@ suite inside the dev sandbox.
   exploration), `test_google_sheets_service.py` (mocked API validation),
   `test_management_service.py` (Search-Or-Action protocol), `test_permission_service.py`
   (role resolution).
+- **Callback-routing layer** (feature 011, `R-UI-14`) — four files with distinct jobs:
+  - `test_callback_contract.py` — format invariants: registry completeness (R-1), prefix
+    uniqueness (R-2), constants carry no separator (C-1), paginator factories own a `page` field
+    (P-1), `pack()` fits 64 bytes at maximum field values, `unpack(pack(x)) == x`.
+  - `test_callback_routing_characterization.py` — **CHAR-OK**: locks "button → screen" for
+    correct behavior. The harness is deliberately **format-agnostic**: it builds a real keyboard,
+    takes a real button's `callback_data` and feeds it to the navigator, so it never hardcodes a
+    wire string and survives format changes untouched. A test that hardcodes `"user_info_5"` is a
+    defect in the test. Also locks the FSM-reset asymmetry (see `fsm-protocol.md`).
+  - `test_callback_routing_defects.py` — **CHAR-DEF**: the DEF-1/2/3 repro tests (`R-PROC-3`).
+    Red before feature 011, green after.
+  - `test_callback_static_guard.py` — AST gate keeping the old mechanism from returning: no
+    substring route matching, no positional extraction, no hand-built parameterized
+    `callback_data` in keyboards. AST rather than regex because the navigator's comments quote the
+    deleted constructs verbatim; a text search would flag the documentation.
 - **`tests/test_handlers/`**: handler/middleware unit tests — routing, state transitions,
   stealth-moderation filters. Uses `__wrapped__` to bypass `sterile_command` redirects during
   logic verification.

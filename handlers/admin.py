@@ -12,6 +12,8 @@ from services.ui_service import UIService
 from services.permission_service import PermissionService
 from services.management_service import ManagementService
 
+import callbacks as cb
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,22 +81,22 @@ async def sheets_import_callback(callback: types.CallbackQuery, state: FSMContex
 
 # --- УПРАВЛЕНИЕ ГРУППАМИ ---
 
-@router.callback_query(F.data.startswith("manage_groups"))
+@router.callback_query(cb.ManageGroupsCB.filter())
 @safe_callback()
-async def show_groups(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def show_groups(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ManageGroupsCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
-@router.callback_query(F.data.startswith("topic_assign_pg_"))
+@router.callback_query(cb.TopicAssignCB.filter())
 @safe_callback()
-async def role_assign_choose_topic(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def role_assign_choose_topic(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.TopicAssignCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
-@router.callback_query(F.data.startswith("group_info_"))
+@router.callback_query(cb.GroupInfoCB.filter())
 @safe_callback()
-async def group_detail(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def group_detail(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.GroupInfoCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data == "add_group_start")
@@ -137,16 +139,11 @@ async def delete_group_init(callback: types.CallbackQuery, state: FSMContext):
 
 # --- НОВЫЕ ОПЕРАЦИИ ШАБЛОНОВ (ПРИМЕНИТЬ/СИНХРО) ---
 
-@router.callback_query(F.data.startswith("tmpl_act_start_"))
+@router.callback_query(cb.TmplActStartCB.filter())
 @safe_callback()
-async def group_template_action_choose_topic(callback: types.CallbackQuery, state: FSMContext):
+async def group_template_action_choose_topic(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.TmplActStartCB):
     """Выбор топика для применения или синхронизации шаблона."""
-    parts = callback.data.split("_")
-    action = parts[3] # apply или sync
-    group_id = int(parts[4])
-
-    title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
-    await UIService.sterile_show(state, callback, title, reply_markup=kb.template_action_topic_select_kb(group_id, action))
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("tmpl_act_exec_"))
@@ -164,27 +161,33 @@ async def group_template_action_execute(callback: types.CallbackQuery, state: FS
         success, msg = ManagementService.sync_group_to_topic(group_id, topic_id)
 
     await callback.answer(msg)
-    await UIService.generic_navigator(state, callback, f"group_info_{group_id}")
+    await UIService.generic_navigator(state, callback, cb.GroupInfoCB(group_id=group_id))
 
 
 # --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ---
 
-@router.callback_query(F.data.startswith("all_topics_list"))
+@router.callback_query(cb.AllTopicsListCB.filter())
 @safe_callback()
-async def show_all_topics(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def show_all_topics(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.AllTopicsListCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
-@router.callback_query(F.data.startswith("topic_global_view_") | F.data.startswith("topic_in_group_"))
+@router.callback_query(cb.TopicGlobalViewCB.filter())
 @safe_callback()
-async def topic_detail(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def topic_detail_global(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.TopicGlobalViewCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
-@router.callback_query(F.data.startswith("group_topics_list_"))
+@router.callback_query(cb.TopicInGroupCB.filter())
 @safe_callback()
-async def show_group_topics(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def topic_detail_in_group(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.TopicInGroupCB):
+    await UIService.generic_navigator(state, callback, callback_data)
+
+
+@router.callback_query(cb.GroupTopicsListCB.filter())
+@safe_callback()
+async def show_group_topics(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.GroupTopicsListCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("topic_del_"))
@@ -199,16 +202,13 @@ async def remove_topic_from_group_init(callback: types.CallbackQuery, state: FSM
     )
 
 
-@router.callback_query(F.data.startswith("add_topic_to_"))
+@router.callback_query(cb.AddTopicToCB.filter())
 @safe_callback()
-async def add_topic_to_group_init(callback: types.CallbackQuery, state: FSMContext):
-    parts = callback.data.split("_pg_")
-    page = int(parts[1]) if len(parts) > 1 else 1
-    group_id = int(parts[0].replace("add_topic_to_", ""))
+async def add_topic_to_group_init(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.AddTopicToCB):
     await UIService.sterile_show(
         state, callback,
         "📍 Выберите топик для добавления в группу:",
-        reply_markup=kb.available_topics_kb(group_id, page=page)
+        reply_markup=kb.available_topics_kb(callback_data.group_id, page=callback_data.page)
     )
 
 
@@ -219,7 +219,7 @@ async def confirm_add_topic(callback: types.CallbackQuery, state: FSMContext):
     topic_id, group_id = int(parts[3]), int(parts[4])
     success, msg = ManagementService.add_topic_to_group(group_id, topic_id)
     await callback.answer(msg)
-    await UIService.generic_navigator(state, callback, f"group_topics_list_{group_id}")
+    await UIService.generic_navigator(state, callback, cb.GroupTopicsListCB(group_id=group_id))
 
 
 @router.callback_query(F.data.startswith("topic_rename_"))
@@ -274,10 +274,10 @@ async def global_topic_delete_init(callback: types.CallbackQuery, state: FSMCont
 
 # --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ---
 
-@router.callback_query(F.data.startswith("manage_users"))
+@router.callback_query(cb.ManageUsersCB.filter())
 @safe_callback()
-async def show_users(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def show_users(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ManageUsersCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data == "add_user_start")
@@ -296,10 +296,10 @@ async def process_user_add(message: types.Message, state: FSMContext):
     await UIService.generic_navigator(state, message, "manage_users")
 
 
-@router.callback_query(F.data.startswith("user_info_"))
+@router.callback_query(cb.UserInfoCB.filter())
 @safe_callback()
-async def user_detail(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def user_detail(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.UserInfoCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("user_rename_"))
@@ -328,10 +328,10 @@ async def process_user_rename(message: types.Message, state: FSMContext):
     await UIService.generic_navigator(state, message, "manage_users")
 
 
-@router.callback_query(F.data.startswith("user_templates_manage_"))
+@router.callback_query(cb.UserTemplatesManageCB.filter())
 @safe_callback()
-async def user_groups_ui(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def user_groups_ui(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.UserTemplatesManageCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("user_template_toggle_"))
@@ -342,7 +342,7 @@ async def toggle_group(callback: types.CallbackQuery, state: FSMContext):
 
     success, msg = ManagementService.toggle_user_group_template(user_id, group_id)
     await callback.answer(msg)
-    await UIService.generic_navigator(state, callback, f"user_templates_manage_{user_id}")
+    await UIService.generic_navigator(state, callback, cb.UserTemplatesManageCB(user_id=user_id))
 
 
 @router.callback_query(F.data.startswith("user_delete_"))
@@ -372,10 +372,10 @@ async def role_assign_choose_user(callback: types.CallbackQuery, state: FSMConte
     )
 
 
-@router.callback_query(F.data.startswith("user_roles_manage_"))
+@router.callback_query(cb.UserRolesManageCB.filter())
 @safe_callback()
-async def user_roles_manage_handler(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def user_roles_manage_handler(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.UserRolesManageCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("role_pick_"))
@@ -396,7 +396,7 @@ async def role_pick_handler(callback: types.CallbackQuery, state: FSMContext):
     else:
         success, msg = ManagementService.grant_role(user_id, role_id, None)
         await callback.answer(msg)
-        await UIService.generic_navigator(state, callback, f"user_roles_manage_{user_id}")
+        await UIService.generic_navigator(state, callback, cb.UserRolesManageCB(user_id=user_id))
 
 
 @router.callback_query(F.data.startswith("role_assign_topic_"))
@@ -415,7 +415,7 @@ async def role_assign_topic_confirm(callback: types.CallbackQuery, state: FSMCon
     success, msg = ManagementService.grant_role(user_id, mod_role_id, topic_id)
     await callback.answer(msg)
 
-    await UIService.generic_navigator(state, callback, f"user_roles_manage_{user_id}")
+    await UIService.generic_navigator(state, callback, cb.UserRolesManageCB(user_id=user_id))
 
 
 @router.callback_query(F.data.startswith("role_revoke_"))

@@ -3,7 +3,7 @@ type: module-registry
 title: Module Registry — File Responsibilities & Function Inventory
 description: Complete file list with individual responsibilities and full function inventory.
 source_anchor: PL-2.2
-timestamp: 2026-07-02
+timestamp: 2026-07-14
 tags: [architecture, modules, inventory]
 ---
 
@@ -19,6 +19,9 @@ Complete file list with individual responsibilities and full function inventory:
 
 - [PL-2.2.2] **loader.py** — Initializes `Bot` and `Dispatcher` with `MemoryStorage`.
 - [PL-2.2.3] **config.py** — Environment variable loader and global constants definition. Centralizes all magic numbers, logging parameters, and WebApp configurations.
+- **callbacks.py** *(feature 011)* — Single source of truth for callback-route format (`R-UI-14`). Declares one `CallbackData` factory per parameterized route, consumed by both sides of the contract: `keyboards/*` build via `.pack()`, `handlers/*` match via `Factory.filter()`, `UIService.generic_navigator` resolves via its registry. Contents: 21 navigator-family factories; 4 "mechanical" ones (`ModeratorCB`, `AddTopicToCB`, `ModAddUserListCB`, `SearchPageCB`) that are in scope only because they call the shared paginator; `TemplateAction` enum; `CONSTANT_ROUTES` (17 parameterless routes that stay plain strings); `route_prefix()` helper.
+  **Leaf node** (`R-ARCH-4`): imports only `aiogram` and `enum` — never `services`, `handlers`, `database` or `keyboards`. It must be reachable by both sides of the contract while depending on neither; placing it inside any package would create an import direction that does not exist today.
+  **Separator quirk**: all factories use aiogram's default `:` except `HelpCB`, which uses `sep="|"`. `HelpCB.back_data` stores a *packed* return route (e.g. `group_topics_list:5:1`), and `pack()` forbids a factory's own separator inside a value — with `:` it would raise on every parameterized return. Prefix extraction therefore splits on the first `:` **or** `|` (`route_prefix()`). Do not "unify" the separator: it breaks help.
 - [PL-2.2.4] **database/__init__.py** — Package initializer for DB facade pattern.
 - [PL-2.2.5] **database/connection.py** — Connection context manager, WAL activation, and Foreign Key enforcement.
 - [PL-2.2.6] **database/audit.py** — Audit requests management: `create_audit_request`, `get_audit_request`, `resolve_audit_request`, `get_pending_requests_by_type`, `get_user_pending_request`, `delete_audit_request`.

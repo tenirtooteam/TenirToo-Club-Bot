@@ -2,6 +2,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 import math
 
+import callbacks as cb
+
 def add_nav_footer(builder: InlineKeyboardBuilder, back_data: str = None, include_close: bool = True, help_key: str = None, help_back_data: str = None):
     """
     Универсальный помощник для добавления кнопок навигации в 'подвал' меню [PL-5.1.14].
@@ -20,15 +22,16 @@ def add_nav_footer(builder: InlineKeyboardBuilder, back_data: str = None, includ
         # 2. Путь назад (back_data) - если мы в дочернем меню
         # 3. 'landing' - системный корень как последний рубеж
         back_link = help_back_data or back_data or "landing"
-        cb_data = f"help:{help_key}:{back_link}"
 
-        # [G-DNA] Telegram Constraint: callback_data <= 64 bytes
-        if len(cb_data.encode('utf-8')) > 64:
-            import logging
-            logging.getLogger(__name__).warning(f"⚠️ [UI] Callback data too long: {cb_data}")
-            cb_data = cb_data[:64]
-
-        nav_buttons.append(InlineKeyboardButton(text="❓", callback_data=cb_data))
+        # [feature 011 / FR-011] Лимит Telegram 64 байта обеспечивает pack():
+        # он поднимает ValueError. Прежняя ручная обрезка cb_data[:64] была
+        # хуже отказа — она резала строку посередине и выпускала синтаксически
+        # целый, но семантически битый маршрут, который молча уходил в fallback.
+        # Теперь превышение — громкий отказ на сборке клавиатуры, а не сюрприз
+        # у пользователя.
+        nav_buttons.append(
+            InlineKeyboardButton(text="❓", callback_data=cb.HelpCB(key=help_key, back_data=back_link).pack())
+        )
 
     if nav_buttons:
         builder.row(*nav_buttons)
@@ -39,7 +42,7 @@ def build_paginated_menu(
     static_buttons: list[InlineKeyboardButton],
     page: int,
     limit: int,
-    callback_prefix: str,
+    page_cb,
     adjust_items: int = 1,
     search_type: str = None, # 'user', 'group', 'topic'
     search_action: str = None, # 'info', 'select', etc.
@@ -47,6 +50,17 @@ def build_paginated_menu(
     help_key: str = None,
     help_back_data: str = None
 ):
+    """Строит меню со страничной навигацией.
+
+    [feature 011 / FR-005] `page_cb` — ЭКЗЕМПЛЯР объявления маршрута с полем
+    `page`, а не строковый префикс. Стрелки получаются как копия этого объекта с
+    подменённым номером страницы, поэтому строковой хирургии здесь больше нет.
+
+    Прежний контракт (`callback_prefix: str` + склейка `f"{prefix}_pg_{n}"`) был
+    корнем сразу двух дефектов: номер страницы приезжал в навигатор как ID
+    сущности (DEF-1), а префикс, сам содержавший `_pg`, ломал разбор целиком
+    (DEF-2). Оба исчезают вместе со склейкой.
+    """
     builder = InlineKeyboardBuilder()
     start = (page - 1) * limit
     end = start + limit
@@ -62,12 +76,16 @@ def build_paginated_menu(
     total_items = len(item_buttons)
     total_pages = max(1, math.ceil(total_items / limit))
 
+    def _page_link(target: int) -> str:
+        """Тот же маршрут, другая страница — номер меняется как поле."""
+        return page_cb.model_copy(update={"page": target}).pack()
+
     if page > 1:
-        nav_arrows.append(InlineKeyboardButton(text="◀️ Пред.", callback_data=f"{callback_prefix}_pg_{page - 1}"))
+        nav_arrows.append(InlineKeyboardButton(text="◀️ Пред.", callback_data=_page_link(page - 1)))
     if total_pages > 1:
         nav_arrows.append(InlineKeyboardButton(text=f"📄 {page}/{total_pages}", callback_data="ignore"))
     if page < total_pages:
-        nav_arrows.append(InlineKeyboardButton(text="След. ▶️", callback_data=f"{callback_prefix}_pg_{page + 1}"))
+        nav_arrows.append(InlineKeyboardButton(text="След. ▶️", callback_data=_page_link(page + 1)))
 
     if nav_arrows:
         builder.row(*nav_arrows)
@@ -88,15 +106,24 @@ def build_paginated_menu(
         if s_btn.callback_data:
             if s_btn.callback_data == "close_menu":
                 continue
-            if s_btn.text == "⬅️ НАЗАД" or s_btn.callback_data == callback_prefix:
+            # [feature 011] Прежде здесь была вторая клауза:
+            # `or s_btn.callback_data == callback_prefix` — «кнопка ведёт назад
+            # на этот же список». Она удалена вместе со строковым префиксом как
+            # мёртвая: проверено runtime-зондом (0 срабатываний на всём прогоне)
+            # и статической сверкой всех 16 вызовов паджинатора. Кнопку «Назад»
+            # целиком опознаёт текстовая ветка ниже.
+            if s_btn.text == "⬅️ НАЗАД":
                 footer_back_data = s_btn.callback_data
                 continue
-            # Если в статичных кнопках есть справка (help:key:back)
-            if s_btn.callback_data.startswith("help:"):
-                parts = s_btn.callback_data.split(":")
-                if len(parts) >= 2:
-                    footer_help_key = parts[1]
+            # Если в статичных кнопках есть справка — забираем её ключ в футер.
+            # [feature 011] Разбор через объявление формата, а не по префиксу
+            # строки: ключ достаётся по имени поля (FR-003).
+            if cb.route_prefix(s_btn.callback_data) == cb.HelpCB.__prefix__:
+                try:
+                    footer_help_key = cb.HelpCB.unpack(s_btn.callback_data).key
                     continue
+                except (TypeError, ValueError):
+                    pass
 
         # Остальные (функциональные) кнопки — на всю строку
         builder.row(s_btn)

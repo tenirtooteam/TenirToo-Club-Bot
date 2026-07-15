@@ -4,6 +4,8 @@ from aiogram.types import InlineKeyboardButton
 from database import db
 from keyboards.pagination_util import add_nav_footer
 
+import callbacks as cb
+
 
 def main_admin_kb():
     from aiogram.types import WebAppInfo
@@ -13,10 +15,10 @@ def main_admin_kb():
     if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
         builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
 
-    builder.button(text="[ 📂 ШАБЛОНЫ ДОСТУПА ]", callback_data="manage_groups")
-    builder.button(text="[ 📍 ВСЕ ТОПИКИ ]", callback_data="all_topics_list")
+    builder.button(text="[ 📂 ШАБЛОНЫ ДОСТУПА ]", callback_data=cb.ManageGroupsCB().pack())
+    builder.button(text="[ 📍 ВСЕ ТОПИКИ ]", callback_data=cb.AllTopicsListCB().pack())
     builder.button(text="[ 🏔 ПОХОДЫ ]", callback_data="event_list")
-    builder.button(text="[ 👥 ПОЛЬЗОВАТЕЛИ ]", callback_data="manage_users")
+    builder.button(text="[ 👥 ПОЛЬЗОВАТЕЛИ ]", callback_data=cb.ManageUsersCB().pack())
     builder.button(text="[ 🛡 РОЛИ ]", callback_data="roles_dashboard")
     builder.button(text="[ 📊 ЭКСПОРТ В GOOGLE ]", callback_data="sheets_export_all")
     builder.button(text="[ 📥 ИМПОРТ ИЗ GOOGLE ]", callback_data="sheets_import_all")
@@ -45,13 +47,13 @@ def all_topics_kb(page: int = 1, limit: int = 7):
     item_buttons = []
     for t_id in topic_ids:
         t_name = names_map.get(t_id, f"ID: {t_id}")
-        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_global_view_{t_id}"))
+        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=cb.TopicGlobalViewCB(topic_id=t_id).pack()))
     static_buttons = [
         InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="admin_main"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     return build_paginated_menu(
-        item_buttons, static_buttons, page, limit, "all_topics_list",
+        item_buttons, static_buttons, page, limit, cb.AllTopicsListCB(page=page),
         search_type="topic", search_action="info"
     )
 
@@ -62,7 +64,7 @@ def topic_edit_kb(topic_id, group_id=0):
         builder.button(text="🗑 Убрать из группы", callback_data=f"topic_del_{topic_id}_{group_id}")
     builder.adjust(1)
 
-    back_data = f"group_topics_list_{group_id}" if group_id != 0 else "all_topics_list"
+    back_data = cb.GroupTopicsListCB(group_id=group_id).pack() if group_id != 0 else cb.AllTopicsListCB().pack()
     add_nav_footer(builder, back_data=back_data)
     return builder.as_markup()
 
@@ -76,14 +78,14 @@ def group_topics_list_kb(group_id, page: int = 1, limit: int = 7):
     item_buttons = []
     for t_id in topics:
         t_name = names_map.get(t_id, f"ID: {t_id}")
-        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=f"topic_in_group_{t_id}_{group_id}"))
+        item_buttons.append(InlineKeyboardButton(text=f"ID: {t_id} | {t_name}", callback_data=cb.TopicInGroupCB(topic_id=t_id, group_id=group_id).pack()))
 
     static_buttons = [
-        InlineKeyboardButton(text="➕ Добавить топик в шаблон", callback_data=f"add_topic_to_{group_id}"),
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
+        InlineKeyboardButton(text="➕ Добавить топик в шаблон", callback_data=cb.AddTopicToCB(group_id=group_id).pack()),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=cb.GroupInfoCB(group_id=group_id).pack()),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"group_topics_list_{group_id}", help_key="topics", help_back_data=f"group_topics_list_{group_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.GroupTopicsListCB(group_id=group_id, page=page), help_key="topics", help_back_data=cb.GroupTopicsListCB(group_id=group_id).pack())
 
 def available_topics_kb(group_id, page: int = 1, limit: int = 7):
     from keyboards.pagination_util import build_paginated_menu
@@ -103,38 +105,38 @@ def available_topics_kb(group_id, page: int = 1, limit: int = 7):
             item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name} (ID: {t_id})", callback_data=f"topic_add_confirm_{t_id}_{group_id}"))
 
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ К списку топиков шаблона", callback_data=f"group_topics_list_{group_id}"),
+        InlineKeyboardButton(text="⬅️ К списку топиков шаблона", callback_data=cb.GroupTopicsListCB(group_id=group_id).pack()),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"add_topic_to_{group_id}", help_key="topics")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.AddTopicToCB(group_id=group_id, page=page), help_key="topics")
 
 def groups_list_kb(page: int = 1, limit: int = 7):
     groups = db.get_all_groups()
     item_buttons = []
     for g_id, g_name in groups:
-        item_buttons.append(InlineKeyboardButton(text=f"📂 {g_name}", callback_data=f"group_info_{g_id}"))
+        item_buttons.append(InlineKeyboardButton(text=f"📂 {g_name}", callback_data=cb.GroupInfoCB(group_id=g_id).pack()))
 
     static_buttons = [
         InlineKeyboardButton(text="➕ Создать шаблон", callback_data="add_group_start"),
-        InlineKeyboardButton(text="❓ О шаблонах", callback_data="help:templates:manage_groups"),
+        InlineKeyboardButton(text="❓ О шаблонах", callback_data=cb.HelpCB(key="templates", back_data=cb.ManageGroupsCB().pack()).pack()),
         InlineKeyboardButton(text="⬅️ НАЗАД", callback_data="admin_main"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
     from keyboards.pagination_util import build_paginated_menu
     return build_paginated_menu(
-        item_buttons, static_buttons, page, limit, "manage_groups",
+        item_buttons, static_buttons, page, limit, cb.ManageGroupsCB(page=page),
         search_type="group", search_action="info",
-        help_key="templates", help_back_data="manage_groups"
+        help_key="templates", help_back_data=cb.ManageGroupsCB().pack()
     )
 
 def group_edit_kb(group_id):
     builder = InlineKeyboardBuilder()
-    builder.button(text="📍 Топики в шаблоне", callback_data=f"group_topics_list_{group_id}")
-    builder.button(text="⚡ Применить шаблон к топику", callback_data=f"tmpl_act_start_apply_{group_id}")
-    builder.button(text="🔄 Синхронизировать топик", callback_data=f"tmpl_act_start_sync_{group_id}")
+    builder.button(text="📍 Топики в шаблоне", callback_data=cb.GroupTopicsListCB(group_id=group_id).pack())
+    builder.button(text="⚡ Применить шаблон к топику", callback_data=cb.TmplActStartCB(action=cb.TemplateAction.APPLY, group_id=group_id).pack())
+    builder.button(text="🔄 Синхронизировать топик", callback_data=cb.TmplActStartCB(action=cb.TemplateAction.SYNC, group_id=group_id).pack())
     builder.button(text="🗑 Удалить шаблон", callback_data=f"del_group_{group_id}")
     builder.adjust(1)
-    add_nav_footer(builder, back_data="manage_groups", help_key="templates", help_back_data=f"group_info_{group_id}")
+    add_nav_footer(builder, back_data=cb.ManageGroupsCB().pack(), help_key="templates", help_back_data=cb.GroupInfoCB(group_id=group_id).pack())
     return builder.as_markup()
 
 def template_action_topic_select_kb(group_id: int, action: str, page: int = 1, limit: int = 7):
@@ -151,15 +153,15 @@ def template_action_topic_select_kb(group_id: int, action: str, page: int = 1, l
         item_buttons.append(InlineKeyboardButton(text=f"📍 {t_name}", callback_data=f"tmpl_act_exec_{action}_{group_id}_{t_id}"))
 
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ Назад", callback_data=f"group_info_{group_id}"),
+        InlineKeyboardButton(text="⬅️ Назад", callback_data=cb.GroupInfoCB(group_id=group_id).pack()),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"tmpl_act_start_{action}_{group_id}", help_key="topics")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.TmplActStartCB(action=action, group_id=group_id, page=page), help_key="topics")
 
 def users_list_kb(page: int = 1, limit: int = 7):
     users = db.get_all_users()
     item_buttons = [
-        InlineKeyboardButton(text=f"👤 {f_name} {l_name}", callback_data=f"user_info_{u_id}")
+        InlineKeyboardButton(text=f"👤 {f_name} {l_name}", callback_data=cb.UserInfoCB(user_id=u_id).pack())
         for u_id, f_name, l_name in users
     ]
     static_buttons = [
@@ -169,22 +171,22 @@ def users_list_kb(page: int = 1, limit: int = 7):
     ]
     from keyboards.pagination_util import build_paginated_menu
     return build_paginated_menu(
-        item_buttons, static_buttons, page, limit, "manage_users",
+        item_buttons, static_buttons, page, limit, cb.ManageUsersCB(page=page),
         search_type="user", search_action="info",
-        help_key="profile", help_back_data="manage_users"
+        help_key="profile", help_back_data=cb.ManageUsersCB().pack()
     )
 
 def user_edit_kb(user_id, is_superadmin: bool = False):
     builder = InlineKeyboardBuilder()
     builder.button(text="🏷 Переименовать", callback_data=f"user_rename_{user_id}")
-    builder.button(text="📋 Состав шаблонов", callback_data=f"user_templates_manage_{user_id}")
-    builder.button(text="👑 Управление ролями", callback_data=f"user_roles_manage_{user_id}")
+    builder.button(text="📋 Состав шаблонов", callback_data=cb.UserTemplatesManageCB(user_id=user_id).pack())
+    builder.button(text="👑 Управление ролями", callback_data=cb.UserRolesManageCB(user_id=user_id).pack())
 
     if is_superadmin:
         builder.button(text="🗑 Удалить пользователя", callback_data=f"user_delete_{user_id}")
 
     builder.adjust(1)
-    add_nav_footer(builder, back_data="manage_users", help_key="profile")
+    add_nav_footer(builder, back_data=cb.ManageUsersCB().pack(), help_key="profile")
     return builder.as_markup()
 
 def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
@@ -199,15 +201,15 @@ def user_groups_edit_kb(user_id, page: int = 1, limit: int = 7):
         item_buttons.append(InlineKeyboardButton(text=f"{mark}{g_name}", callback_data=f"user_template_toggle_{user_id}_{g_id}"))
 
     static_buttons = [
-        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=f"user_info_{user_id}"),
+        InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=cb.UserInfoCB(user_id=user_id).pack()),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"user_templates_manage_{user_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.UserTemplatesManageCB(user_id=user_id, page=page))
 
 def roles_dashboard_kb(is_admin: bool):
     builder = InlineKeyboardBuilder()
     builder.button(text="ℹ️ Описание ролей (FAQ)", callback_data="roles_faq")
-    builder.button(text="📋 Список пользователей с ролями", callback_data="list_users_roles")
+    builder.button(text="📋 Список пользователей с ролями", callback_data=cb.ListUsersRolesCB().pack())
     builder.adjust(1)
     add_nav_footer(builder, back_data="admin_main" if is_admin else "moderator")
     return builder.as_markup()
@@ -234,7 +236,7 @@ def role_selection_kb(user_id: int):
         builder.button(text=display_name, callback_data=callback_data)
 
     builder.adjust(1)
-    add_nav_footer(builder, back_data=f"user_roles_manage_{user_id}")
+    add_nav_footer(builder, back_data=cb.UserRolesManageCB(user_id=user_id).pack())
     return builder.as_markup()
 
 
@@ -258,7 +260,7 @@ def user_roles_manage_kb(user_id: int):
         builder.button(text=display, callback_data=callback)
     builder.button(text="➕ Назначить роль", callback_data=f"role_assign_user_{user_id}")
     builder.adjust(1)
-    add_nav_footer(builder, back_data=f"user_info_{user_id}", help_key="templates")
+    add_nav_footer(builder, back_data=cb.UserInfoCB(user_id=user_id).pack(), help_key="templates")
     return builder.as_markup()
 
 
@@ -278,7 +280,7 @@ def topic_selection_for_role_kb(user_id, page: int = 1, limit: int = 7):
         InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=f"role_assign_user_{user_id}"),
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, f"topic_assign_pg_{user_id}")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.TopicAssignCB(user_id=user_id, page=page))
 
 def back_to_roles_dashboard_kb():
     builder = InlineKeyboardBuilder()
@@ -303,7 +305,7 @@ def search_results_kb(results, search_type, search_action, search_context=None, 
         InlineKeyboardButton(text="⬅️ НАЗАД", callback_data=str(search_context) if search_context else "landing"),
         InlineKeyboardButton(text="❌ Закрыть", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "search")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.SearchPageCB(page=page))
 
 
 def confirmation_kb(action_type: str, target_id: int, back_callback: str, extra_id: int = 0):
@@ -328,4 +330,4 @@ def simple_back_kb(back_data: str):
     add_nav_footer(builder, back_data=back_data)
     return builder.as_markup()
 
-
+

@@ -11,6 +11,8 @@ from services.permission_service import PermissionService
 from services.ui_service import UIService
 from services.management_service import ManagementService
 
+import callbacks as cb
+
 router = Router()
 logger = logging.getLogger(__name__)
 
@@ -56,30 +58,21 @@ async def show_help_view(state: FSMContext, event: types.Message | types.Callbac
     await UIService.sterile_show(state, event, help_text, reply_markup=markup)
 
 
-@router.callback_query(F.data.startswith("help:"))
+@router.callback_query(cb.HelpCB.filter())
 @safe_callback()
-async def universal_help_handler(callback: types.CallbackQuery, state: FSMContext):
-    """
-    Универсальный хендлер для всех кнопок помощи.
-    Принимает формат колбэка: help:{key}:{back_data}
-    """
-    parts = callback.data.split(":")
+async def universal_help_handler(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.HelpCB):
+    """Универсальный хендлер для всех кнопок помощи.
 
-    # [G-DNA] Robust Parsing: поддержка старых и новых форматов
-    if len(parts) >= 3:
-        # Новый формат: help:{key}:{back_data}
-        key = parts[1]
-        back_data = parts[2]
-    elif len(parts) == 2:
-        # Переходный формат: help:{key}
-        key = parts[1]
-        back_data = "landing"
-    else:
-        # Совсем старый формат или мусор
-        key = parts[0].replace("help_", "")
-        back_data = "landing"
+    [feature 011 / R-UI-11] Защитный разбор обеспечивает сам фильтр: `unpack()`
+    внутри него ловит `(TypeError, ValueError)` и не пропускает битые данные к
+    хендлеру. Прежняя ручная лесенка по `split(":")` с угадыванием формата
+    больше не нужна — ключ и маршрут возврата приезжают по имени поля (FR-003).
 
-    await show_help_view(state, callback, key, back_data)
+    Данные старого формата (`help_main_menu`, `help:key`) фильтр не признаёт;
+    они уходят в глобальный fallback неотвеченных колбэков (`R-SEC-2`), то есть
+    деградируют безопасно, как и требует C-7.
+    """
+    await show_help_view(state, callback, callback_data.key, callback_data.back_data)
 
 
 @router.callback_query(F.data == "close_menu")
@@ -127,10 +120,10 @@ async def roles_faq_view(callback: types.CallbackQuery, state: FSMContext):
     await UIService.generic_navigator(state, callback, callback.data)
 
 
-@router.callback_query(F.data == "list_users_roles")
+@router.callback_query(cb.ListUsersRolesCB.filter())
 @safe_callback()
-async def list_users_with_roles(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def list_users_with_roles(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ListUsersRolesCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("search_start_"))
@@ -192,12 +185,11 @@ async def search_query_handler(message: types.Message, state: FSMContext):
     )
 
 
-@router.callback_query(F.data.startswith("search_pg_"))
+@router.callback_query(cb.SearchPageCB.filter())
 @safe_callback()
-async def search_results_pagination(callback: types.CallbackQuery, state: FSMContext):
+async def search_results_pagination(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.SearchPageCB):
     """Пагинация результатов поиска."""
-    parts = callback.data.split("_")
-    page = int(parts[2])
+    page = callback_data.page
     data = await state.get_data()
     query = data.get("search_query")
     s_type = data.get("search_type")
@@ -277,12 +269,12 @@ async def perform_search_pick(state, event_or_msg, s_type, s_action, s_context, 
     if s_action == "admin_role_target":
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.generic_navigator(state, event_or_msg, f"user_roles_manage_{item_id}")
+        return await UIService.generic_navigator(state, event_or_msg, cb.UserRolesManageCB(user_id=item_id))
 
     if s_action == "mod_select":
         await state.set_state(None)
         await UIService.clear_fsm_data_safely(state)
-        return await UIService.generic_navigator(state, event_or_msg, f"mod_topic_select_{item_id}")
+        return await UIService.generic_navigator(state, event_or_msg, cb.ModTopicSelectCB(topic_id=item_id))
 
 
 

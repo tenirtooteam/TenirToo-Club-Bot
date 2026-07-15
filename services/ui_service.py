@@ -2,15 +2,32 @@
 import logging
 from functools import wraps
 from aiogram import Bot, types
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm.context import FSMContext
 from aiogram.exceptions import TelegramBadRequest
+
+import callbacks as cb
 
 logger = logging.getLogger(__name__)
 
 
+class _RouteNotResolved:
+    """Часовой: типизированный путь не признал маршрут своим.
+
+    Отдельный объект, а не None: None — легальный результат экрана.
+    """
+
+    __slots__ = ()
+
+
+_ROUTE_NOT_RESOLVED = _RouteNotResolved()
+
+
 class UIService:
-    # Команды, которые поддерживают пагинацию (принимают аргумент page)
-    PAGINATED_CMDS = {"manage_groups", "manage_users", "all_topics_list", "list_users_roles"}
+    # [feature 011 / FR-005] PAGINATED_CMDS удалён. Это был второй, дублирующий
+    # реестр — список имён команд, «умеющих» страницу. Страничность теперь следует
+    # из наличия поля `page` у объявления маршрута; расходиться двум источникам
+    # правды больше негде.
 
     @staticmethod
     async def delete_tracked_ui(state: FSMContext, bot: Bot, chat_id: int):
@@ -247,35 +264,96 @@ class UIService:
         )
 
     @staticmethod
-    async def generic_navigator(state: FSMContext, event: types.Message | types.CallbackQuery, callback_data: str):
-        """Ультимативный роутер: callback_data -> UI экран."""
+    async def _resolve_typed_route(state, event, callback_data):
+        """Разрешает маршрут через реестр объявлений. Иначе — часовой.
+
+        Возвращает `_ROUTE_NOT_RESOLVED`, если маршрут не относится к
+        мигрированному семейству: тогда навигатор уходит на старый путь.
+
+        Битые данные УЖЕ мигрированного маршрута — не «чужой маршрут», а отказ:
+        уводим в защитный возврат, не давая старой цепочке подобрать их
+        подстрокой и увести на случайный экран.
+        """
+        if isinstance(callback_data, CallbackData):
+            entry = _ROUTE_REGISTRY.get(type(callback_data).__prefix__)
+            if entry is None:
+                return _ROUTE_NOT_RESOLVED
+            return await entry[1](state, event, callback_data)
+
+        prefix = cb.route_prefix(str(callback_data))
+        entry = _ROUTE_REGISTRY.get(prefix)
+        if entry is None:
+            return _ROUTE_NOT_RESOLVED
+
+        factory, render = entry
+        try:
+            data = factory.unpack(str(callback_data))
+        except (TypeError, ValueError) as e:
+            # Тот же кортеж, что ловит CallbackQueryFilter в aiogram (D-1):
+            # расхождение «фильтр пропустил / навигатор упал» невозможно.
+            logger.warning(
+                f"⚠️ [NAVIGATOR] Битые данные маршрута {prefix!r}: {callback_data!r} ({type(e).__name__}: {e})"
+            )
+            return await UIService.show_admin_dashboard(
+                state, event, text="⚠️ Ошибка навигации. Возврат в главное меню:"
+            )
+
+        return await render(state, event, data)
+
+    @staticmethod
+    async def generic_navigator(
+        state: FSMContext,
+        event: types.Message | types.CallbackQuery,
+        callback_data: "str | CallbackData",
+    ):
+        """Ультимативный роутер: маршрут -> UI экран.
+
+        [feature 011] Принимает либо объявление маршрута (`CallbackData`), либо
+        строку. Имя параметра сохранено — `R-UI-3` фиксирует имя и обязанность
+        Defensive Routing, а не тип (research.md D-6).
+
+        Порядок разрешения (contracts/callback-routes.md §C-4):
+          1. объект `CallbackData` -> реестр по префиксу, уже разобран;
+          2. строка, чей префикс есть в реестре -> `unpack()` -> экран;
+          3. иначе -> старый путь (словарь простых маршрутов + цепочка ветвлений);
+          4. промах или `(TypeError, ValueError)` -> защитный возврат.
+
+        Шаг 3 — переходный: пока мигрированы не все семейства, строки старого
+        формата (`user_info_5`) обязаны продолжать работать. Он удаляется в
+        фазе 5, когда станет доказуемо мёртвым.
+        """
         from database import db
         import keyboards as kb
         from services.permission_service import PermissionService
 
         user_id = event.from_user.id
 
+        # 0. Типизированный путь: точное сопоставление с объявленным контрактом.
+        resolved = await UIService._resolve_typed_route(state, event, callback_data)
+        if resolved is not _ROUTE_NOT_RESOLVED:
+            return resolved
+
+        # Дальше — только строки: объект сюда дойти не может (см. _resolve_typed_route).
+        callback_data = str(callback_data)
+
         # 1. Глобальная навигация (Simple)
         simple = {
             "admin_main": ("🛠 <b>Штаб управления</b>\nЗдесь настраивается жизнь всего клуба.", kb.main_admin_kb),
             "user_main": ("🏠 <b>Главное меню</b>\nТвой личный пульт управления приключениями:", kb.user_main_kb),
             "user_profile_view": (None, None), # Специальная обработка ниже
-            "user_topics": ("📍 <b>Твои маршруты</b>\nСписок топиков, где ты можешь общаться:", lambda: kb.user_topics_list_kb(user_id)),
-            "manage_groups": ("📂 <b>Шаблоны доступа</b>\nГрупповые правила для выдачи прав:", kb.groups_list_kb),
-            "manage_users": ("👥 <b>Клубный реестр</b>\nСписок всех участников:", kb.users_list_kb),
-            "all_topics_list": ("📍 <b>Все локации</b>\nПолный список топиков форума:", kb.all_topics_kb),
             "roles_dashboard": ("🛡 <b>Центр ответственности</b>\nКто за что отвечает в клубе:", lambda: kb.roles_dashboard_kb(PermissionService.is_global_admin(user_id))),
             "roles_faq": ("🛡 <b>Описание ролей</b>\n\n👑 <b>Админ</b>: Видит всё, управляет всеми процессами.\n🛡 <b>Модератор</b>: Хранитель порядка в конкретном топике.\n👤 <b>Участник</b>: Тот, ради кого мы всё это затеяли.", kb.back_to_roles_dashboard_kb),
-            "list_users_roles": ("📋 <b>Ответственные лица</b>\nСписок всех пользователей с особыми правами:", kb.users_list_kb),
-            "moderator": ("🛠 <b>Инструменты хранителя</b>\nВыбери топик для управления:", lambda: kb.moderator_topics_list_kb(PermissionService.get_manageable_topics(user_id))),
             "templates_faq": (None, None), # Redirects to help_service logic
             "event_list": ("📅 <b>Наши приключения</b>\nАктуальные выезды и походы:", lambda: kb.get_events_list_kb(db.get_active_events())),
             "event_pending_list": ("⏳ <b>Новые заявки</b>\nПоходы, ожидающие одобрения:", lambda: kb.get_events_list_kb(db.get_pending_events(), is_admin=True)),
             "landing": (None, None), # Специальный вызов через get_landing_data
         }
 
-        cmd = callback_data.split("_pg_")[0]
-        page = int(callback_data.split("_pg_")[1]) if "_pg_" in callback_data else 1
+        # [feature 011 / FR-005] Прежде номер страницы отрезался отсюда как
+        # `split("_pg_")[1]` — это и был источник DEF-1/DEF-2. Теперь страница —
+        # объявленное поле фабрики, а сюда доходят только беспараметрические
+        # маршруты, у которых её нет.
+        cmd = callback_data
         if cmd in simple:
             await state.set_state(None)
             await UIService.clear_fsm_data_safely(state)
@@ -283,7 +361,7 @@ class UIService:
 
             # 1.1 Специальные редиректы
             if cmd == "templates_faq":
-                return await UIService.generic_navigator(state, event, "help:templates:manage_groups")
+                return await UIService.generic_navigator(state, event, cb.HelpCB(key="templates", back_data="manage_groups"))
 
             if cmd == "user_profile_view":
                 # Переходим к блоку "Инфо-карточки" ниже
@@ -292,22 +370,14 @@ class UIService:
                 text, kb_func = await UIService.get_landing_data(user_id)
                 return await UIService.sterile_show(state, event, text, reply_markup=kb_func())
             elif kb_func is not None:
-                if cmd in UIService.PAGINATED_CMDS:
-                    markup = kb_func(page=page)
-                else:
-                    markup = kb_func()
-                return await UIService.sterile_show(state, event, text, reply_markup=markup)
+                return await UIService.sterile_show(state, event, text, reply_markup=kb_func())
 
-        # 1.5 Специальная обработка HELP (help:{key}:{back_data})
-        if cmd.startswith("help:"):
-            from handlers.common import show_help_view
-            parts = cmd.split(":")
-            return await show_help_view(state, event, key=parts[1], back_data=parts[2] if len(parts) > 2 else "admin_main")
+        # [feature 011] Здесь разбирался старый формат справки `help:{key}:{back}`
+        # ручным `split(":")` с позиционным `parts[1]`/`parts[2]`. Удалён: справку
+        # разрешает реестр через HelpCB, а строка старого формата до сюда не
+        # доходит — её отбраковывает unpack() в защитный возврат (C-7).
 
-        # 2. Параметризованная навигация
-        p = callback_data.split("_")
-
-        # Инфо-карточки
+        # 2. Специальные экраны, которым не нужен параметр.
         if cmd == "user_profile_view":
             user_name = db.get_user_name(user_id)
             user_templates = db.get_user_group_templates(user_id)
@@ -317,71 +387,15 @@ class UIService:
             text = UIService.format_user_card(user_id, user_name, groups_str, roles, available_topics)
             return await UIService.sterile_show(state, event, text, reply_markup=kb.user_profile_kb())
 
-        if "user_info" in cmd: return await UIService.show_user_detail(state, event, int(p[-1]))
-        if "group_info" in cmd: return await UIService.show_group_detail(state, event, int(p[-1]))
-        if "topic_" in cmd and ("global" in cmd or "in_group" in cmd):
-            return await UIService.show_topic_detail(state, event, int(p[-1]), int(p[-2]) if "in_group" in cmd else 0)
-
-        if cmd.startswith("u_topic_info"):
-            t_id = int(p[-1])
-            t_name = db.get_topic_name(t_id)
-            access_groups = db.get_groups_by_topic(t_id)
-            groups_str = "\n".join(f"— {g}" for g in access_groups) if access_groups else "Доступ не настроен"
-            has_access = db.can_write(user_id, t_id)
-            access_status = "✅ У тебя есть доступ." if has_access else "❌ У тебя нет доступа."
-            text = (
-                f"📍 <b>Информация о топике</b>\n\n"
-                f"<b>Название:</b> {t_name}\n"
-                f"<b>ID:</b> <code>{t_id}</code>\n\n"
-                f"👥 <b>Связанные шаблоны:</b>\n{groups_str}\n\n"
-                f"🔐 <b>Твой статус:</b> {access_status}\n\n"
-                f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
-            )
-            return await UIService.sterile_show(state, event, text, reply_markup=kb.user_topic_detail_kb(t_id))
-
-        # Модерация топиков
-        if cmd.startswith("mod_topic_select") or cmd.startswith("mod_back_to_topic"):
-            t_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_menu_kb(t_id))
-
-        if cmd.startswith("mod_topic_groups"):
-            t_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"📂 <b>Группы топика: {db.get_topic_name(t_id)}</b>", kb.moderator_group_list_kb(t_id, page=page))
-
-        if cmd.startswith("mod_topic_moderators"):
-            t_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"👑 <b>Модераторы: {db.get_topic_name(t_id)}</b>", kb.moderator_topic_moderators_kb(t_id))
-
-        if cmd.startswith("mod_gr_addlist"):
-            t_id = int(p[-1])
-            return await UIService.sterile_show(state, event, "🔗 <b>Привязка группы:</b>", kb.moderator_available_groups_kb(t_id, page=page))
-
-        if cmd.startswith("mod_users_manage"):
-            t_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"👥 <b>Юзеры топика: {db.get_topic_name(t_id)}</b>", kb.moderator_users_list_kb(t_id, page=page))
-
-        # Админка: управление ролями и правами
-        if cmd.startswith("user_roles_manage"):
-            u_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>", kb.user_roles_manage_kb(u_id))
-
-        if cmd.startswith("user_templates_manage"):
-            u_id = int(p[3])
-            return await UIService.sterile_show(state, event, f"🔐 <b>Шаблоны пользователя: {db.get_user_name(u_id)}</b>", kb.user_groups_edit_kb(u_id, page=page))
-
-        if cmd.startswith("tmpl_act_start_"):
-            action = p[3]
-            g_id = int(p[4])
-            title = "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:" if action == "apply" else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
-            return await UIService.sterile_show(state, event, title, reply_markup=kb.template_action_topic_select_kb(g_id, action, page=page))
-
-        if cmd.startswith("group_topics_list"):
-            g_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"📍 <b>Топики группы: {db.get_group_name(g_id)}</b>", kb.group_topics_list_kb(g_id, page=page))
-
-        if cmd.startswith("topic_assign_pg"):
-            u_id = int(p[-1])
-            return await UIService.sterile_show(state, event, f"📍 <b>Выбор топика для: {db.get_user_name(u_id)}</b>", kb.topic_selection_for_role_kb(u_id, page=page))
+        # [feature 011] Здесь жила цепочка подстрочных ветвлений на ~80 строк:
+        # `if "user_info" in cmd`, `if "topic_" in cmd and ("global" in cmd or
+        # "in_group" in cmd)` и позиционный разбор `int(p[-1])` / `int(p[3])`.
+        # Удалена: маршруты семейства разрешает реестр (_ROUTE_REGISTRY) по точному
+        # ключу, параметры приезжают по имени поля. Именно в этой цепочке жили все
+        # три дефекта — DEF-1, DEF-2, DEF-3 (research.md §2).
+        #
+        # Мёртвой доказана зондом: за полный прогон сюда доходят только постоянные
+        # маршруты и неизвестные строки, ни одной параметризованной.
 
         # Резервный лог и сброс на главное меню (если что-то пошло не так)
         logger.warning(f"⚠️ [NAVIGATOR] Неизвестная команда или некорректные данные: {cmd} (data: {callback_data})")
@@ -500,25 +514,25 @@ class UIService:
             name = ManagementService.get_entity_name("group", target_id)
             return (
                 f"⚠️ <b>ВНИМАНИЕ!</b>\n\nВы действительно хотите удалить группу <b>{name}</b>?\n<i>Это действие нельзя отменить!</i>",
-                f"group_info_{target_id}"
+                cb.GroupInfoCB(group_id=target_id).pack()
             )
         elif action == "topic_del" or action == "mod_topic_del":
             name = ManagementService.get_entity_name("topic", target_id)
             g_name = ManagementService.get_entity_name("group", extra_id)
-            back = f"topic_in_group_{target_id}_{extra_id}" if action == "topic_del" else f"mod_topic_groups_{target_id}"
+            back = cb.TopicInGroupCB(topic_id=target_id, group_id=extra_id).pack() if action == "topic_del" else cb.ModTopicGroupsCB(topic_id=target_id).pack()
             return (f"❓ Убрать топик <b>{name}</b> из группы <b>{g_name}</b>?", back)
 
         elif action == "global_topic_del":
             name = ManagementService.get_entity_name("topic", target_id)
             return (
                 f"⚠️ <b>КРИТИЧЕСКОЕ ДЕЙСТВИЕ!</b>\n\nУдалить топик <b>{name}</b> из БД?\n<i>Это очистит все привязки и роли!</i>",
-                f"topic_global_view_{target_id}"
+                cb.TopicGlobalViewCB(topic_id=target_id).pack()
             )
         elif action == "user_del":
             name = ManagementService.get_entity_name("user", target_id)
             return (
                 f"⚠️ <b>ВНИМАНИЕ!</b>\n\nУдалить пользователя <b>{name}</b> (ID: {target_id})?\n<i>Это аннулирует все его доступы!</i>",
-                f"user_info_{target_id}"
+                cb.UserInfoCB(user_id=target_id).pack()
             )
         elif action.startswith("role_rev"):
             name = ManagementService.get_entity_name("user", target_id)
@@ -527,7 +541,7 @@ class UIService:
             context = f"топика {db.get_topic_name(extra_id)}" if extra_id else "глобально"
             return (
                 f"❓ Отозвать роль <b>{role_name}</b> у пользователя <b>{name}</b> ({context})?",
-                f"user_roles_manage_{target_id}"
+                cb.UserRolesManageCB(user_id=target_id).pack()
             )
         elif action == "event_del":
             name = ManagementService.get_entity_name("event", target_id)
@@ -540,7 +554,7 @@ class UIService:
             t_name = ManagementService.get_entity_name("topic", extra_id)
             return (
                 f"❓ Снять права модератора с <b>{name}</b> в топике <b>{t_name}</b>?",
-                f"mod_topic_moderators_{extra_id}"
+                cb.ModTopicModeratorsCB(topic_id=extra_id).pack()
             )
 
         return ("Вы уверены?", "admin_main")
@@ -632,3 +646,306 @@ class UIService:
             f"📍 <b>Доступные топики:</b>\n{topics_display}"
         )
         return text
+
+
+# =============================================================================
+# [feature 011] Реестр маршрутов: объявление -> экран.
+#
+# Заменяет цепочку подстрочных ветвлений внутри generic_navigator. Ключ —
+# префикс объявления, поиск ТОЧНЫЙ (dict), а не по вхождению: коллизия имён,
+# которую допускал `"user_info" in cmd`, здесь невозможна by construction.
+#
+# Параметры экранов приезжают по ИМЕНИ поля. Позиционного разбора (p[-1], p[3])
+# в этом пути нет — в нём и жили DEF-1/DEF-2/DEF-3.
+#
+# Заполняется по семьям маршрутов: пока здесь только непаджинируемые (фаза 3),
+# паджинируемые придут в фазе 4. Остальные обслуживает старый путь.
+# =============================================================================
+
+
+async def _render_user_info(state, event, data: cb.UserInfoCB):
+    return await UIService.show_user_detail(state, event, data.user_id)
+
+
+async def _render_group_info(state, event, data: cb.GroupInfoCB):
+    return await UIService.show_group_detail(state, event, data.group_id)
+
+
+async def _render_topic_global_view(state, event, data: cb.TopicGlobalViewCB):
+    return await UIService.show_topic_detail(state, event, data.topic_id, 0)
+
+
+async def _render_topic_in_group(state, event, data: cb.TopicInGroupCB):
+    """[FR-017 / фикс DEF-3] Топик и группа уходят по назначению.
+
+    Старый путь звал show_topic_detail(int(p[-1]), int(p[-2])) — то есть
+    group_id уезжал в параметр topic_id, и открывалась карточка чужого топика.
+    Здесь перепутать нечего: поля адресуются по имени.
+    """
+    return await UIService.show_topic_detail(state, event, data.topic_id, data.group_id)
+
+
+async def _render_u_topic_info(state, event, data: cb.UserTopicInfoCB):
+    from database import db
+    import keyboards as kb
+
+    t_id = data.topic_id
+    t_name = db.get_topic_name(t_id)
+    access_groups = db.get_groups_by_topic(t_id)
+    groups_str = "\n".join(f"— {g}" for g in access_groups) if access_groups else "Доступ не настроен"
+    has_access = db.can_write(event.from_user.id, t_id)
+    access_status = "✅ У тебя есть доступ." if has_access else "❌ У тебя нет доступа."
+    text = (
+        f"📍 <b>Информация о топике</b>\n\n"
+        f"<b>Название:</b> {t_name}\n"
+        f"<b>ID:</b> <code>{t_id}</code>\n\n"
+        f"👥 <b>Связанные шаблоны:</b>\n{groups_str}\n\n"
+        f"🔐 <b>Твой статус:</b> {access_status}\n\n"
+        f"<i>Если доступа нет, твои сообщения в этом топике будут удаляться автоматически.</i>"
+    )
+    return await UIService.sterile_show(state, event, text, reply_markup=kb.user_topic_detail_kb(t_id))
+
+
+async def _render_mod_topic_select(state, event, data: cb.ModTopicSelectCB):
+    from database import db
+    import keyboards as kb
+
+    t_id = data.topic_id
+    return await UIService.sterile_show(
+        state, event, f"📍 <b>Управление: {db.get_topic_name(t_id)}</b>",
+        kb.moderator_topic_menu_kb(t_id),
+    )
+
+
+async def _render_user_roles_manage(state, event, data: cb.UserRolesManageCB):
+    from database import db
+    import keyboards as kb
+
+    u_id = data.user_id
+    return await UIService.sterile_show(
+        state, event, f"🛡 <b>Роли пользователя: {db.get_user_name(u_id)}</b>",
+        kb.user_roles_manage_kb(u_id),
+    )
+
+
+async def _render_help(state, event, data: cb.HelpCB):
+    from handlers.common import show_help_view
+
+    return await show_help_view(state, event, key=data.key, back_data=data.back_data)
+
+
+_ROUTE_REGISTRY: "dict[str, tuple[type[CallbackData], object]]" = {
+    cb.UserInfoCB.__prefix__: (cb.UserInfoCB, _render_user_info),
+    cb.GroupInfoCB.__prefix__: (cb.GroupInfoCB, _render_group_info),
+    cb.TopicGlobalViewCB.__prefix__: (cb.TopicGlobalViewCB, _render_topic_global_view),
+    cb.TopicInGroupCB.__prefix__: (cb.TopicInGroupCB, _render_topic_in_group),
+    cb.UserTopicInfoCB.__prefix__: (cb.UserTopicInfoCB, _render_u_topic_info),
+    cb.ModTopicSelectCB.__prefix__: (cb.ModTopicSelectCB, _render_mod_topic_select),
+    cb.UserRolesManageCB.__prefix__: (cb.UserRolesManageCB, _render_user_roles_manage),
+    cb.HelpCB.__prefix__: (cb.HelpCB, _render_help),
+}
+
+
+# --- Паджинируемые маршруты (фаза 4) --------------------------------------
+# Номер страницы приезжает объявленным полем, а не отрезается от строки.
+# Экраны и тексты — дословно из старого пути: фича меняет механизм, не
+# содержание (FR-014).
+
+
+async def _reset_fsm(state: FSMContext):
+    """Сбрасывает состояние ввода перед показом экрана верхнего уровня.
+
+    [FR-007] Точная копия того, что делал старый путь внутри `if cmd in simple`.
+    Асимметрия не случайна и не подлежит «выравниванию»: экраны верхнего уровня
+    (списки, панели) сбрасывают незавершённый ввод, экраны-карточки — нет.
+    Зовут её только те маршруты, что жили в словаре `simple`; переезд в реестр
+    обязан сохранить это ровно как было (`R-FSM-1`).
+    """
+    await state.set_state(None)
+    await UIService.clear_fsm_data_safely(state)
+
+
+async def _render_manage_groups(state, event, data: cb.ManageGroupsCB):
+    import keyboards as kb
+
+    await _reset_fsm(state)
+    return await UIService.sterile_show(
+        state, event,
+        "📂 <b>Шаблоны доступа</b>\nГрупповые правила для выдачи прав:",
+        reply_markup=kb.groups_list_kb(page=data.page),
+    )
+
+
+async def _render_manage_users(state, event, data: cb.ManageUsersCB):
+    import keyboards as kb
+
+    await _reset_fsm(state)
+    return await UIService.sterile_show(
+        state, event,
+        "👥 <b>Клубный реестр</b>\nСписок всех участников:",
+        reply_markup=kb.users_list_kb(page=data.page),
+    )
+
+
+async def _render_all_topics_list(state, event, data: cb.AllTopicsListCB):
+    import keyboards as kb
+
+    await _reset_fsm(state)
+    return await UIService.sterile_show(
+        state, event,
+        "📍 <b>Все локации</b>\nПолный список топиков форума:",
+        reply_markup=kb.all_topics_kb(page=data.page),
+    )
+
+
+async def _render_list_users_roles(state, event, data: cb.ListUsersRolesCB):
+    """Список ответственных лиц.
+
+    Переиспользует users_list_kb, чьи стрелки помечены маршрутом `manage_users`.
+    Поэтому переход на стр. 2 уводит на «Клубный реестр» — другой заголовок, тот
+    же список. Поведение существует сегодня; фича его сохраняет, а не чинит:
+    в санкционированный список FR-015…FR-017 оно не входит. Зафиксировано
+    характеризацией, заведено в роадмап.
+    """
+    import keyboards as kb
+
+    await _reset_fsm(state)
+    return await UIService.sterile_show(
+        state, event,
+        "📋 <b>Ответственные лица</b>\nСписок всех пользователей с особыми правами:",
+        reply_markup=kb.users_list_kb(page=data.page),
+    )
+
+
+async def _render_user_topics(state, event, data: cb.UserTopicsCB):
+    import keyboards as kb
+
+    await _reset_fsm(state)
+    return await UIService.sterile_show(
+        state, event,
+        "📍 <b>Твои маршруты</b>\nСписок топиков, где ты можешь общаться:",
+        reply_markup=kb.user_topics_list_kb(event.from_user.id, page=data.page),
+    )
+
+
+async def _render_moderator(state, event, data: cb.ModeratorCB):
+    import keyboards as kb
+    from services.permission_service import PermissionService
+
+    await _reset_fsm(state)
+    manageable = PermissionService.get_manageable_topics(event.from_user.id)
+    return await UIService.sterile_show(
+        state, event,
+        "🛠 <b>Инструменты хранителя</b>\nВыбери топик для управления:",
+        reply_markup=kb.moderator_topics_list_kb(manageable, page=data.page),
+    )
+
+
+async def _render_group_topics_list(state, event, data: cb.GroupTopicsListCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"📍 <b>Топики группы: {db.get_group_name(data.group_id)}</b>",
+        kb.group_topics_list_kb(data.group_id, page=data.page),
+    )
+
+
+async def _render_mod_topic_groups(state, event, data: cb.ModTopicGroupsCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"📂 <b>Группы топика: {db.get_topic_name(data.topic_id)}</b>",
+        kb.moderator_group_list_kb(data.topic_id, page=data.page),
+    )
+
+
+async def _render_mod_topic_moderators(state, event, data: cb.ModTopicModeratorsCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"👑 <b>Модераторы: {db.get_topic_name(data.topic_id)}</b>",
+        kb.moderator_topic_moderators_kb(data.topic_id, page=data.page),
+    )
+
+
+async def _render_mod_gr_addlist(state, event, data: cb.ModGroupAddListCB):
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        "🔗 <b>Привязка группы:</b>",
+        kb.moderator_available_groups_kb(data.topic_id, page=data.page),
+    )
+
+
+async def _render_mod_users_manage(state, event, data: cb.ModUsersManageCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"👥 <b>Юзеры топика: {db.get_topic_name(data.topic_id)}</b>",
+        kb.moderator_users_list_kb(data.topic_id, page=data.page),
+    )
+
+
+async def _render_user_templates_manage(state, event, data: cb.UserTemplatesManageCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"🔐 <b>Шаблоны пользователя: {db.get_user_name(data.user_id)}</b>",
+        kb.user_groups_edit_kb(data.user_id, page=data.page),
+    )
+
+
+async def _render_tmpl_act_start(state, event, data: cb.TmplActStartCB):
+    import keyboards as kb
+
+    title = (
+        "⚡ Выберите топик для ПРИМЕНЕНИЯ шаблона:"
+        if data.action == cb.TemplateAction.APPLY
+        else "🔄 Выберите топик для СИНХРОНИЗАЦИИ с шаблоном:"
+    )
+    return await UIService.sterile_show(
+        state, event, title,
+        reply_markup=kb.template_action_topic_select_kb(
+            data.group_id, data.action.value, page=data.page
+        ),
+    )
+
+
+async def _render_topic_assign(state, event, data: cb.TopicAssignCB):
+    from database import db
+    import keyboards as kb
+
+    return await UIService.sterile_show(
+        state, event,
+        f"📍 <b>Выбор топика для: {db.get_user_name(data.user_id)}</b>",
+        kb.topic_selection_for_role_kb(data.user_id, page=data.page),
+    )
+
+
+_ROUTE_REGISTRY.update({
+    cb.ManageGroupsCB.__prefix__: (cb.ManageGroupsCB, _render_manage_groups),
+    cb.ManageUsersCB.__prefix__: (cb.ManageUsersCB, _render_manage_users),
+    cb.AllTopicsListCB.__prefix__: (cb.AllTopicsListCB, _render_all_topics_list),
+    cb.ListUsersRolesCB.__prefix__: (cb.ListUsersRolesCB, _render_list_users_roles),
+    cb.UserTopicsCB.__prefix__: (cb.UserTopicsCB, _render_user_topics),
+    cb.ModeratorCB.__prefix__: (cb.ModeratorCB, _render_moderator),
+    cb.GroupTopicsListCB.__prefix__: (cb.GroupTopicsListCB, _render_group_topics_list),
+    cb.ModTopicGroupsCB.__prefix__: (cb.ModTopicGroupsCB, _render_mod_topic_groups),
+    cb.ModTopicModeratorsCB.__prefix__: (cb.ModTopicModeratorsCB, _render_mod_topic_moderators),
+    cb.ModGroupAddListCB.__prefix__: (cb.ModGroupAddListCB, _render_mod_gr_addlist),
+    cb.ModUsersManageCB.__prefix__: (cb.ModUsersManageCB, _render_mod_users_manage),
+    cb.UserTemplatesManageCB.__prefix__: (cb.UserTemplatesManageCB, _render_user_templates_manage),
+    cb.TmplActStartCB.__prefix__: (cb.TmplActStartCB, _render_tmpl_act_start),
+    cb.TopicAssignCB.__prefix__: (cb.TopicAssignCB, _render_topic_assign),
+})

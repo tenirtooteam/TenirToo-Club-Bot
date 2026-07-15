@@ -10,6 +10,8 @@ from database import db
 from services.permission_service import PermissionService
 from services.notification_service import NotificationService
 
+import callbacks as cb
+
 
 logger = logging.getLogger(__name__)
 
@@ -339,8 +341,8 @@ class ManagementService:
             ManagementService._trigger_sheets_sync("all")
 
             if action == "mod_topic_del":
-                 return True, "✅ Топик убран из группы", f"mod_topic_groups_{target_id}"
-            return True, "✅ Топик убран из группы", f"group_topics_list_{extra_id}"
+                 return True, "✅ Топик убран из группы", cb.ModTopicGroupsCB(topic_id=target_id).pack()
+            return True, "✅ Топик убран из группы", cb.GroupTopicsListCB(group_id=extra_id).pack()
 
         elif action == "global_topic_del":
             db.delete_topic(target_id)
@@ -357,13 +359,13 @@ class ManagementService:
             role_id = int(action.split("_")[-1]) if action != "role_rev" else 0
             t_id = None if extra_id == 0 else extra_id
             db.revoke_role(target_id, role_id, t_id)
-            return True, "✅ Роль отозвана", f"user_roles_manage_{target_id}"
+            return True, "✅ Роль отозвана", cb.UserRolesManageCB(user_id=target_id).pack()
 
         elif action == "mod_rem":
             # Снятие модератора (вызывается модератором)
             role_id = db.get_role_id("moderator")
             db.revoke_role(target_id, role_id, extra_id)
-            return True, "✅ Модератор удалён", f"mod_topic_moderators_{extra_id}"
+            return True, "✅ Модератор удалён", cb.ModTopicModeratorsCB(topic_id=extra_id).pack()
 
         elif action == "event_del":
             db.delete_event(target_id)

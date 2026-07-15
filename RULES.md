@@ -95,8 +95,8 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: PL-6.3
 
 ### R-UI-3 [A] Unified navigator for standard transitions
-**Rule**: Standard UI returns/transitions SHOULD use `UIService.generic_navigator(state, event, callback_data)` rather than direct `sterile_show`. The navigator MUST use Defensive Routing (verify the route/keyboard exists before dispatch).
-**Why**: Centralizes routing, prevents UI-logic leak and `NoneType` crashes on incomplete route maps.
+**Rule**: Standard UI returns/transitions SHOULD use `UIService.generic_navigator(state, event, callback_data)` rather than direct `sterile_show`; `callback_data` accepts a `CallbackData` declaration or a plain string. The navigator MUST use Defensive Routing: route lookup is an **exact** registry match — never substring containment — and parameters are read **by field name**, never by position in the string. An unknown route, a failing `unpack()`, or stale-format data MUST log a warning and return to the main menu without raising.
+**Why**: Centralizes routing, prevents UI-logic leak and `NoneType` crashes on incomplete route maps. Substring matching let a route whose name contains another's silently hijack the wrong screen; positional extraction made the page number arrive as an entity ID — both shipped as live defects before feature 011.
 **Legacy**: PL-6.5, CP-3.23, PL-5.1.10, PL-5.1.15
 
 ### R-UI-4 [A] Orphan message termination
@@ -135,7 +135,7 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 **Legacy**: CP-3.41, PL-5.1.17
 
 ### R-UI-11 [B] WebApp button & callback hardening
-**Rule**: `web_app` buttons MUST be gated on non-empty `config.WEBAPP_URL`; colon-callback parsers MUST split defensively; `sterile_show` MUST catch `BUTTON_TYPE_INVALID` and fall back to a new message. **Enforced by** `tests/test_services/test_ui_integrity.py`, `tests/test_services/test_ui_fuzzer.py`.
+**Rule**: `web_app` buttons MUST be gated on non-empty `config.WEBAPP_URL`; parameterized callbacks MUST be parsed defensively — for declared routes this duty belongs to `Factory.filter()` / `unpack()`, which reject malformed data via `(TypeError, ValueError)` rather than guessing at a hand-rolled `split()`; `sterile_show` MUST catch `BUTTON_TYPE_INVALID` and fall back to a new message. Callback data MUST NOT be truncated to fit Telegram's 64-byte limit: overflow MUST fail loudly at keyboard-build time (`pack()` raises), because a mid-string truncation yields a syntactically valid but semantically broken route. **Enforced by** `tests/test_services/test_ui_integrity.py`, `tests/test_services/test_ui_fuzzer.py`.
 **Legacy**: CP-3.53, PL-5.1.21
 
 ### R-UI-12 [A] Sterile input entry points
@@ -152,6 +152,11 @@ Domains: ARCH (layers/facades/imports), DB, UI, FSM, CODE (coding & response mec
 
 ## FSM — State Machine Hygiene
 
+
+### R-UI-14 [B] Single source of truth for callback format
+**Rule**: Every parameterized callback route MUST be declared exactly once, as a `CallbackData` factory in `callbacks.py`. Keyboards MUST build such callback data only via `.pack()`; handlers MUST match it via `Factory.filter()`; the navigator MUST resolve it via its route registry. Hand-assembling parameterized callback data from string fragments (f-strings, concatenation) is prohibited. Pagination MUST be a declared field, never a string suffix; a parallel registry of "paginated" route names is prohibited. Parameterless routes stay plain strings (`callbacks.CONSTANT_ROUTES`) and MUST NOT contain a separator. **Enforced by** `tests/test_services/test_callback_static_guard.py`, `tests/test_services/test_callback_contract.py`.
+**Why**: Producer and consumer are coupled through the wire format; two hand-written copies drift, and the drift is invisible until a live user clicks. Feature 011 found the correct parse and a broken one living side by side in the same repo.
+**Scope**: The `event_*` / `ann_*` / `date_*` families and the `search_start_*` / `search_pick_*` parsing are not yet migrated (same defect class, tracked in the roadmap).
 ### R-FSM-1 [A] Never state.clear()
 **Rule**: `state.clear()` is forbidden — it destroys `last_menu_id` and breaks the Sterile Interface silently. Use `state.set_state(None)` to nullify state and `UIService.clear_fsm_data_safely(state)` to purge custom keys (preserving `last_menu_ids`, `last_menu_id`, `admin_onboarded`).
 **Why**: Clearing wipes UI-tracking keys with no runtime error — the next menu deploys without cleaning the previous.

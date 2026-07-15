@@ -3,6 +3,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from database import db
 from keyboards.pagination_util import add_nav_footer, build_paginated_menu
 
+import callbacks as cb
+
 
 def user_main_kb():
     from aiogram.types import WebAppInfo
@@ -12,7 +14,7 @@ def user_main_kb():
     if config.WEBAPP_URL and config.WEBAPP_URL.startswith("http"):
         builder.button(text="🏔 ЛИЧНЫЙ КАБИНЕТ (Mini App)", web_app=WebAppInfo(url=config.WEBAPP_URL))
 
-    builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data="user_topics")
+    builder.button(text="[ 📍 МОИ ТОПИКИ ]", callback_data=cb.UserTopicsCB().pack())
     builder.button(text="[ 🏔 ПОХОДЫ ]", callback_data="event_list")
     builder.button(text="[ 👤 МОЙ ПРОФИЛЬ ]", callback_data="user_profile_view")
     builder.adjust(1)
@@ -33,13 +35,13 @@ def user_topics_list_kb(user_id: int, page: int = 1, limit: int = 7):
         label = "" if t_id in user_available else " [Нет доступа]"
         item_buttons.append(InlineKeyboardButton(
             text=f"{status} {t_name}{label}",
-            callback_data=f"u_topic_info_{t_id}"
+            callback_data=cb.UserTopicInfoCB(topic_id=t_id).pack()
         ))
 
     static_buttons = [
         InlineKeyboardButton(text="❌ ЗАКРЫТЬ", callback_data="close_menu")
     ]
-    return build_paginated_menu(item_buttons, static_buttons, page, limit, "user_topics", help_key="topics", help_back_data="user_topics")
+    return build_paginated_menu(item_buttons, static_buttons, page, limit, cb.UserTopicsCB(page=page), help_key="topics", help_back_data=cb.UserTopicsCB().pack())
 
 
 def user_profile_kb():
@@ -50,5 +52,5 @@ def user_profile_kb():
 
 def user_topic_detail_kb(topic_id: int):
     builder = InlineKeyboardBuilder()
-    add_nav_footer(builder, back_data="user_topics", help_key="profile", help_back_data=f"u_topic_info_{topic_id}")
+    add_nav_footer(builder, back_data=cb.UserTopicsCB().pack(), help_key="profile", help_back_data=cb.UserTopicInfoCB(topic_id=topic_id).pack())
     return builder.as_markup()

@@ -11,6 +11,8 @@ from services.ui_service import UIService
 from services.permission_service import PermissionService
 from services.management_service import ManagementService
 
+import callbacks as cb
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,15 +61,15 @@ async def moderator_dashboard(message: types.Message, state: FSMContext):
     return text, kb_func() if kb_func else None
 
 
-@router.callback_query(F.data.startswith("moderator"))
+@router.callback_query(cb.ModeratorCB.filter())
 @safe_callback()
-async def back_to_moderator_main(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def back_to_moderator_main(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModeratorCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
-@router.callback_query(F.data.startswith("mod_topic_select_"))
+@router.callback_query(cb.ModTopicSelectCB.filter())
 @safe_callback()
-async def moderator_topic_selected(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def moderator_topic_selected(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModTopicSelectCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("mod_topic_rename_"))
@@ -87,7 +89,7 @@ async def moderator_rename_topic_start(callback: types.CallbackQuery, state: FSM
         callback,
         "✍️ Введите новое название топика:",
         ModeratorStates.waiting_for_topic_name,
-        reply_markup=kb.get_mod_cancel_kb(f"mod_topic_select_{topic_id}")
+        reply_markup=kb.get_mod_cancel_kb(cb.ModTopicSelectCB(topic_id=topic_id).pack())
     )
 
 
@@ -115,20 +117,20 @@ async def moderator_rename_topic_finish(message: types.Message, state: FSMContex
         except Exception as e:
             logger.warning(f"⚠️ Ошибка API: {e}")
 
-    await UIService.generic_navigator(state, message, f"mod_topic_select_{topic_id}")
+    await UIService.generic_navigator(state, message, cb.ModTopicSelectCB(topic_id=topic_id))
 
 
-@router.callback_query(F.data.startswith("mod_topic_groups_"))
+@router.callback_query(cb.ModTopicGroupsCB.filter())
 @safe_callback()
-async def moderator_show_groups(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def moderator_show_groups(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModTopicGroupsCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 
-@router.callback_query(F.data.startswith("mod_gr_addlist_"))
+@router.callback_query(cb.ModGroupAddListCB.filter())
 @safe_callback()
-async def moderator_show_unattached_groups(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def moderator_show_unattached_groups(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModGroupAddListCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 @router.callback_query(F.data.startswith("mod_gr_link_"))
 @safe_callback()
@@ -146,7 +148,7 @@ async def moderator_link_group(callback: types.CallbackQuery, state: FSMContext)
     ManagementService.add_topic_to_group(group_id, topic_id)
     await callback.answer("✅ Группа привязана.")
 
-    await UIService.generic_navigator(state, callback, f"mod_topic_groups_{topic_id}")
+    await UIService.generic_navigator(state, callback, cb.ModTopicGroupsCB(topic_id=topic_id))
 
 @router.callback_query(F.data.startswith("mod_group_remove_"))
 @safe_callback()
@@ -161,10 +163,10 @@ async def moderator_remove_group_init(callback: types.CallbackQuery, state: FSMC
     )
 
 
-@router.callback_query(F.data.startswith("mod_users_manage_"))
+@router.callback_query(cb.ModUsersManageCB.filter())
 @safe_callback()
-async def moderator_manage_users(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def moderator_manage_users(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModUsersManageCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("mod_tgl_dir_"))
@@ -193,16 +195,15 @@ async def moderator_toggle_direct_access(callback: types.CallbackQuery, state: F
         success, msg = ManagementService.grant_direct_access(str(target_user_id), topic_id)
         await callback.answer(msg)
 
-    await UIService.generic_navigator(state, callback, f"mod_topic_select_{topic_id}")
+    await UIService.generic_navigator(state, callback, cb.ModTopicSelectCB(topic_id=topic_id))
 
 
-@router.callback_query(F.data.startswith("mod_add_user_list_"))
+@router.callback_query(cb.ModAddUserListCB.filter())
 @safe_callback()
-async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMContext):
+async def moderator_add_user_list(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModAddUserListCB):
     """Начало выдачи прямого доступа: запрос ID или имени пользователя."""
-    parts = callback.data.split("_pg_")
-    page = int(parts[1]) if len(parts) > 1 else 1
-    topic_id = extract_topic_id_from_callback(callback)
+    page = callback_data.page
+    topic_id = callback_data.topic_id
     user_id = callback.from_user.id
 
     if not PermissionService.can_manage_topic(user_id, topic_id):
@@ -227,7 +228,7 @@ async def process_direct_access_user_search(message: types.Message, state: FSMCo
 
     success, result = ManagementService.grant_direct_access(text, topic_id)
     if success:
-        await UIService.generic_navigator(state, message, f"mod_users_manage_{topic_id}")
+        await UIService.generic_navigator(state, message, cb.ModUsersManageCB(topic_id=topic_id))
         return
 
     if result == "SEARCH_REQUIRED":
@@ -249,10 +250,10 @@ async def moderator_back_to_topic(callback: types.CallbackQuery, state: FSMConte
 
 # --- УПРАВЛЕНИЕ МОДЕРАТОРАМИ ТОПИКА ---
 
-@router.callback_query(F.data.startswith("mod_topic_moderators_"))
+@router.callback_query(cb.ModTopicModeratorsCB.filter())
 @safe_callback()
-async def moderator_show_moderators(callback: types.CallbackQuery, state: FSMContext):
-    await UIService.generic_navigator(state, callback, callback.data)
+async def moderator_show_moderators(callback: types.CallbackQuery, state: FSMContext, callback_data: cb.ModTopicModeratorsCB):
+    await UIService.generic_navigator(state, callback, callback_data)
 
 
 @router.callback_query(F.data.startswith("mod_moderator_add_"))
