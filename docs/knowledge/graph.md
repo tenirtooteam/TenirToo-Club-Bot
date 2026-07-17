@@ -2,7 +2,7 @@
 type: graph-guide
 title: Knowledge Graph — Usage & Freshness
 description: How the graphify knowledge graph works, its query commands, and the two channels that keep it current.
-timestamp: 2026-07-04
+timestamp: 2026-07-16
 ---
 
 # Knowledge Graph (graphify)
@@ -49,9 +49,23 @@ After a semantic `extract`, run `graphify cluster-only <path> --backend deepseek
 
 graphify runs its semantic LLM work **headlessly via the DeepSeek backend** — a direct API call
 from graphify's own process, never the interactive session's budget. It needs `DEEPSEEK_API_KEY`
-in the environment (kept in `.claude/settings.json` `env` block); graphify auto-selects the
-backend from whichever API key is set. Query and `graphify update` (code-only, AST) need no LLM
-at all. A full semantic pass over this repo costs ~$0.02 on DeepSeek.
+in **graphify's own process environment**; it auto-selects the backend from whichever API key is
+set. Query and `graphify update` (code-only, AST) need no LLM at all. A full semantic pass over
+this repo costs ~$0.02 on DeepSeek.
+
+**Where the key actually lives (verified 2026-07-16).** The key is set in the **Windows User
+environment** (`HKCU\Environment`), so every shell inherits it — this is what graphify reads.
+Two other locations look plausible and are not:
+
+| Location | Read by | Holds the graphify key? |
+|---|---|---|
+| Windows User env (`HKCU\Environment`) | every process started after it was set | **yes** — graphify's actual source |
+| project `.env` | the **bot** at startup, via dotenv | no — graphify does not parse `.env`; this key is the bot's own |
+| `.claude/settings.json` `env` block | Claude Code sessions | no — carries only `GRAPHIFY_CLAUDE_CLI_MODEL` |
+
+A User-level variable reaches only processes started *after* it was set, so a long-running app
+may not see it until restarted. Diagnose with the env var itself (`$env:DEEPSEEK_API_KEY`), not
+by grepping config files — absence from `.claude/settings.json` says nothing about availability.
 
 **Backend note:** the `claude-cli` backend (`GRAPHIFY_CLAUDE_CLI_MODEL=haiku`) is also wired but
 does NOT work from sandboxed agent shells (its `claude -p` subprocess reports `Not logged in`);
