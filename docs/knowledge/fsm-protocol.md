@@ -3,7 +3,7 @@ type: fsm-protocol
 title: FSM Data Keys, Sterile Interface Mechanics, Callback Resilience & Traffic Controller
 description: UIService method mechanics, full inventory of FSM state keys, and descriptive behavior of the callback-resilience decorator and the unified /start entry point.
 source_anchor: PL-5.1, PL-5.2, PL-5.5, PL-5.6
-timestamp: 2026-07-14
+timestamp: 2026-07-17
 tags: [fsm, ui, routing]
 ---
 
@@ -83,6 +83,24 @@ tags: [fsm, ui, routing]
 - **`UIService.clear_fsm_data_safely`**: clears user-defined FSM context variables while
   preserving the sterile-UI tracking keys (`last_menu_ids`, `last_menu_id`,
   `admin_onboarded`). Applied automatically in navigation routing and cancel/back flows.
+
+## State Persistence (feature 012 / №16)
+
+FSM state and data are **persistent across bot restarts**. The dispatcher is wired
+(`loader.py`) with `SQLiteStorage` — a custom aiogram `BaseStorage` backed by the project's
+SQLite database (`database/fsm_storage.py`, table `fsm_storage`) — not the default in-memory
+`MemoryStorage`. This closes item №16: before it, a restart wiped every FSM key, so the Sterile
+Interface lost its `last_menu_ids` stack (previously tracked menus became undeletable garbage),
+mid-input users had their state silently dropped, and admins were re-shown onboarding.
+
+The storage is key-agnostic and holds no domain logic — it neither knows nor cares what
+`last_menu_ids` or `admin_onboarded` mean; that knowledge stays solely in `UIService`. Two
+behaviors matter for the protocol above: (1) the deletion boundary respects the `R-FSM-1`
+whitelist — a row is dropped only when state is null **and** data is empty together, so
+`set_state(None)` + `clear_fsm_data_safely` never loses the tracking keys; (2) there is **no
+TTL** — state restores verbatim at any age, so a prompt answered after a restart still lands in
+its state handler. Storage mechanics and the schema rationale live in
+[db-patterns.md](db-patterns.md) and [db-schema.md](db-schema.md).
 
 ## FSM Data Keys
 

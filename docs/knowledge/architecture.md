@@ -3,7 +3,7 @@ type: architecture
 title: Project Identity, Stack & Layered Architecture
 description: Stack facts, the five-layer decomposition, import graph, and connection-manager behavior.
 source_anchor: PL-1, PL-2.1, PL-2.3, PL-2.6
-timestamp: 2026-07-02
+timestamp: 2026-07-17
 tags: [architecture, stack, layers]
 ---
 
@@ -55,10 +55,19 @@ keyboards/__init__.py   →  keyboards/*_kb.py             →  database/db.py  
 middlewares/*           →  services/permission_service.py →  database/db.py
 web/routers/*           →  services/*                    →  database/db.py
 main.py                 →  handlers/*, middlewares/*, database/db.py (init_db only), web/main.py
+loader.py               →  database/db.py (SQLiteStorage class only — feature 012 / №16)
 database/__init__.py    →  database/db.py
 database/db.py          →  database/connection.py (init_db, get_conn re-export)
+                        →  database/fsm_storage.py (SQLiteStorage re-export)
                         →  database/(members|topics|groups|roles|permissions).py
 ~~~
+
+The `loader.py → database/db.py` arrow (added in feature 012) reaches the facade for the
+`SQLiteStorage` FSM backend only; it mirrors the existing `main.py → database/db.py (init_db
+only)` edge and flows consumer-to-provider like every other arrow. Note this edge is **not**
+covered by import-linter, whose `root_packages` are `handlers`/`middlewares`/`services`/
+`database` — root-level modules such as `loader.py` sit outside its contract, so this graph is
+the authoritative record for it.
 
 ## Context Manager Connectivity
 

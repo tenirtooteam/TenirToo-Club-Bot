@@ -3,7 +3,7 @@ type: db-schema
 title: Database Entity-Relationship Model (DDL)
 description: Full SQLite DDL for the Tenir-Too bot — tables, foreign keys, and indexes.
 source_anchor: PL-3.1
-timestamp: 2026-07-02
+timestamp: 2026-07-17
 tags: [database, schema, sqlite, ddl]
 ---
 
@@ -104,5 +104,23 @@ CREATE TABLE IF NOT EXISTS audit_requests (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- [Feature 012 / №16] Persistent FSM storage (aiogram BaseStorage backend).
+-- Composite PK mirrors aiogram's StorageKey. thread_id is NOT NULL DEFAULT 0
+-- (a None -> 0 sentinel): SQLite treats NULLs in a composite PK as distinct, so a
+-- nullable thread_id would duplicate the private-chat row on every write. No FKs
+-- by design — FSM state exists before a user is registered and chat_id is not a
+-- user. updated_at is passive metadata (SQL-populated, UTC).
+CREATE TABLE IF NOT EXISTS fsm_storage (
+    bot_id     INTEGER NOT NULL,
+    chat_id    INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    thread_id  INTEGER NOT NULL DEFAULT 0,
+    destiny    TEXT    NOT NULL DEFAULT 'default',
+    state      TEXT,
+    data       TEXT    NOT NULL DEFAULT '{}',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (bot_id, chat_id, user_id, thread_id, destiny)
 );
 ~~~

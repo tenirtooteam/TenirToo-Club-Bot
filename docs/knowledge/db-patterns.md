@@ -3,7 +3,7 @@ type: db-patterns
 title: Database Integrity Fact, Upsert Pattern, Indexes & Background Sync
 description: Transactional integrity mechanism, the one upsert exception, hot-path indexes, and the background Google Sheets sync pattern.
 source_anchor: PL-3.1.1, PL-3.3, PL-3.4, PL-3.5
-timestamp: 2026-07-02
+timestamp: 2026-07-17
 tags: [database, patterns, sync]
 ---
 
@@ -32,6 +32,34 @@ the only function in the codebase using this pattern; all other mutations use st
 - `idx_group_members_user_id ON group_members(user_id)` — hot path for template member
   lookups.
 - `idx_group_topics_topic_id ON group_topics(topic_id)` — hot path for topic template lookups.
+
+## Persistent FSM Storage (feature 012 / №16)
+
+`SQLiteStorage` (`database/fsm_storage.py`) is a custom aiogram `BaseStorage` that persists FSM
+state and data in the `fsm_storage` table (DDL in [db-schema.md](db-schema.md)) through the same
+process-wide shared connection (`get_conn()`), so state survives a bot restart. It replaces the
+default `MemoryStorage`, which lost everything on restart — leaving undeletable tracked menus and
+dropping mid-input users. Three points make the table unusual:
+
+- **`thread_id` sentinel** — the column is `NOT NULL DEFAULT 0` and the storage maps
+  `StorageKey.thread_id = None` to `0`. SQLite treats NULLs inside a composite `PRIMARY KEY` as
+  distinct, so a nullable `thread_id` would insert a *new* row on every write in private chats
+  (the main path), making reads nondeterministic. The sentinel keeps one row per owner. Safe
+  because Telegram thread ids are message ids, always positive.
+- **No foreign keys, deliberately** — FSM state exists before a user is registered (registration
+  happens later in `UserManagerMiddleware`), `chat_id` is not a user, and `ON DELETE CASCADE`
+  would silently wipe live state. `PRAGMA foreign_keys=ON` still holds process-wide; this table
+  simply declares no FK.
+- **Deletion boundary (R-FSM-1)** — a row is removed only when `state IS NULL` **and** `data` is
+  empty *together*. Dropping it on a cleared state alone would destroy the Sterile Interface
+  tracking keys (`last_menu_ids`, `last_menu_id`, `admin_onboarded`) that the project's standard
+  teardown (`set_state(None)` + `clear_fsm_data_safely`) deliberately preserves.
+
+Values are stored as JSON (all FSM values are `None`/`int`/`str`/`bool`/`list[int]` — JSON-safe);
+a corrupted row degrades to empty-with-a-warning rather than crashing (FR-009). There is no TTL:
+state restores verbatim at any age, with `updated_at` kept only as passive metadata. The schema
+is a private implementation detail — the `database.db` facade re-exports only the `SQLiteStorage`
+class (for wiring in `loader.py`), never any FSM data operation.
 
 ## Background Sync Pattern
 

@@ -43,4 +43,9 @@ from .announcements import (
     delete_announcements_by_topic, update_announcement_metadata,
     get_announcements_by_target
 )
+# [Feature 012 / №16] Класс персистентного FSM-storage. Ре-экспорт ТОЛЬКО класса
+# (конструктор для проводки в loader.py) — ни одной доменной операции над
+# состояниями FSM у фасада не появляется (I-5): схема fsm_storage остаётся
+# приватной деталью, сервисы доступа к ней не получают.
+from .fsm_storage import SQLiteStorage
 

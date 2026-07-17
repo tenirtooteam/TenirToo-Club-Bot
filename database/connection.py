@@ -198,6 +198,25 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )""")
 
+                # [Feature 012 / №16] Персистентный FSM-storage. Составной PK повторяет
+                # StorageKey aiogram; thread_id NOT NULL DEFAULT 0 — сентинел вместо None,
+                # т.к. SQLite считает NULL в составном PK различными (иначе дубли строк на
+                # основном пути — личные сообщения). Без FK: состояние существует и у
+                # незарегистрированного пользователя, а chat_id — не пользователь.
+                # updated_at — пассивные метаданные (заполняются SQL-ом, UTC; наивных
+                # datetime.now() не вводим).
+                c.execute("""CREATE TABLE IF NOT EXISTS fsm_storage (
+                    bot_id     INTEGER NOT NULL,
+                    chat_id    INTEGER NOT NULL,
+                    user_id    INTEGER NOT NULL,
+                    thread_id  INTEGER NOT NULL DEFAULT 0,
+                    destiny    TEXT    NOT NULL DEFAULT 'default',
+                    state      TEXT,
+                    data       TEXT    NOT NULL DEFAULT '{}',
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (bot_id, chat_id, user_id, thread_id, destiny)
+                )""")
+
                 # Индексы
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members(group_id)")
                 c.execute("CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members(user_id)")
