@@ -3,6 +3,8 @@
 
 # База данных
 database/*.db
+# WAL-режим кладёт рядом спутники: -wal, -shm, -journal
+database/*.db-*
 
 # Логи
 logs/
