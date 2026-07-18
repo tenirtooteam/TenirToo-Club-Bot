@@ -32,6 +32,29 @@ All notable changes to the Tenir-Too Club Bot project are documented in this fil
 - Test isolation hook `reset_notification_state()` wired into the `db_setup` fixture (`R-TEST-1`); 16
   new unit/journey tests covering flood-wait retry, batching, the @all gate/cooldown, and cache bounding.
 
+## [1.13.0] - 2026-07-17
+
+### Added (feature 012 №16 — Persistent FSM Storage, Phase 3)
+- **FSM state survives bot restarts** (`database/fsm_storage.py`, new `SQLiteStorage(BaseStorage)`):
+  the dispatcher is now built on a custom aiogram storage backed by the shared SQLite connection
+  instead of the in-process `MemoryStorage`. State (`state`) and data (all FSM keys, JSON-encoded) live
+  in a new `fsm_storage` table created idempotently by `init_db`; `loader.py` wires
+  `Dispatcher(storage=SQLiteStorage())`. Previously every restart wiped all FSM state — mid-input flows
+  (topic rename, group add, search, date entry) broke silently, and the sterile-UI tracking keys
+  (`last_menu_ids`, `last_menu_id`, `admin_onboarded`) were lost, leaving un-clearable menu clutter and
+  re-triggering admin onboarding.
+- **Composite-key isolation with a thread_id sentinel** (`fsm_storage.py`, `_pk`): the storage key
+  (bot/chat/user/thread) is the primary key; `thread_id None` is normalized to `0` because SQLite treats
+  `NULL` components of a composite PK as distinct, which otherwise produced duplicate rows on the main DM
+  path (caught by a probe).
+- **Deletion boundary preserves tracking keys** (`R-FSM-1`): a row is removed only when it is fully empty
+  (`state IS NULL AND data == {}`); clearing state alone does not drop the row, so whitelisted tracking
+  keys that outlive `clear_fsm_data_safely` are not destroyed. No TTL — records are restored verbatim
+  regardless of age (a timestamp column is carried as passive metadata for future TTL only).
+- **Facade boundary intact** (`database/db.py` re-exports `SQLiteStorage`; `R-ARCH-1`): services gain no
+  domain access to FSM state; the schema stays an implementation detail. 10 new tests
+  (`tests/test_database/test_fsm_storage.py`); the existing corpus passed unchanged (SC-006).
+
 ## [1.12.0] - 2026-07-14
 
 ### Changed (feature 011 №19 — Typed Callback Routing, Phase 3)
