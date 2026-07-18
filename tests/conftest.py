@@ -41,6 +41,9 @@ def db_setup(tmp_path):
     reset_registration_cache()
     # [Feature 010 / №17] Чистый реестр pending-задач Sheets-синка на каждый тест.
     reset_sheets_sync_state()
+    # [Feature 013 / №18] Чистое состояние рассылок (_alert_cache, _all_cooldown) на каждый тест.
+    from services.notification_service import reset_notification_state
+    reset_notification_state()
 
     yield test_db
 

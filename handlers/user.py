@@ -66,9 +66,10 @@ async def handle_all_mention(message: types.Message, bot: Bot):
 
     sender_name = message.from_user.first_name
 
-    # Запускаем рассылку через сервис
+    # Запускаем рассылку через сервис (ролевой гейт и rate-limit — внутри сервиса, US3)
     await NotificationService.send_native_all(
         bot=bot,
+        sender_id=message.from_user.id,
         chat_id=message.chat.id,
         topic_id=topic_id,
         sender_name=sender_name,

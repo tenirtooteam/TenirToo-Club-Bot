@@ -2,6 +2,36 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.14.0] - 2026-07-18
+
+### Fixed (feature 013 №18 — Broadcast Rate-Limiting & Reliability, Phase 3)
+- **Mass PM broadcasts no longer drop recipients under flood-wait** (`services/notification_service.py`,
+  `send_to_users`, FR-001..004): sends now route through a shared `_send_message_resilient` helper that
+  honors Telegram `429`/`TelegramRetryAfter` (waits `min(retry_after, FLOOD_WAIT_CAP_SECONDS)` and
+  retries) and paces sends with a cooperative `asyncio.sleep` (`R-DATA-7`). Previously the loop caught
+  every exception and moved on, so the first flood-wait silently lost the tail of the list — an
+  audit-result notification could never reach the admins it concerned. Unreachable recipients (blocked
+  bot) are logged and skipped without aborting the run.
+- **@all reaches every authorized member, not just the first 50** (`send_native_all`, FR-005..008): the
+  authorized list is split into batches of `MENTION_BATCH_SIZE` and one message is sent per batch, each
+  through the flood-wait-aware helper. The silent `authorized_users[:50]` truncation is gone — on a
+  topic with 51+ authorized users, everyone past the 50th used to receive no push and nobody was told.
+- **Anti-spam alert cache is bounded** (`_alert_cache`, `_prune_alert_cache`, FR-012/FR-013): the
+  moderation PM-alert de-dup map now drops entries older than `ALERT_CACHE_TTL_SECONDS` (plus a
+  hard-ceiling safety cap) on each alert, instead of accumulating one `(user, topic)` timestamp forever.
+  The observable de-dup windows (60 s default-deny, 3600 s member-deny, now named constants) are
+  unchanged.
+
+### Added (feature 013 №5 — @all abuse guard)
+- **@all is gated by role and rate-limited per sender** (`send_native_all` + `handlers/user.py`,
+  FR-009..011): a mass ping now runs only for a moderator of the topic (`is_moderator_of_topic`) or the
+  superadmin (`is_superadmin`/`ADMIN_ID`); other senders' `@all` broadcasts nothing while the trigger
+  message is still deleted (silent, stealth-moderation style). A moderator's `@all` is limited to once
+  per `ALL_MENTION_COOLDOWN_SECONDS`; the superadmin is exempt. Previously any write-capable member
+  could ping up to 50 people, arbitrarily often, with no role or frequency check.
+- Test isolation hook `reset_notification_state()` wired into the `db_setup` fixture (`R-TEST-1`); 16
+  new unit/journey tests covering flood-wait retry, batching, the @all gate/cooldown, and cache bounding.
+
 ## [1.12.0] - 2026-07-14
 
 ### Changed (feature 011 №19 — Typed Callback Routing, Phase 3)
