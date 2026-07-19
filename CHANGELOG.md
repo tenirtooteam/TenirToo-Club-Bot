@@ -2,6 +2,16 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.15.2] - 2026-07-19
+
+### Removed (dead code)
+- **`ManagementService.toggle_event_participation`** (`services/management_service.py`) — the blind
+  state-toggle that feature 014 superseded with the explicit-intent orchestrator
+  (`EventService.apply_participation_change` + `add_event_participation_action` /
+  `leave_event_action`). It had zero production and test callers (feature 007 moved `leave_event`
+  off it; feature 014 unified the remaining surfaces), so removal is behavior-neutral. Module
+  registry (`docs/knowledge/module-registry.md`, `PL-2.2.19`) updated to match. Full suite 429 green.
+
 ## [1.15.1] - 2026-07-19
 
 ### Added (web-bridge / TMA E2E test coverage without Telegram — Phase 5 groundwork)

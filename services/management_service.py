@@ -657,18 +657,6 @@ class ManagementService:
         return True, "❌ Вы больше не участвуете."
 
     @staticmethod
-    def toggle_event_participation(event_id: int, user_id: int) -> tuple[bool, str]:
-        """Логика записи/отписки от мероприятия."""
-        if db.is_event_participant(event_id, user_id):
-            db.remove_event_participant(event_id, user_id)
-            ManagementService._trigger_sheets_sync("event_participants", event_id)
-            return True, "❌ Вы больше не участвуете."
-        else:
-            db.add_event_participant(event_id, user_id)
-            ManagementService._trigger_sheets_sync("event_participants", event_id)
-            return True, "✅ Вы записаны!"
-
-    @staticmethod
     def approve_event_action(event_id: int) -> bool:
         """Одобрение мероприятия администратором."""
         return db.approve_event(event_id)
