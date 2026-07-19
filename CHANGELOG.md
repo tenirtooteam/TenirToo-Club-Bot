@@ -2,6 +2,29 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.15.1] - 2026-07-19
+
+### Added (web-bridge / TMA E2E test coverage without Telegram — Phase 5 groundwork)
+- **In-process ASGI E2E harness for the web bridge** (`tests/test_web/conftest.py`): drives the
+  real FastAPI app through the ASGI interface with no sockets and no `httpx` (unavailable — pip is
+  SSL-intercepted in this env, and Starlette's `TestClient` requires it), so it stays within
+  `R-TEST-2` ("no real network"). `forge_init_data` signs Telegram WebApp initData with a real
+  HMAC-SHA256 test token, so `web.auth.validate_webapp_init_data` is exercised for real rather than
+  bypassed; the `web_app` fixture patches the import-bound `web.auth.BOT_TOKEN`.
+- **25 new web E2E tests** closing the two coverage gaps left after feature 014 (the crypto helper
+  and both toggle endpoints were already covered):
+  - auth wiring through a live endpoint — `X-TG-Init-Data` → `get_current_user_id` → route → HTTP
+    status — valid plus seven rejection paths incl. anti-replay (`test_e2e_auth.py`, 8);
+  - every previously-uncovered GET endpoint — dashboard init/topics/profile/events/event-view/
+    admin-gates/roles-faq and announcement details 200/403/404/400 (`test_e2e_read.py`, 15);
+  - a thin auth→toggle end-to-end cap that does not duplicate the feature-014 logic tests
+    (`test_e2e_toggle.py`, 2).
+- Full suite 404 to 429 green.
+- (Local, gitignored) `local_scripts/tma_audit_server.py`: a browser dev/audit stand serving the
+  real API + frontend with an injected `window.Telegram.WebApp` shim (offline; real Telegram SDK
+  and web fonts stripped) and printing per-persona forged-initData URLs — the development vehicle
+  for the feature-015 frontend rewrite.
+
 ## [1.15.0] - 2026-07-19
 
 ### Added (feature 014 — Backend unification: single participation orchestrator, Phase 5 enabler)
