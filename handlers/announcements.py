@@ -77,25 +77,21 @@ async def announcement_join_handler(callback: types.CallbackQuery, state: FSMCon
 
     # 3. Выполняем действие в зависимости от типа
     if ann_type == "event":
-        from services.management_service import ManagementService
-
-        # Получаем код действия (1 - иду, 0 - не иду)
+        # Код действия (1 - иду, 0 - не иду). [Feature 014] Явное намерение -> единый
+        # оркестратор: мутация + уведомление организаторов + обновление ВСЕХ анонсов внутри.
         action_code = callback.data.split(":")[-1]
 
-        if action_code == "1":
-            msg = ManagementService.add_event_participation_action(target_id, user_id)
-            if "записаны" in msg:
-                await EventService.notify_organizers_of_direct_join(callback.message.bot, target_id, user_id)
-        elif action_code == "0":
-            msg = ManagementService.remove_event_participation_action(target_id, user_id)
+        if action_code in ("1", "0"):
+            intent = "join" if action_code == "1" else "leave"
+            _, msg = await EventService.apply_participation_change(
+                callback.message.bot, target_id, user_id, intent
+            )
+            await callback.answer(msg, show_alert=True)
         else:
-            # Старый формат (тоггл) - на всякий случай
-            _, msg = ManagementService.toggle_event_participation(target_id, user_id)
-
-        await callback.answer(msg, show_alert=True)
-
-        # Обновляем ВСЕ анонсы этого мероприятия [CC-2]
-        await AnnouncementService.refresh_announcements(callback.message.bot, "event", target_id)
+            # [Feature 014 / FR-011] Кнопка старого формата без явного намерения — вежливый
+            # отказ без угадывания направления и без какой-либо мутации.
+            logger.warning(f"[Feature 014] Legacy announcement button without intent: user={user_id} ann={ann_id} data={callback.data}")
+            await callback.answer("⚠️ Кнопка устарела. Откройте анонс заново.", show_alert=True)
     else:
         await callback.answer("🛠 Этот тип анонса пока в разработке.")
 

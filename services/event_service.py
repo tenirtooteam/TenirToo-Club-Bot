@@ -201,3 +201,49 @@ class EventService:
                 await bot.send_message(org_id, text, parse_mode="HTML")
             except Exception as e:
                 logger.warning(f"Не удалось отправить уведомление о вступлении организатору {org_id}: {e}")
+
+    @staticmethod
+    async def apply_participation_change(bot: Bot, event_id: int, user_id: int, intent: str) -> tuple[bool, str]:
+        """[Feature 014] Единая точка изменения участия + все его последствия.
+
+        Мутация делегируется ManagementService (R-DATA-1); при ФАКТИЧЕСКОМ изменении состава —
+        уведомление организаторов (только на запись, R-DATA-11) и обновление ВСЕХ анонсов
+        похода. Факт «изменилось» определяется структурно (участник до/после), а не по тексту
+        сообщения. Гард прямой записи остаётся на стороне вызывающего (гарды поверхностей
+        различаются, унифицируется только хвост последствий).
+
+        intent: "join" | "leave". Иное значение — вежливый отказ без мутации и последствий.
+        Возвращает (success, message), где success == «пользователь в намеренном состоянии».
+        Сбой доставки последствия (Telegram) логируется и НЕ откатывает сохранённое изменение
+        и НЕ превращает успех в ошибку (R-SEC-3, defense-in-depth).
+        """
+        from services.management_service import ManagementService
+
+        before = db.is_event_participant(event_id, user_id)
+
+        if intent == "join":
+            message = ManagementService.add_event_participation_action(event_id, user_id)
+        elif intent == "leave":
+            _, message = ManagementService.leave_event_action(event_id, user_id)
+        else:
+            logger.warning(f"[Feature 014] Неизвестное намерение участия '{intent}': event={event_id} user={user_id}")
+            return False, "⚠️ Непонятное действие. Обновите страницу и попробуйте снова."
+
+        after = db.is_event_participant(event_id, user_id)
+        changed = before != after
+
+        if changed:
+            if intent == "join":
+                try:
+                    await EventService.notify_organizers_of_direct_join(bot, event_id, user_id)
+                except Exception as e:
+                    logger.warning(f"[Feature 014] Сбой уведомления организаторов: event={event_id} user={user_id}: {e}")
+
+            from services.announcement_service import AnnouncementService
+            try:
+                await AnnouncementService.refresh_announcements(bot, "event", event_id)
+            except Exception as e:
+                logger.warning(f"[Feature 014] Сбой обновления анонсов: event={event_id}: {e}")
+
+        success = (after == (intent == "join"))
+        return success, message

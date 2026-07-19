@@ -431,12 +431,9 @@ async def leave_event(callback: CallbackQuery, state: FSMContext):
     if not event['is_approved'] and not is_admin and not is_creator:
         return await callback.answer("❌ Действие недоступно. Поход на модерации.", show_alert=True)
 
-    # [BUG-4] Выход — только удаление (remove-only), не toggle (R-DATA-1, R-SEC-3)
-    success, msg = ManagementService.leave_event_action(event_id, user_id)
-
-    # Обновляем анонсы [CC-2]
-    from services.announcement_service import AnnouncementService
-    await AnnouncementService.refresh_announcements(callback.bot, "event", event_id)
+    # [BUG-4] Выход — только удаление (remove-only), не toggle (R-DATA-1, R-SEC-3).
+    # [Feature 014] Мутация + обновление ВСЕХ анонсов — в единой точке.
+    success, msg = await EventService.apply_participation_change(callback.bot, event_id, user_id, "leave")
 
     await callback.answer(msg)
     await view_event(callback, state)

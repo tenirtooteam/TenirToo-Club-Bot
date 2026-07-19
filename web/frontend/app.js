@@ -291,9 +291,15 @@ async function toggleParticipation() {
     tg.HapticFeedback.impactOccurred('medium');
     elements.btn.disabled = true;
 
+    // [Feature 014] Явное намерение из текущего отрисованного состояния кнопки (класс
+    // 'joined' == is_participant). Сервер — единственный авторитет: устаревшее состояние
+    // безопасно (leave не-участника и join уже-участника — no-op), молчаливого переключения нет.
+    const action = elements.btn.classList.contains('joined') ? 'leave' : 'join';
+
     try {
         // Выбираем эндпоинт в зависимости от контекста (анонс или список)
-        const endpoint = annId ? `/api/announcements/${annId}/toggle` : `/api/dashboard/events/${activeEventId}/toggle`;
+        const base = annId ? `/api/announcements/${annId}/toggle` : `/api/dashboard/events/${activeEventId}/toggle`;
+        const endpoint = `${base}?action=${action}`;
         const result = await apiFetch(endpoint, 'POST');
         
         if (result.success) {

@@ -2,7 +2,6 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from services.permission_service import PermissionService
-from services.management_service import ManagementService
 from database import db
 from ..auth import get_current_user_id
 
@@ -80,28 +79,24 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
     }
 
 @router.post("/events/{event_id}/toggle")
-async def toggle_event_participation_direct(event_id: int, user_id: int = Depends(get_current_user_id)):
-    """Переключает участие в мероприятии напрямую из списка (без анонса)."""
-    # Единый гард прямой записи [feature 006, FR-001/002]. Дашборд без топик-контекста.
+async def toggle_event_participation_direct(event_id: int, action: str | None = None, user_id: int = Depends(get_current_user_id)):
+    """Изменяет участие в мероприятии из списка (без анонса) по явному намерению.
+
+    [Feature 014] action = "join" | "leave"; последствия — в единой точке
+    EventService.apply_participation_change. Гард прямой записи остаётся здесь.
+    """
+    if action not in ("join", "leave"):
+        raise HTTPException(status_code=400, detail="Некорректное действие. Обновите страницу.")
+
     from services.event_service import EventService
+    # Единый гард прямой записи [feature 006, FR-001/002]. Дашборд без топик-контекста.
     allowed, reason = EventService.check_direct_join_allowed(user_id, event_id, topic_id=None)
     if not allowed:
-        logger.warning(f"[FR-011] Direct dashboard join denied: user={user_id} event={event_id} reason={reason}")
+        logger.warning(f"[FR-011] Direct dashboard change denied: user={user_id} event={event_id} action={action} reason={reason}")
         raise HTTPException(status_code=403, detail=reason)
 
-    success, message = ManagementService.toggle_event_participation(event_id, user_id)
-
-    if success and "записаны" in message:
-        from loader import bot
-        from services.event_service import EventService
-        from services.announcement_service import AnnouncementService
-
-        # Уведомляем организаторов
-        await EventService.notify_organizers_of_direct_join(bot, event_id, user_id)
-
-        # Обновляем анонс в группе [CC-2]
-        await AnnouncementService.refresh_announcements(bot, "event", event_id)
-
+    from loader import bot
+    success, message = await EventService.apply_participation_change(bot, event_id, user_id, action)
     return {"success": success, "message": message}
 
 # --- Admin Section (Mirroring Bot Start Menu) ---

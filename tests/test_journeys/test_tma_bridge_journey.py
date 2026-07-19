@@ -57,11 +57,14 @@ async def test_tma_toggle_reactivity(db_setup, mock_bot):
             # Call toggle endpoint (should join)
             # We also need to patch notify_organizers_of_direct_join
             with patch("services.event_service.EventService.notify_organizers_of_direct_join", new_callable=AsyncMock):
-                response = await toggle_event_participation_direct(event_id=event_id, user_id=user_id)
+                response = await toggle_event_participation_direct(event_id=event_id, action="join", user_id=user_id)
 
                 assert response["success"] is True
                 # Verify user is participant now
                 assert db.is_event_participant(event_id, user_id)
 
-                # Verify refresh announcements was called to update Telegram group physical message
+                # [Feature 014] The dashboard toggle now routes through
+                # EventService.apply_participation_change; refresh is invoked at the event
+                # level, i.e. it fans out to EVERY published announcement copy (refresh-all),
+                # not a single hand-edited message.
                 mock_refresh.assert_called_once_with(mock_bot, "event", event_id)

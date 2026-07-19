@@ -2,6 +2,40 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.15.0] - 2026-07-19
+
+### Added (feature 014 — Backend unification: single participation orchestrator, Phase 5 enabler)
+- **One method owns every consequence of a participation change** (`services/event_service.py`,
+  new `EventService.apply_participation_change(bot, event_id, user_id, intent)`): the mutation is
+  delegated to `ManagementService` (`R-DATA-1`), and on an actual state change it notifies
+  organizers (join only, `R-DATA-11`) and refreshes ALL published announcement copies of the
+  event. "Changed" is derived structurally (participant state before/after), not by matching the
+  human message text. `ManagementService`/`AnnouncementService` are imported lazily inside the
+  method to keep the event/announcement/management import triangle acyclic (`R-ARCH-4`).
+
+### Changed (feature 014 — four surfaces unified onto the orchestrator)
+- **All four direct-participation surfaces are now thin callers** carrying an explicit
+  `join`/`leave` intent: the dashboard toggle endpoint (`web/routers/dashboard.py`), the
+  announcement toggle endpoint (`web/routers/announcements.py`), the `ann_join` bot handler
+  (`handlers/announcements.py`) and the event-card `leave_event` handler (`handlers/events.py`).
+  Their access guards stay at the callsite; only the consequence tail is unified. The frontend
+  (`web/frontend/app.js`) sends the explicit intent derived from the rendered participation state.
+
+### Fixed (feature 014 — side-effect drift between web flows)
+- **A dashboard "leave" now refreshes announcements** — previously it updated nothing, leaving
+  every published copy stale.
+- **An announcement-card change refreshes EVERY copy of the event**, not just the clicked message:
+  the endpoint's hand-rolled single-message edit is gone (refresh fans out via
+  `refresh_announcements`).
+- **The web toggle can no longer silently join a non-participant** (bug №7, previously fixed only
+  in bot handlers): both web endpoints dropped the toggle for explicit intent, so a stale "leave"
+  button is a safe no-op, never an implicit join. Leave is remove-only everywhere (`R-SEC-3`).
+- **A no-intent action is refused, not guessed**: an old-format announcement button (no explicit
+  action code) gets a polite refusal with no mutation; the web endpoints reject a missing/invalid
+  `action` with `400`.
+- 13 new tests (method unit tests + per-surface characterization-to-parity + a cross-surface
+  parity journey), format-agnostic (driven through the real producers). Full suite 391 to 404 green.
+
 ## [1.14.0] - 2026-07-18
 
 ### Fixed (feature 013 №18 — Broadcast Rate-Limiting & Reliability, Phase 3)

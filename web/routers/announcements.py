@@ -2,7 +2,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from services.event_service import EventService
-from services.management_service import ManagementService
 from services.permission_service import PermissionService
 from database import db
 from ..auth import get_current_user_id
@@ -44,8 +43,17 @@ async def get_announcement_details(ann_id: int, user_id: int = Depends(get_curre
     }
 
 @router.post("/{ann_id}/toggle")
-async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_user_id)):
-    """Переключает участие пользователя в мероприятии через TMA."""
+async def toggle_participation(ann_id: int, action: str | None = None, user_id: int = Depends(get_current_user_id)):
+    """Изменяет участие в мероприятии через анонс TMA по явному намерению.
+
+    [Feature 014] action = "join" | "leave"; мутация + все последствия (уведомление
+    организаторов на запись + обновление ВСЕХ копий анонса) — в единой точке
+    EventService.apply_participation_change. Ручной edit одного сообщения удалён: обновление
+    всех копий делает refresh_announcements внутри метода.
+    """
+    if action not in ("join", "leave"):
+        raise HTTPException(status_code=400, detail="Некорректное действие. Обновите страницу.")
+
     ann = db.get_announcement(ann_id)
     if not ann:
         raise HTTPException(status_code=404, detail="Announcement not found")
@@ -58,33 +66,9 @@ async def toggle_participation(ann_id: int, user_id: int = Depends(get_current_u
     # Единый гард прямой записи [feature 006, FR-001/002] — топик анонса + проверка одобрения.
     allowed, reason = EventService.check_direct_join_allowed(user_id, target_id, topic_id=topic_id)
     if not allowed:
-         logger.warning(f"[FR-011] Web announcement join denied: user={user_id} event={target_id} topic={topic_id} reason={reason}")
+         logger.warning(f"[FR-011] Web announcement change denied: user={user_id} event={target_id} topic={topic_id} action={action} reason={reason}")
          raise HTTPException(status_code=403, detail=reason)
 
-    success, message = ManagementService.toggle_event_participation(target_id, user_id)
-
-    # Реактивность: обновляем сообщение в Telegram, если есть привязка [PL-5.1.18]
-    if success:
-        chat_id, message_id = ann[5], ann[6] # Из БД анонсов
-        if chat_id and message_id:
-            from loader import bot
-            from services.announcement_service import AnnouncementService
-            from keyboards.announcements_kb import get_announcement_kb
-
-            try:
-                new_text = AnnouncementService.format_announcement_text(ann_id)
-                await bot.edit_message_text(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=new_text,
-                    reply_markup=get_announcement_kb(ann_id)
-                )
-            except Exception as e:
-                logger.warning(f"Не удалось обновить сообщение анонса {ann_id} из Web: {e}")
-
-    # Уведомление организаторов [PL-5.1.13]
-    if success and "записаны" in message:
-        from loader import bot
-        await EventService.notify_organizers_of_direct_join(bot, target_id, user_id)
-
+    from loader import bot
+    success, message = await EventService.apply_participation_change(bot, target_id, user_id, action)
     return {"success": success, "message": message}

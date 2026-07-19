@@ -3,7 +3,7 @@ type: module-registry
 title: Module Registry — File Responsibilities & Function Inventory
 description: Complete file list with individual responsibilities and full function inventory.
 source_anchor: PL-2.2
-timestamp: 2026-07-14
+timestamp: 2026-07-19
 tags: [architecture, modules, inventory]
 ---
 
@@ -35,7 +35,7 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.14] **database/db.py** — Single facade re-exporting all database functions (including announcements.py). **The only permitted import point for data operations.**
 - [PL-2.2.14.1] **database/dtos.py** — Domain data containers (EventDTO, AuditRequestDTO) with dict-like compatibility interface.
 - [PL-2.2.15] **services/ui_service.py** — Централизованный UI lifecycle via `UIService`: `delete_tracked_ui`, `delete_msg`, `terminate_input`, `clear_fsm_data_safely`, `sterile_redirect`, `sterile_show`, `generic_navigator`, `get_landing_data(user_id, role_override)` (Traffic Controller), `show_admin_dashboard`, `show_moderator_dashboard`, `sterile_ask`, `show_temp_message`, `show_user_detail`, `show_group_detail`, `show_topic_detail`, `show_moderator_groups`, `show_moderator_moderators`, `sterile_command`, `get_confirmation_ui`, `format_user_card`.
-- [PL-2.2.16] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`.
+- [PL-2.2.16] **services/event_service.py** — Expedition business logic: `format_event_card`, `notify_admins_for_approval`, `can_edit_event`, `get_active_events`, `get_pending_events`, `get_event_details`, `is_event_participant`, `check_direct_join_allowed`, `notify_organizers_of_direct_join`, `apply_participation_change` (feature 014 — the single participation-change orchestrator: intent-directed mutation via `ManagementService` + join-only organizer notify + all-copies `refresh_announcements`; structural before/after change detection; lazy imports for `R-ARCH-4`).
 - [PL-2.2.17] **services/google_sheets_service.py** — Asynchronous Google Sheets API integration via `GoogleSheetsService`. Methods: `export_users`, `export_groups`, `export_events`, `export_event_participants`, `import_users`, `import_groups`.
 - [PL-2.2.18] **services/help_service.py** — Centralized help content registry and tooltip logic via `HelpService`. Methods: `get_help`.
 - [PL-2.2.19] **services/management_service.py** — Domain Service for entity management. All methods return `(bool, str)`. Functions: `ensure_user_registered`, `add_user`, `create_group`, `assign_moderator_role`, `grant_direct_access`, `toggle_user_group_template`, `apply_group_to_topic`, `sync_group_to_topic`, `copy_topic_to_topic`, `grant_role`, `execute_deletion`, `update_user_name`, `update_topic_name`, `register_topic_if_not_exists`, `create_event_action` (Internal Sanitization [PL-6.7]), `toggle_event_participation`, `leave_event_action` (remove-only, no audit bypass), `add_event_participation_action`, `remove_event_participation_action`, `approve_event_action`, `submit_request`, `resolve_request` (Atomic Audit, idempotent CAS gate), `get_pending_request_id`, `get_user_pending_request_id`, `cancel_participation_request_action`, `get_entity_name`, `search_entities`, `_trigger_sheets_sync`.
@@ -80,8 +80,8 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.49] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
 - [PL-2.2.51] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation), `get_current_user_id` (FastAPI dependency for user auth). [CC-3]
 - [PL-2.2.52] **web/main.py** — FastAPI application: Unified logging, router inclusion (`announcements`, `dashboard`).
-- [PL-2.2.53] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation`. [CC-1]
-- [PL-2.2.54] **web/routers/dashboard.py** — Web API for personal cabinet: `get_dashboard_init`, `get_user_topics`, `get_user_profile`, `get_all_events`, `get_event_view`, `toggle_event_participation_direct`, `get_all_topics_admin`, `get_all_groups_admin`, `get_roles_faq`.
+- [PL-2.2.53] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; the old single-message edit is removed). [CC-1]
+- [PL-2.2.54] **web/routers/dashboard.py** — Web API for personal cabinet: `get_dashboard_init`, `get_user_topics`, `get_user_profile`, `get_all_events`, `get_event_view`, `toggle_event_participation_direct` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; missing/invalid action → 400), `get_all_topics_admin`, `get_all_groups_admin`, `get_roles_faq`.
 - [PL-2.2.55] **web/frontend/** — Static assets for Mini App: `index.html` (Multi-view Dashboard), `style.css` (Premium Grid/Glassmorphism), `app.js` (Navigation, API Bridge, Admin Views).
 - [PL-2.2.56] **tests/test_web/test_auth.py** — Unit tests for Web Bridge authentication (HMAC-SHA256).
 - [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
