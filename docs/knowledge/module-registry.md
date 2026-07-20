@@ -3,7 +3,7 @@ type: module-registry
 title: Module Registry — File Responsibilities & Function Inventory
 description: Complete file list with individual responsibilities and full function inventory.
 source_anchor: PL-2.2
-timestamp: 2026-07-19
+timestamp: 2026-07-20
 tags: [architecture, modules, inventory]
 ---
 
@@ -79,10 +79,13 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.48.3] **tests/test_journeys/test_prompt_linter_journey.py** — Journey/integration tests verifying CLI execution of the prompt linter.
 - [PL-2.2.49] **obsolete_tests/** — Directory containing legacy and broken tests moved for reference during the 'Total Shield' transition.
 - [PL-2.2.51] **web/auth.py** — Security layer: `validate_webapp_init_data` (HMAC-SHA256 validation), `get_current_user_id` (FastAPI dependency for user auth). [CC-3]
-- [PL-2.2.52] **web/main.py** — FastAPI application: Unified logging, router inclusion (`announcements`, `dashboard`).
-- [PL-2.2.53] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; the old single-message edit is removed). [CC-1]
-- [PL-2.2.54] **web/routers/dashboard.py** — Web API for personal cabinet: `get_dashboard_init`, `get_user_topics`, `get_user_profile`, `get_all_events`, `get_event_view`, `toggle_event_participation_direct` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; missing/invalid action → 400), `get_all_topics_admin`, `get_all_groups_admin`, `get_roles_faq`.
-- [PL-2.2.55] **web/frontend/** — Static assets for Mini App: `index.html` (Multi-view Dashboard), `style.css` (Premium Grid/Glassmorphism), `app.js` (Navigation, API Bridge, Admin Views).
+- [PL-2.2.51.1] **web/serialization.py** — Display serialization for the JSON boundary (feature 015): `display` un-escapes stored HTML-escaped display strings so the frontend escape-by-default render layer shows correct glyphs; `ManagementService` storage is untouched.
+- [PL-2.2.52] **web/main.py** — FastAPI application: Unified logging, router inclusion (`announcements`, `dashboard`, `events`).
+- [PL-2.2.53] **web/routers/announcements.py** — Web API for announcements: `get_announcement_details`, `toggle_participation` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; the old single-message edit is removed). Display fields un-escaped via `web/serialization.py` (feature 015). [CC-1]
+- [PL-2.2.54] **web/routers/dashboard.py** — Web API for personal cabinet: `get_dashboard_init`, `get_user_topics`, `get_user_profile`, `get_all_events` (returns `end_date` for the date-range chip), `get_event_view` (returns a server-computed `can_edit` flag — feature 015 D7/U1), `toggle_event_participation_direct` (feature 014 — explicit `action` join/leave, delegates to `apply_participation_change`; missing/invalid action → 400), `get_all_topics_admin`, `get_all_groups_admin`, `get_roles_faq`. Display string fields un-escaped via `web/serialization.py::display` (feature 015 D3).
+- [PL-2.2.54.1] **web/routers/events.py** — Web API for event authoring (feature 015): `create_event` (`POST /api/events`, session-only — parity with the bot's un-gated `event_create`), `update_event` (`PUT /api/events/{id}`, per-event `EventService.can_edit_event` — authority-parity, no blanket admin gate). Thin adapter over `ManagementService.create_event_action`/`update_event_details`; dates parsed server-side via `DateService`.
+- [PL-2.2.55] **web/frontend/** — Mini App frontend (feature 015 — native ES modules, no framework/bundler): `index.html` (module host + initial loader), `style.css` (design-system v2 "Alpine night to dawn" tokens, status-by-shape, date-range chip), `js/` (see PL-2.2.55.1). The former `app.js` monolith was deleted.
+- [PL-2.2.55.1] **web/frontend/js/** — ES-module frontend: `main.js` (bootstrap — Telegram SDK glue, `?ann_id=` entry mapping, theme via `colorScheme`), `router.js` (hash routing + back-stack), `api.js` (init-data fetch wrapper), `render.js` (escape-by-default DOM helpers), `screens/*` (file-per-screen: dashboard, events-list, event-card, event-form, topics, profile, admin, roles-faq, plus `shell` and the `index` barrel), `ui/components.js` (`statusBadge`, `dateChip`).
 - [PL-2.2.56] **tests/test_web/test_auth.py** — Unit tests for Web Bridge authentication (HMAC-SHA256).
 - [PL-2.2.57] **tests/test_journeys/test_tma_integration.py** — Journey test for WebApp-to-Bot reactivity.
 - [PL-2.2.57.1] **tests/test_journeys/test_event_creation_tdd.py** — E2E event creation journey test validating UI lifecycle via simulator.
@@ -96,3 +99,6 @@ Complete file list with individual responsibilities and full function inventory:
 - [PL-2.2.57.9] **tests/test_journeys/test_ux_fallback_journey.py** — Journey tests for FSM creation Escape Hatch, fallback callback handlers, and safe_callback.
 - [PL-2.2.57.10] **tests/test_journeys/test_ux_refinement_journey.py** — Journey tests for onboarding loop prevention, escape hatches, search back navigation, moderator redirects, and terminology alignment.
 - [PL-2.2.58] **tests/test_web/** — Directory for Web Bridge layer tests.
+- [PL-2.2.58.1] **tests/test_web/test_events_create.py** — Level-A E2E for event creation (feature 015): positive, empty-title 400, unrecognized-date still saves, auth required.
+- [PL-2.2.58.2] **tests/test_web/test_events_edit.py** — Level-A E2E for event editing (feature 015): creator-non-admin OK, no-rights 403, missing 404, empty-title 400 (authority-parity).
+- [PL-2.2.58.3] **tests/test_web/test_frontend_contract.py** — Level-A E2E for frontend server contracts (feature 015): `?ann_id=` entry target, escape-by-default (raw markup returned literally), `can_edit` affordance flag.

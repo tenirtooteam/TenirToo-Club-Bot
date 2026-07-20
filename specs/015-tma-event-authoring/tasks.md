@@ -60,7 +60,7 @@ full suite stays green.
 - [x] T007 [US2] Add `PUT /api/events/{event_id}` to `web/routers/events.py`: re-check `EventService.can_edit_event(user_id, event_id)` server-side (403 on failure, 404 if absent), parse dates, call `ManagementService.update_event_details(...)`; no approval re-notification (edit parity); return the DTO
 - [x] T008 [US1] [US2] [US3] Add a web-layer display serialization helper that un-escapes stored display strings for JSON output (D3, no change to `ManagementService`) and apply it to the reused readers `web/routers/dashboard.py` (`/events`, `/events/{id}`) and `web/routers/announcements.py` (`/{ann_id}`); additionally add a server-computed `can_edit` field to the `GET /api/dashboard/events/{id}` response via `EventService.can_edit_event(user_id, event_id)` (D7/U1) — response shape only, no query/logic change
 - [x] T009 [US1] [US2] Run `.\venv\Scripts\python.exe -m pytest tests\test_web -q` then the full suite; confirm the new endpoint tests plus the reused-reader changes (D3 display-serialization + `can_edit`) are green and no existing dashboard/announcements test regressed (assertions check both `args` and `kwargs` on mocked bot calls, R-TEST-3)
-- [ ] T009a **HARD STOP**: Report progress to the user (Шэф) in Russian — backend authoring endpoints complete and green — and AWAIT EXPLICIT APPROVAL before starting the frontend modularization. (R-PROC-2)
+- [x] T009a **HARD STOP**: Report progress to the user (Шэф) in Russian — backend authoring endpoints complete and green — and AWAIT EXPLICIT APPROVAL before starting the frontend modularization. (R-PROC-2)
 
 ---
 
@@ -106,7 +106,7 @@ persona is refused at submit.
 - [x] T018 [US2] Extend `web/frontend/js/screens/event-form.js` edit mode — seed from `GET /api/dashboard/events/{id}`, submit `PUT /api/events/{id}`; surface a server 403 as a polite refusal (no client-side gating)
 - [x] T019 [US1] [US2] Wire form routes `#/event/new` and `#/event/{id}/edit` into `web/frontend/js/router.js`; add the create affordance on the events-list screen and the edit affordance on the event-card screen shown only when the event-details DTO reports `can_edit true` (D7/U1)
 - [x] T020 [US1] [US2] Verify on the Level-B stand: create flow including the unrecognized-date hint; a rejected submit (empty title) preserves the already-entered form fields (FR-006); the edit control appears only for the creator persona and edit succeeds; an unrelated persona sees no edit control and a direct edit call is refused; then run the full suite green
-- [ ] T020a **HARD STOP**: Report progress to the user (Шэф) in Russian — authoring form complete, create and edit verified with authority-parity — and AWAIT EXPLICIT APPROVAL before applying the design system. (R-PROC-2)
+- [x] T020a **HARD STOP**: Report progress to the user (Шэф) in Russian — authoring form complete, create and edit verified with authority-parity — and AWAIT EXPLICIT APPROVAL before applying the design system. (R-PROC-2)
 
 ---
 
@@ -121,7 +121,7 @@ distinguishable by shape (not color alone); a multi-day event shows a date range
 - [x] T022 [US4] Implement status-by-shape markers and the date-range chip in `web/frontend/js/ui/components.js` (FR-018) and use them on list, card, and form screens
 - [x] T023 [US4] Apply v2 tokens across the authoring and list/card screens; verify on the stand that tokens are consistent, statuses are distinguishable by shape, and multi-day events show a range
 - [x] T024 [US4] Update `CHANGELOG.md` for feature 015 via the docs-update CMD-4 command (R-PROC-6)
-- [ ] T024a **HARD STOP**: Report progress to the user (Шэф) in Russian — design system applied and changelog updated — and AWAIT EXPLICIT APPROVAL before the polish phase. (R-PROC-2)
+- [x] T024a **HARD STOP**: Report progress to the user (Шэф) in Russian — design system applied and changelog updated — and AWAIT EXPLICIT APPROVAL before the polish phase. (R-PROC-2)
 
 ---
 
@@ -129,9 +129,9 @@ distinguishable by shape (not color alone); a multi-day event shows a date range
 
 **Purpose**: Final validation and documentation synchronization across the feature.
 
-- [ ] T025 [P] Run the full quickstart.md validation — the backend test table plus the Level-B browser walkthrough (US1 to US4)
-- [ ] T026 Route C docs-update sweep: reflect the new `web/routers/events.py` and the `web/frontend/js/` module set in the module registry (`docs/knowledge/module-registry.md`) via CMD-1/CMD-2; no git operations during Route C
-- [ ] T027 Final gate: run checklist-linter `.\venv\Scripts\python.exe local_scripts\prompt_linter.py --dir specs/015-tma-event-authoring --stage checklist` and confirm it passes with every box marked `[x]` (R-PROC-4)
+- [x] T025 [P] Run the full quickstart.md validation — the backend test table plus the Level-B browser walkthrough (US1 to US4)
+- [x] T026 Route C docs-update sweep: reflect the new `web/routers/events.py` and the `web/frontend/js/` module set in the module registry (`docs/knowledge/module-registry.md`) via CMD-1/CMD-2; no git operations during Route C
+- [x] T027 Final gate: run checklist-linter `.\venv\Scripts\python.exe local_scripts\prompt_linter.py --dir specs/015-tma-event-authoring --stage checklist` and confirm it passes with every box marked `[x]` (R-PROC-4)
 
 ---
 
