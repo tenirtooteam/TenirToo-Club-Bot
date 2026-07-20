@@ -72,11 +72,11 @@ bootstrap with `?ann_id=` mapping. Serves US3.
 **Independent Test**: On the Level-B stand, the app boots via the module entry; `?ann_id=` maps to
 the announcement card and no-param maps to the dashboard.
 
-- [ ] T010 [US3] Create `web/frontend/js/render.js` — escape-by-default DOM helpers (text setter plus a safe list/template builder); no raw-`innerHTML` path for server or user data (FR-013, contracts/frontend-architecture.md)
-- [ ] T011 [US3] Create `web/frontend/js/api.js` — fetch wrapper attaching the init-data header, treating `success` structurally, surfacing errors uniformly; no date or business logic
-- [ ] T012 [US3] Create `web/frontend/js/router.js` — hash route table, exact-key lookup (no substring match), back-history stack plus `tg.BackButton`, unknown-route falls back to dashboard
-- [ ] T013 [US3] Create `web/frontend/js/main.js` — bootstrap: read `?ann_id=` from `location.search`, route to `#/ann/{id}` when present else `#/dashboard`, Telegram SDK glue (FR-014)
-- [ ] T013a **HARD STOP**: Report progress to the user (Шэф) in Russian — core frontend modules stood up — and AWAIT EXPLICIT APPROVAL before migrating the read screens. (R-PROC-2)
+- [x] T010 [US3] Create `web/frontend/js/render.js` — escape-by-default DOM helpers (text setter plus a safe list/template builder); no raw-`innerHTML` path for server or user data (FR-013, contracts/frontend-architecture.md)
+- [x] T011 [US3] Create `web/frontend/js/api.js` — fetch wrapper attaching the init-data header, treating `success` structurally, surfacing errors uniformly; no date or business logic
+- [x] T012 [US3] Create `web/frontend/js/router.js` — hash route table, exact-key lookup (no substring match), back-history stack plus `tg.BackButton`, unknown-route falls back to dashboard
+- [x] T013 [US3] Create `web/frontend/js/main.js` — bootstrap: read `?ann_id=` from `location.search`, route to `#/ann/{id}` when present else `#/dashboard`, Telegram SDK glue (FR-014)
+- [x] T013a **HARD STOP**: Report progress to the user (Шэф) in Russian — core frontend modules stood up — and AWAIT EXPLICIT APPROVAL before migrating the read screens. (R-PROC-2)
 
 ---
 
@@ -88,10 +88,10 @@ monolith. Serves US3.
 **Independent Test**: On the stand, all read screens render the same data as before; navigation is
 reload-free; a markup title renders as literal text.
 
-- [ ] T014 [P] [US3] Migrate read screens into `web/frontend/js/screens/` (dashboard, events-list, event-card, announcement-card, topics/profile/admin/roles) using `render.js` — same data sources (existing dashboard/announcements GETs); behavior-preserving, consuming the D3-serialized (un-escaped) display fields already applied in Chunk A
-- [ ] T015 [US3] Update `web/frontend/index.html` to load `<script type="module" src="js/main.js">`, remove the `app.js` script, and delete `web/frontend/app.js`
-- [ ] T016 [US3] Verify on the Level-B stand: `?ann_id=` entry lands on the card, dashboard is the default, navigation is reload-free, and a title containing markup renders as literal characters; then run the full suite green
-- [ ] T016a **HARD STOP**: Report progress to the user (Шэф) in Russian — modular frontend live, monolith removed, entry and escape verified — and AWAIT EXPLICIT APPROVAL before building the authoring form. (R-PROC-2)
+- [x] T014 [P] [US3] Migrate read screens into `web/frontend/js/screens/` (dashboard, events-list, event-card, announcement-card, topics/profile/admin/roles) using `render.js` — same data sources (existing dashboard/announcements GETs); behavior-preserving, consuming the D3-serialized (un-escaped) display fields already applied in Chunk A
+- [x] T015 [US3] Update `web/frontend/index.html` to load `<script type="module" src="js/main.js">`, remove the `app.js` script, and delete `web/frontend/app.js`
+- [x] T016 [US3] Verify on the Level-B stand: `?ann_id=` entry lands on the card, dashboard is the default, navigation is reload-free, and a title containing markup renders as literal characters; then run the full suite green
+- [x] T016a **HARD STOP**: Report progress to the user (Шэф) in Russian — modular frontend live, monolith removed, entry and escape verified — and AWAIT EXPLICIT APPROVAL before building the authoring form. (R-PROC-2)
 
 ---
 
@@ -102,10 +102,10 @@ reload-free; a markup title renders as literal text.
 **Independent Test**: On the stand, a non-admin creator creates and edits an event; an unrelated
 persona is refused at submit.
 
-- [ ] T017 [US1] Create `web/frontend/js/screens/event-form.js` create mode — fields title / date_text / optional end_date_text, submit `POST /api/events` via `api.js`, show the "won't reach the calendar" hint from `date_recognized`; optional UX hints only, no client-side date business logic
-- [ ] T018 [US2] Extend `web/frontend/js/screens/event-form.js` edit mode — seed from `GET /api/dashboard/events/{id}`, submit `PUT /api/events/{id}`; surface a server 403 as a polite refusal (no client-side gating)
-- [ ] T019 [US1] [US2] Wire form routes `#/event/new` and `#/event/{id}/edit` into `web/frontend/js/router.js`; add the create affordance on the events-list screen and the edit affordance on the event-card screen shown only when the event-details DTO reports `can_edit true` (D7/U1)
-- [ ] T020 [US1] [US2] Verify on the Level-B stand: create flow including the unrecognized-date hint; a rejected submit (empty title) preserves the already-entered form fields (FR-006); the edit control appears only for the creator persona and edit succeeds; an unrelated persona sees no edit control and a direct edit call is refused; then run the full suite green
+- [x] T017 [US1] Create `web/frontend/js/screens/event-form.js` create mode — fields title / date_text / optional end_date_text, submit `POST /api/events` via `api.js`, show the "won't reach the calendar" hint from `date_recognized`; optional UX hints only, no client-side date business logic
+- [x] T018 [US2] Extend `web/frontend/js/screens/event-form.js` edit mode — seed from `GET /api/dashboard/events/{id}`, submit `PUT /api/events/{id}`; surface a server 403 as a polite refusal (no client-side gating)
+- [x] T019 [US1] [US2] Wire form routes `#/event/new` and `#/event/{id}/edit` into `web/frontend/js/router.js`; add the create affordance on the events-list screen and the edit affordance on the event-card screen shown only when the event-details DTO reports `can_edit true` (D7/U1)
+- [x] T020 [US1] [US2] Verify on the Level-B stand: create flow including the unrecognized-date hint; a rejected submit (empty title) preserves the already-entered form fields (FR-006); the edit control appears only for the creator persona and edit succeeds; an unrelated persona sees no edit control and a direct edit call is refused; then run the full suite green
 - [ ] T020a **HARD STOP**: Report progress to the user (Шэф) in Russian — authoring form complete, create and edit verified with authority-parity — and AWAIT EXPLICIT APPROVAL before applying the design system. (R-PROC-2)
 
 ---
