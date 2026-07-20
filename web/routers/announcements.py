@@ -5,6 +5,7 @@ from services.event_service import EventService
 from services.permission_service import PermissionService
 from database import db
 from ..auth import get_current_user_id
+from ..serialization import display
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,9 +35,9 @@ async def get_announcement_details(ann_id: int, user_id: int = Depends(get_curre
     return {
         "id": ann_id,
         "event_id": target_id,
-        "title": event["title"],
-        "start_date": event["start_date"],
-        "end_date": event["end_date"],
+        "title": display(event["title"]),
+        "start_date": display(event["start_date"]),
+        "end_date": display(event["end_date"]),
         "is_participant": is_participant,
         "participants_count": len(event["participants"]),
         "status": "approved" if event["is_approved"] else "pending"

@@ -2,8 +2,10 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from services.permission_service import PermissionService
+from services.event_service import EventService
 from database import db
 from ..auth import get_current_user_id
+from ..serialization import display
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,8 +56,8 @@ async def get_all_events(user_id: int = Depends(get_current_user_id)):
         if details:
             results.append({
                 "id": e['event_id'],
-                "title": e['title'],
-                "date": e['start_date'],
+                "title": display(e['title']),
+                "date": display(e['start_date']),
                 "participants_count": len(details['participants']),
                 "is_participant": user_id in details['participants']
             })
@@ -70,12 +72,14 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
 
     return {
         "id": event_id,
-        "title": details["title"],
-        "start_date": details["start_date"],
-        "end_date": details["end_date"],
+        "title": display(details["title"]),
+        "start_date": display(details["start_date"]),
+        "end_date": display(details["end_date"]),
         "participants_count": len(details["participants"]),
         "is_participant": user_id in details["participants"],
-        "status": "approved" if details["is_approved"] else "pending"
+        "status": "approved" if details["is_approved"] else "pending",
+        # can_edit: серверно-вычисляемый affordance-флаг (D7/U1) — НЕ авторитет, PUT перепроверяет.
+        "can_edit": EventService.can_edit_event(user_id, event_id)
     }
 
 @router.post("/events/{event_id}/toggle")

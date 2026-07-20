@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from config import WEBAPP_CORS_ORIGINS
-from .routers import announcements, dashboard
+from .routers import announcements, dashboard, events
 
 app = FastAPI(title="Tenir-Too Web Bridge")
 logger = logging.getLogger("web")
@@ -30,6 +30,7 @@ async def health_check():
 
 app.include_router(announcements.router, prefix="/api/announcements", tags=["Announcements"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
+app.include_router(events.router, prefix="/api/events", tags=["Events"])
 
 # Раздача статики [PL-2.1] - В самом конце, чтобы не перехватывать API роуты
 frontend_path = os.path.join(os.path.dirname(__file__), "frontend")
