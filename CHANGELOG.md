@@ -2,6 +2,45 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.16.0] - 2026-07-20
+
+### Added (feature 015 — TMA event authoring + frontend modularization, Phase 5)
+- **Event authoring domain in the web bridge** (`web/routers/events.py`): `POST /api/events`
+  (create — session-only, parity with the bot's un-gated `event_create`) and
+  `PUT /api/events/{id}` (edit — per-event via `EventService.can_edit_event`; authority-parity,
+  `R-SEC-3`/`R-ARCH-7`; **no blanket `require_admin` on the domain** — that stays a tool for the
+  admin domain, feature 017). Both are thin adapters over the existing sanitizing mutations
+  `ManagementService.create_event_action` / `update_event_details` — no new mutation logic
+  (`R-DATA-1`); dates are parsed server-side via `DateService` (`R-CODE-5`). The create tail
+  (`submit_request` + `notify_admins_for_approval`) preserves bot parity, so a TMA-created event is
+  indistinguishable from a bot-created one.
+- **Mini App frontend rewritten from the `web/frontend/app.js` monolith (346 lines) to native
+  ES modules** with no framework or bundler (Footprint 0, `R-PROC-7`): `render.js`
+  (escape-by-default — data reaches the DOM only as text nodes), `api.js` (init-data header,
+  structural success), `router.js` (hash routing + back-stack, exact-match, `?ann_id=` entry
+  preserved), file-per-screen modules under `web/frontend/js/screens/`, and the create/edit
+  authoring form `event-form.js`. `app.js` deleted.
+- **Display serialization at the JSON boundary** (`web/serialization.py::display`): un-escapes
+  stored HTML-escaped display strings so the escape-by-default render layer shows correct glyphs
+  (the bot's HTML-escaped storage is untouched). The event-details DTO gains a server-computed,
+  non-authoritative `can_edit` flag driving the edit affordance (the `PUT` re-checks regardless).
+- **Design system v2 "Alpine night → dawn"**: tokens (dark theme by default, light via Telegram
+  `colorScheme`), status encoded by **shape** (leading dot / square marker, not colour alone — for
+  accessibility) and a date-range chip for multi-day hikes (`web/frontend/js/ui/components.js`).
+
+### Security (feature 015)
+- **Closed the stored-XSS surface** in the Mini App: the old monolith rendered user-authored event
+  and topic names via `innerHTML`; with `tg.initData` sharing the JS scope, an injected payload
+  meant session theft within the session TTL. The new render layer is escape-by-default — verified
+  on the Level-B stand that a `<img onerror>` title renders as literal text and never executes.
+
+### Testing (feature 015)
+- New Level-A E2E tests without Telegram (`tests/test_web/test_events_create.py`,
+  `test_events_edit.py`, `test_frontend_contract.py`): create positive/negative,
+  edit creator-non-admin/no-rights/404 (authority-parity), `?ann_id=` entry, escape-by-default
+  (raw markup returned literally), and the `can_edit` affordance flag. Full suite 429 → 440 green.
+  Frontend verified interactively on the Level-B browser stand.
+
 ## [1.15.2] - 2026-07-19
 
 ### Removed (dead code)

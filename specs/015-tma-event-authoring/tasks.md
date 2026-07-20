@@ -117,10 +117,10 @@ persona is refused at submit.
 **Independent Test**: On the stand, authoring and list screens use v2 tokens; a status is
 distinguishable by shape (not color alone); a multi-day event shows a date range.
 
-- [ ] T021 [US4] Add design-system v2 tokens (color, typography, radius, spacing custom properties) to `web/frontend/style.css`, sourced from the approved v2 mockup `_nogit_tma_mockup_v2.html` (cross-machine fallback: the published artifact)
-- [ ] T022 [US4] Implement status-by-shape markers and the date-range chip in `web/frontend/js/ui/components.js` (FR-018) and use them on list, card, and form screens
-- [ ] T023 [US4] Apply v2 tokens across the authoring and list/card screens; verify on the stand that tokens are consistent, statuses are distinguishable by shape, and multi-day events show a range
-- [ ] T024 [US4] Update `CHANGELOG.md` for feature 015 via the docs-update CMD-4 command (R-PROC-6)
+- [x] T021 [US4] Add design-system v2 tokens (color, typography, radius, spacing custom properties) to `web/frontend/style.css`, sourced from the approved v2 mockup `_nogit_tma_mockup_v2.html` (cross-machine fallback: the published artifact)
+- [x] T022 [US4] Implement status-by-shape markers and the date-range chip in `web/frontend/js/ui/components.js` (FR-018) and use them on list, card, and form screens
+- [x] T023 [US4] Apply v2 tokens across the authoring and list/card screens; verify on the stand that tokens are consistent, statuses are distinguishable by shape, and multi-day events show a range
+- [x] T024 [US4] Update `CHANGELOG.md` for feature 015 via the docs-update CMD-4 command (R-PROC-6)
 - [ ] T024a **HARD STOP**: Report progress to the user (Шэф) in Russian — design system applied and changelog updated — and AWAIT EXPLICIT APPROVAL before the polish phase. (R-PROC-2)
 
 ---

@@ -12,6 +12,12 @@ const tg = window.Telegram && window.Telegram.WebApp;
 if (tg) {
     tg.ready();
     tg.expand();
+    // Тема Telegram управляет палитрой v2 (иначе — дефолт «Альпийская ночь»).
+    const applyTheme = () => {
+        if (tg.colorScheme) document.documentElement.setAttribute("data-theme", tg.colorScheme);
+    };
+    applyTheme();
+    if (tg.onEvent) tg.onEvent("themeChanged", applyTheme);
 }
 
 // Все экраны регистрируют свои маршруты до старта роутера.

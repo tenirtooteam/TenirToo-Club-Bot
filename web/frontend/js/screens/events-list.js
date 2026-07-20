@@ -3,6 +3,7 @@
 import { h, mount } from "../render.js";
 import { api } from "../api.js";
 import * as router from "../router.js";
+import { dateChip } from "../ui/components.js";
 import { root, showLoading, showError } from "./shell.js";
 
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -15,9 +16,10 @@ function eventRow(e) {
             router.navigate(`#/event/${e.id}`);
         },
     },
+        dateChip(e.date, e.end_date),
         h("div", { class: "list-item-content" },
             h("h4", {}, e.title),
-            h("p", {}, `${e.date} • ${e.participants_count} участников`)
+            h("p", {}, `${e.participants_count} участников`)
         ),
         h("div", { class: "list-item-arrow" }, e.is_participant ? "✅" : "→")
     );

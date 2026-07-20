@@ -7,6 +7,7 @@
 import { h, mount } from "../render.js";
 import { api } from "../api.js";
 import * as router from "../router.js";
+import { statusBadge } from "../ui/components.js";
 import { root, showLoading, showError } from "./shell.js";
 
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -54,8 +55,7 @@ function buildCard(mode, id, data, toggleUrl) {
 
     return h("div", { class: "view" },
         h("header", {},
-            h("div", { class: "event-badge", id: "event-status" },
-                data.status === "approved" ? "Активно" : "На модерации"),
+            statusBadge(data.status),
             h("h1", { id: "event-title" }, data.title),
             h("p", { class: "date-range", id: "event-dates" },
                 `${data.start_date} — ${data.end_date || "?"}`),

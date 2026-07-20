@@ -58,6 +58,7 @@ async def get_all_events(user_id: int = Depends(get_current_user_id)):
                 "id": e['event_id'],
                 "title": display(e['title']),
                 "date": display(e['start_date']),
+                "end_date": display(details['end_date']),  # для date-range чипа (US4/FR-018)
                 "participants_count": len(details['participants']),
                 "is_participant": user_id in details['participants']
             })
