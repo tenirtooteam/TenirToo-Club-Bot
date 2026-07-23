@@ -29,6 +29,7 @@ export async function render() {
             menuItem("📍", "Мои топики", data.stats.topics_available, "#/topics"),
             menuItem("🏔", "Походы", data.stats.events_active, "#/events"),
             menuItem("👤", "Мой профиль", null, "#/profile"),
+            menuItem("⚖️", "Модерация", null, "#/moderation"),
             data.is_admin ? menuItem("📍", "Все топики", null, "#/admin/topics") : null,
             data.is_admin ? menuItem("📂", "Шаблоны", null, "#/admin/groups") : null,
             menuItem("🛡️", "Роли", null, "#/roles")

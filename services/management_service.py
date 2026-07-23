@@ -683,6 +683,60 @@ class ManagementService:
         return db.get_user_pending_request(user_id, entity_type, entity_id)
 
     @staticmethod
+    def get_moderation_queue(user_id: int) -> list[dict]:
+        """[Feature 016 / D5] Скоупленная под зрителя очередь pending-заявок модерации.
+
+        Авторитет по типу (D1/FR-007): черновики (event_approval) — только глобальному
+        админу; заявки на участие (event_participation) — только организаторам своего похода
+        (создатель/лид, БЕЗ админ-оверрайда). Обогащение (название похода, имя заявителя) с
+        группировкой чтений походов по уникальному event_id (без N+1). Порядок — старейшие
+        первыми (наследуется из db.get_pending_requests). Возврат — список dict'ов под JSON.
+        """
+        relevant = [
+            r for r in db.get_pending_requests()
+            if r["entity_type"] in ("event_approval", "event_participation")
+        ]
+        if not relevant:
+            return []
+
+        is_admin = db.is_global_admin(user_id)
+
+        # Уникальный event_id → детали похода (одно чтение на поход, без N+1)
+        event_cache = {}
+        for r in relevant:
+            if r["entity_id"] not in event_cache:
+                event_cache[r["entity_id"]] = db.get_event_details(r["entity_id"])
+
+        name_cache: dict[int, str] = {}
+        queue: list[dict] = []
+        for r in relevant:
+            event = event_cache.get(r["entity_id"])
+
+            if r["entity_type"] == "event_approval":
+                if not is_admin:
+                    continue
+            else:  # event_participation — только организаторы этого похода (D1)
+                if event is None:
+                    continue
+                if not (event["creator_id"] == user_id or user_id in event["leads"]):
+                    continue
+
+            if r["user_id"] not in name_cache:
+                name_cache[r["user_id"]] = db.get_user_name(r["user_id"]) or f"ID:{r['user_id']}"
+
+            queue.append({
+                "request_id": r["id"],
+                "type": r["entity_type"],
+                "event_id": r["entity_id"],
+                "event_title": event["title"] if event else f"Поход {r['entity_id']}",
+                "requester_id": r["user_id"],
+                "requester_name": name_cache[r["user_id"]],
+                "created_at": r["created_at"],
+            })
+
+        return queue
+
+    @staticmethod
     async def resolve_request(bot: Bot, request_id: int, status: str, comment: str = None) -> tuple[bool, str]:
         """
         Разрешает заявку (одобрено/отклонено), выполняет действие в БД и уведомляет пользователя.
@@ -713,6 +767,12 @@ class ManagementService:
             elif request["entity_type"] == "event_participation":
                 db.add_event_participant(request["entity_id"], request["user_id"])
                 ManagementService._trigger_sheets_sync("event_participants", request["entity_id"])
+                # [node-3 / FR-004] Одобрение меняет состав → публичные анонсы обязаны стать
+                # правдивыми (счётчик/capacity-метр). Это МОДЕРИРУЕМОЕ одобрение, а не прямой
+                # вход: notify_organizers_of_direct_join здесь НЕ шлём (его текст был бы ложью).
+                # Ленивый импорт — announcement_service импортирует ManagementService (R-ARCH-4).
+                from services.announcement_service import AnnouncementService
+                await AnnouncementService.refresh_announcements(bot, "event", request["entity_id"])
 
         elif status == "rejected":
             if request["entity_type"] == "event_approval":

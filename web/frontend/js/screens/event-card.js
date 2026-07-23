@@ -53,13 +53,23 @@ function buildCard(mode, id, data, toggleUrl) {
         }, "✏️ Редактировать")
         : null;
 
+    // Управление составом (feature 016 US3) — организаторам похода (создатель/лид). Гейт —
+    // серверный is_organizer; в анонсе (mode="ann") поля нет -> кнопка не появляется.
+    const manageBtn = data.is_organizer
+        ? h("button", {
+            class: "edit-btn",
+            onClick: () => router.navigate(`#/moderation/event/${id}/participants`),
+        }, "👥 Участники")
+        : null;
+
     return h("div", { class: "view" },
         h("header", {},
             statusBadge(data.status),
             h("h1", { id: "event-title" }, data.title),
             h("p", { class: "date-range", id: "event-dates" },
                 `${data.start_date} — ${data.end_date || "?"}`),
-            editBtn
+            editBtn,
+            manageBtn
         ),
         h("main", {},
             h("div", { class: "stats-row" },

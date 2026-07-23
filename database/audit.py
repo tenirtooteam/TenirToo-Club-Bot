@@ -77,6 +77,30 @@ def get_pending_requests_by_type(entity_type: str, entity_id: int) -> List[int]:
         logger.error(f"❌ Ошибка получения pending заявок: {e}")
         return []
 
+def get_pending_requests() -> List[AuditRequestDTO]:
+    """[Feature 016 / FR-012] Все pending-заявки поверх типов сущностей, старейшие первыми.
+
+    Тупой кросс-сущностный read: без авторизации и без фильтра по типу — скоупинг под
+    зрителя и обогащение выполняет сервисный слой (get_moderation_queue).
+    """
+    try:
+        with get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, user_id, entity_type, entity_id, status, comment, created_at "
+                "FROM audit_requests WHERE status = 'pending' ORDER BY created_at ASC"
+            )
+            return [
+                AuditRequestDTO(
+                    id=row[0], user_id=row[1], entity_type=row[2], entity_id=row[3],
+                    status=row[4], comment=row[5], created_at=row[6],
+                )
+                for row in cursor.fetchall()
+            ]
+    except sqlite3.Error as e:
+        logger.error(f"❌ Ошибка получения всех pending заявок: {e}")
+        return []
+
 def get_user_pending_request(user_id: int, entity_type: str, entity_id: int) -> Optional[int]:
     """Проверяет, есть ли у пользователя уже активная заявка на эту сущность."""
     try:

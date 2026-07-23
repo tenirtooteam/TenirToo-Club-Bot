@@ -121,6 +121,19 @@ class EventService:
         return event["creator_id"] == user_id
 
     @staticmethod
+    def is_organizer_of_event(user_id: int, event_id: int) -> bool:
+        """[Feature 016 / D2] Организатор похода = создатель ИЛИ назначенный лид.
+
+        Отличается от can_edit_event (создатель + глобальный админ, БЕЗ лидов): право
+        модерации участия по Option C — только организаторы, без админ-оверрайда.
+        Read-only.
+        """
+        event = db.get_event_details(event_id)
+        if not event:
+            return False
+        return event["creator_id"] == user_id or user_id in event["leads"]
+
+    @staticmethod
     def get_active_events(today: Optional[str] = None) -> List[EventDTO]:
         """Возвращает список активных мероприятий (сорт. по ISO, без прошедших)."""
         return db.get_active_events(today=today)

@@ -2,6 +2,43 @@
 
 All notable changes to the Tenir-Too Club Bot project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.17.0] - 2026-07-22
+
+### Added (feature 016 — TMA event moderation + audit-request queue, Phase 5)
+- **Moderation domain in the web bridge** (`web/routers/moderation.py`, prefix `/api/moderation`):
+  `GET /queue` (viewer-scoped pending-request queue), `POST /requests/{id}/resolve`,
+  `GET /events/{id}/participants`, `DELETE /events/{id}/participants/{uid}`. Thin adapters over
+  existing services — resolution reuses `ManagementService.resolve_request` (feature-007 atomic CAS
+  → exactly-once), participant removal reuses `EventService.apply_participation_change` (feature 014,
+  remove-only). **Authority-parity per request type, no blanket `require_admin`** (`R-SEC-3`/`R-ARCH-7`):
+  draft approvals (`event_approval`) are resolved by global admins only; participation requests
+  (`event_participation`) and roster management by the event's organizers only (creator + leads).
+- **Consolidated audit-request queue** — closing the long-dangling "review in the Audit section"
+  promise: `event_participation` requests had no in-UI resolution path at all before. New data
+  primitive `db.get_pending_requests()` (all pending, oldest-first) + `ManagementService.get_moderation_queue`
+  (viewer-scoped, enriched, event lookups grouped to avoid N+1) + read-only predicate
+  `EventService.is_organizer_of_event` (creator or lead; distinct from `can_edit_event`).
+- **Mini App moderation screens** (additive to the feature-015 module architecture, no framework/build):
+  `js/screens/moderation-queue.js` (request card with Approve/Reject, status-by-shape) and
+  `js/screens/participants.js` (roster + participant removal behind an explicit confirm, `R-DATA-4`);
+  `api.del`, router/nav entries, a "Moderation" dashboard tile, and a server-gated "Participants"
+  button on the event card (`is_organizer` added to the event-details DTO — non-authoritative affordance).
+
+### Fixed (feature 016)
+- **Announcement staleness on moderated participation approval** (node-3): approving an
+  `event_participation` request added the participant but never refreshed the event's public
+  announcements, so the publicly shown roster/capacity silently drifted. `ManagementService.resolve_request`
+  now refreshes announcements on participation approval (via the shared `AnnouncementService`,
+  lazy-imported — `R-ARCH-4`) while **not** sending the direct-join organizer notice (whose text is a
+  lie for a moderated approval). One fix, both channels (bot + web). `R-CODE-6`.
+
+### Testing (feature 016)
+- New tests: `tests/test_services/test_participation_approve_refresh.py` (node-3 repro, written red
+  first), `test_moderation_queue_service.py` (viewer-scoping / ordering), and Level-A web-bridge suites
+  `tests/test_web/test_moderation_queue.py`, `test_moderation_resolve.py` (authority-parity both
+  directions, exactly-once, reject semantics), `test_moderation_participants.py` (roster + removal).
+  Suite 440 → 466.
+
 ## [1.16.0] - 2026-07-20
 
 ### Added (feature 015 — TMA event authoring + frontend modularization, Phase 5)

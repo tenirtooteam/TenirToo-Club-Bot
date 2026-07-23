@@ -80,7 +80,10 @@ async def get_event_view(event_id: int, user_id: int = Depends(get_current_user_
         "is_participant": user_id in details["participants"],
         "status": "approved" if details["is_approved"] else "pending",
         # can_edit: серверно-вычисляемый affordance-флаг (D7/U1) — НЕ авторитет, PUT перепроверяет.
-        "can_edit": EventService.can_edit_event(user_id, event_id)
+        "can_edit": EventService.can_edit_event(user_id, event_id),
+        # is_organizer: affordance для экрана состава (feature 016 US3) — организатор (создатель/лид);
+        # НЕ авторитет, роутер модерации перепроверяет. Отличается от can_edit (создатель+админ).
+        "is_organizer": EventService.is_organizer_of_event(user_id, event_id)
     }
 
 @router.post("/events/{event_id}/toggle")

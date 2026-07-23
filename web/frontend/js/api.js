@@ -43,4 +43,5 @@ export const api = {
     get: (url) => apiFetch(url),
     post: (url, body) => apiFetch(url, { method: "POST", body }),
     put: (url, body) => apiFetch(url, { method: "PUT", body }),
+    del: (url) => apiFetch(url, { method: "DELETE" }),
 };

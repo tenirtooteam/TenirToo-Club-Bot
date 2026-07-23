@@ -10,6 +10,8 @@ import * as topics from "./topics.js";
 import * as profile from "./profile.js";
 import * as admin from "./admin.js";
 import * as rolesFaq from "./roles-faq.js";
+import * as moderationQueue from "./moderation-queue.js";
+import * as participants from "./participants.js";
 
 export function registerScreens(router) {
     router.register("#/dashboard", () => dashboard.render());
@@ -24,5 +26,7 @@ export function registerScreens(router) {
     router.register("#/admin/topics", () => admin.renderTopics());
     router.register("#/admin/groups", () => admin.renderGroups());
     router.register("#/roles", () => rolesFaq.render());
+    router.register("#/moderation", () => moderationQueue.render());
+    router.register("#/moderation/event/:id/participants", (p) => participants.render(p.id));
     router.setNotFound(() => dashboard.render());
 }

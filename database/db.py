@@ -35,7 +35,8 @@ from .events import (
 )
 from .audit import (
     create_audit_request, get_audit_request, resolve_audit_request,
-    get_pending_requests_by_type, get_user_pending_request, delete_audit_request
+    get_pending_requests_by_type, get_pending_requests, get_user_pending_request,
+    delete_audit_request
 )
 from .dtos import EventDTO, AuditRequestDTO
 from .announcements import (
